@@ -3,8 +3,6 @@ from datetime import date, datetime, time
 from math import ceil
 from pathlib import Path
 
-import pandas as pd
-
 import loader
 
 
@@ -163,14 +161,15 @@ def save_snapshot(user_id: int, sha256: str, filename: str, file_bytes: bytes, l
         return upload_id
 
 
-def list_uploads(user_id: int) -> pd.DataFrame:
+def list_uploads(user_id: int) -> list[dict]:
     with connect(user_id) as conn:
-        rows = conn.execute(
-            """select id, sha256, filename, uploaded_at
-               from public.uploads where user_id = %s order by uploaded_at desc, id desc""",
-            (user_id,),
-        ).fetchall()
-    return pd.DataFrame(rows, columns=["id", "sha256", "filename", "uploaded_at"])
+        return list(
+            conn.execute(
+                """select id, sha256, filename, uploaded_at
+                   from public.uploads where user_id = %s order by uploaded_at desc, id desc""",
+                (user_id,),
+            ).fetchall()
+        )
 
 
 def load_workbook(user_id: int, upload_id: int) -> loader.WorkbookData:
@@ -224,19 +223,20 @@ def load_workbook(user_id: int, upload_id: int) -> loader.WorkbookData:
     return loader.WorkbookData(locais=locais)
 
 
-def history_locais(user_id: int) -> pd.DataFrame:
+def history_locais(user_id: int) -> list[dict]:
     with connect(user_id) as conn:
-        rows = conn.execute(
-            """select u.id as upload_id, u.filename, u.uploaded_at, l.nome as local,
-                      l.valor_mensal, l.saldo_mensal, l.investimento, l.equipamento,
-                      l.mao_de_obra, l.tempo_retorno, l.meses_retorno, l.margem, l.data_inst
-               from public.locais l
-               join public.uploads u on u.id = l.upload_id
-               where u.user_id = %s
-               order by u.uploaded_at, l.nome""",
-            (user_id,),
-        ).fetchall()
-    return pd.DataFrame(rows)
+        return list(
+            conn.execute(
+                """select u.id as upload_id, u.filename, u.uploaded_at, l.nome as local,
+                          l.valor_mensal, l.saldo_mensal, l.investimento, l.equipamento,
+                          l.mao_de_obra, l.tempo_retorno, l.meses_retorno, l.margem, l.data_inst
+                   from public.locais l
+                   join public.uploads u on u.id = l.upload_id
+                   where u.user_id = %s
+                   order by u.uploaded_at, l.nome""",
+                (user_id,),
+            ).fetchall()
+        )
 
 
 def delete_upload(user_id: int, upload_id: int) -> None:

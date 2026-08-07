@@ -3,8 +3,6 @@ import os
 import sqlite3
 from datetime import datetime
 
-import pandas as pd
-
 import auth
 import config
 import loader
@@ -276,33 +274,33 @@ def _meses_retorno(local) -> int | None:
     return math.ceil((local.investimento - local.taxa_instalacao) / local.saldo_mensal)
 
 
-def listar_uploads(user_id: int) -> pd.DataFrame:
+def listar_uploads(user_id: int) -> list[dict]:
     conn = _conexao()
     try:
         _inicializar(conn)
-        return pd.read_sql_query(
+        linhas = conn.execute(
             "SELECT id, sha256, filename, uploaded_at FROM uploads WHERE user_id = ? ORDER BY uploaded_at DESC, id DESC",
-            conn,
-            params=(user_id,),
-        )
+            (user_id,),
+        ).fetchall()
+        return [dict(linha) for linha in linhas]
     finally:
         conn.close()
 
 
-def carregar_historico_locais(user_id: int) -> pd.DataFrame:
+def carregar_historico_locais(user_id: int) -> list[dict]:
     conn = _conexao()
     try:
         _inicializar(conn)
-        return pd.read_sql_query(
+        linhas = conn.execute(
             """SELECT u.id AS upload_id, u.filename, u.uploaded_at, l.nome AS local,
                       l.valor_mensal, l.saldo_mensal, l.investimento, l.equipamento,
                       l.mao_de_obra, l.tempo_retorno, l.meses_retorno, l.margem, l.data_inst
                FROM locais l JOIN uploads u ON u.id = l.upload_id
                WHERE u.user_id = ?
                ORDER BY u.uploaded_at, l.nome""",
-            conn,
-            params=(user_id,),
-        )
+            (user_id,),
+        ).fetchall()
+        return [dict(linha) for linha in linhas]
     finally:
         conn.close()
 

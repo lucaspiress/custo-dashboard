@@ -32,11 +32,11 @@ def listar(usuario: dict = Depends(usuario_atual)) -> list[dict]:
     uploads = store.list_uploads(usuario["id"])
     return [
         {
-            "id": int(linha["id"]),
-            "filename": linha["filename"],
-            "uploaded_at": _uploaded_at(linha["uploaded_at"]),
+            "id": int(u["id"]),
+            "filename": u["filename"],
+            "uploaded_at": _uploaded_at(u["uploaded_at"]),
         }
-        for _, linha in uploads.iterrows()
+        for u in uploads
     ]
 
 
@@ -69,16 +69,18 @@ def _carregar(usuario: dict, upload_id: int) -> loader.WorkbookData:
 
 @router.get("/history")
 def historico(usuario: dict = Depends(usuario_atual)) -> dict:
-    df = store.history_locais(usuario["id"])
+    registros_raw = store.history_locais(usuario["id"])
     registros = []
-    for _, linha in df.iterrows():
+    numericas = ("valor_mensal", "saldo_mensal", "investimento", "equipamento", "mao_de_obra", "tempo_retorno", "margem")
+    for linha in registros_raw:
         registro = {}
-        for coluna in df.columns:
-            valor = linha[coluna]
-            if coluna in ("valor_mensal", "saldo_mensal", "investimento", "equipamento", "mao_de_obra", "tempo_retorno", "margem"):
-                registro[coluna] = None if valor is None or str(valor) in ("", "nan") else float(valor)
+        for coluna, valor in linha.items():
+            if coluna in numericas:
+                registro[coluna] = None if valor is None else float(valor)
             elif coluna == "upload_id":
                 registro[coluna] = int(valor)
+            elif coluna == "meses_retorno":
+                registro[coluna] = None if valor is None else int(valor)
             else:
                 registro[coluna] = str(valor) if valor is not None else None
         registros.append(registro)
@@ -91,29 +93,31 @@ def grafico_historico(
     metrica: str = Query("investimento"),
     usuario: dict = Depends(usuario_atual),
 ) -> dict:
-    import pandas as pd
+    from datetime import datetime
 
-    df = store.history_locais(usuario["id"])
-    if df.empty:
+    registros = store.history_locais(usuario["id"])
+    if not registros:
         raise HTTPException(status_code=404, detail="Nenhum histórico ainda.")
-    df = df[df["local"] == local]
-    if df.empty:
+    registros = [r for r in registros if r.get("local") == local]
+    if not registros:
         raise HTTPException(status_code=404, detail="Local não encontrado no histórico.")
-    df = df.copy()
-    df["uploaded_at"] = pd.to_datetime(df["uploaded_at"])
-    df = df.sort_values("uploaded_at")
-    e_meses = metrica == "tempo_retorno"
-    if e_meses:
-        df = df.dropna(subset=[metrica])
-    if metrica not in df.columns or df.empty:
+    if metrica not in ("investimento", "saldo_mensal", "tempo_retorno"):
         raise HTTPException(status_code=404, detail="Métrica não disponível.")
+    if metrica == "tempo_retorno":
+        registros = [r for r in registros if r.get(metrica) is not None]
+    for r in registros:
+        valor = r.get("uploaded_at")
+        if isinstance(valor, str):
+            r["uploaded_at"] = datetime.fromisoformat(valor)
+    if not registros:
+        raise HTTPException(status_code=404, detail="Sem dados para a métrica.")
     titulos = {
         "investimento": "Investimento por upload",
         "saldo_mensal": "Saldo mensal por upload",
         "tempo_retorno": "Tempo de retorno (meses) por upload",
     }
     return {
-        "fig": charts.grafico_historico(df, metrica, f"{titulos.get(metrica, metrica)} — {local}").to_json()
+        "fig": charts.grafico_historico(registros, metrica, f"{titulos.get(metrica, metrica)} — {local}").to_json()
     }
 
 
@@ -121,13 +125,9 @@ def grafico_historico(
 def analise(upload_id: int, usuario: dict = Depends(usuario_atual)) -> dict:
     workbook = _carregar(usuario, upload_id)
     uploads = store.list_uploads(usuario["id"])
-    filename = None
-    uploaded_at = None
-    for _, linha in uploads.iterrows():
-        if int(linha["id"]) == upload_id:
-            filename = linha["filename"]
-            uploaded_at = _uploaded_at(linha["uploaded_at"])
-            break
+    upload = next((u for u in uploads if int(u["id"]) == upload_id), None)
+    filename = upload["filename"] if upload else None
+    uploaded_at = _uploaded_at(upload["uploaded_at"]) if upload else None
     locais = []
     for local in workbook.locais:
         locais.append(

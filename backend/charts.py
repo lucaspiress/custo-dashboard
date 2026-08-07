@@ -263,17 +263,19 @@ def grafico_categorias(local: loader.Local) -> go.Figure:
     )
 
 
-def grafico_historico(df, metrica: str, titulo: str) -> go.Figure:
+def grafico_historico(registros: list[dict], metrica: str, titulo: str) -> go.Figure:
     fig = go.Figure()
     cores = theme.PALETA_GRAFICOS
     e_meses = "retorno" in metrica
-    for indice, nome_local in enumerate(sorted(df["local"].unique())):
-        dados = df[df["local"] == nome_local]
-        y = dados[metrica]
+    locais = sorted({r["local"] for r in registros})
+    for indice, nome_local in enumerate(locais):
+        dados = [r for r in registros if r["local"] == nome_local]
+        dados.sort(key=lambda r: r["uploaded_at"])
+        y = [r[metrica] for r in dados]
         custom = [[_fmt_br(v, 1) if not e_meses else f"{v:.1f} meses"] for v in y]
         fig.add_trace(
             go.Scatter(
-                x=dados["uploaded_at"],
+                x=[r["uploaded_at"] for r in dados],
                 y=y,
                 mode="lines+markers",
                 name=nome_local,
@@ -282,8 +284,7 @@ def grafico_historico(df, metrica: str, titulo: str) -> go.Figure:
                 fillcolor="rgba(30, 64, 175, 0.04)",
                 marker=dict(size=8, color=cores[indice % len(cores)], line=dict(color="#ffffff", width=1.5)),
                 customdata=custom,
-                hovertemplate="%{x|%d/%m/%Y %H:%M}<br>"
-                + ("<b>%{customdata[0]}</b><extra></extra>" if e_meses else "<b>%{customdata[0]}</b><extra></extra>"),
+                hovertemplate="%{x|%d/%m/%Y %H:%M}<br><b>%{customdata[0]}</b><extra></extra>",
             )
         )
     fig.update_layout(
@@ -294,7 +295,7 @@ def grafico_historico(df, metrica: str, titulo: str) -> go.Figure:
             y_titulo="Meses" if e_meses else "R$",
         )
     )
-    fig.update_xaxes(tickformat="%d/%m/%Y")
+    fig.update_xaxes(tickformat="%d/%m/%Y", type="date")
     if not e_meses:
         fig.update_yaxes(tickprefix="R$ ", separatethousands=True)
     return fig

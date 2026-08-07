@@ -32,10 +32,10 @@ def relatorio(upload_id: int, usuario: dict = Depends(usuario_atual)) -> Respons
     uploads = store.list_uploads(usuario["id"])
     nome_snapshot = "planilha.xlsx"
     uploaded_at = None
-    for _, linha in uploads.iterrows():
-        if int(linha["id"]) == upload_id:
-            nome_snapshot = linha["filename"]
-            uploaded_at = linha["uploaded_at"]
+    for u in uploads:
+        if int(u["id"]) == upload_id:
+            nome_snapshot = u["filename"]
+            uploaded_at = u["uploaded_at"]
             break
     pdf_bytes = report.gerar_pdf(nome_snapshot, workbook.locais, str(uploaded_at) if uploaded_at else None)
     return Response(
@@ -52,9 +52,9 @@ def exportar(upload_id: int, usuario: dict = Depends(usuario_atual)) -> Response
     workbook = _carregar(usuario, upload_id)
     uploads = store.list_uploads(usuario["id"])
     nome_snapshot = "planilha.xlsx"
-    for _, linha in uploads.iterrows():
-        if int(linha["id"]) == upload_id:
-            nome_snapshot = linha["filename"]
+    for u in uploads:
+        if int(u["id"]) == upload_id:
+            nome_snapshot = u["filename"]
             break
     buffer = export.exportar_excel(workbook.locais)
     return Response(
