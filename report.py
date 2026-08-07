@@ -17,6 +17,13 @@ import loader
 
 
 PAGE_W, PAGE_H = A4
+CONTENT_LEFT = 56.0
+CONTENT_RIGHT = PAGE_W - 56.0
+CONTENT_WIDTH = CONTENT_RIGHT - CONTENT_LEFT
+CONTENT_TOP = 58.0
+CONTENT_BOTTOM = PAGE_H - 52.0
+CARD_GAP = 1.0
+CARD_WIDTH = (CONTENT_WIDTH - (CARD_GAP * 2)) / 3
 LOGO_PATH = Path(__file__).parent / "assets" / "rota_group_logo.png"
 
 NAVY = colors.HexColor("#172033")
@@ -84,8 +91,26 @@ def _wrap(text: str, font: str, size: float, width: float) -> list[str]:
     return lines
 
 
+def _fit_text(text: str, font: str, size: float, max_width: float) -> tuple[str, float]:
+    text = str(text)
+    if stringWidth(text, font, size) <= max_width:
+        return text, size
+    fitted_size = size
+    while fitted_size > 6 and stringWidth(text, font, fitted_size) > max_width:
+        fitted_size -= 0.25
+    if stringWidth(text, font, fitted_size) <= max_width:
+        return text, fitted_size
+    suffix = "..."
+    clipped = text
+    while clipped and stringWidth(clipped + suffix, font, fitted_size) > max_width:
+        clipped = clipped[:-1]
+    return clipped.rstrip() + suffix, fitted_size
+
+
 def _text(c: canvas.Canvas, text: str, x: float, top: float, size: float = 8, font: str = FONT_REGULAR,
-          color= NAVY, align: str = "left") -> None:
+          color=NAVY, align: str = "left", max_width: float | None = None) -> None:
+    if max_width is not None:
+        text, size = _fit_text(text, font, size, max_width)
     c.setFont(font, size)
     c.setFillColor(color)
     y = PAGE_H - top - size
@@ -111,6 +136,8 @@ def _wrapped(c: canvas.Canvas, text: str, x: float, top: float, width: float, si
 
 def _rect(c: canvas.Canvas, x: float, top: float, width: float, height: float,
           fill=WHITE, stroke=GRID, line_width: float = 0.6) -> None:
+    if x < CONTENT_LEFT - 0.5 or x + width > CONTENT_RIGHT + 0.5:
+        raise ValueError(f"Bloco fora da área de conteúdo: x={x}, width={width}")
     c.setFillColor(fill)
     c.setStrokeColor(stroke)
     c.setLineWidth(line_width)
@@ -144,16 +171,16 @@ def _card(c: canvas.Canvas, x: float, top: float, width: float, height: float, l
     _rect(c, x, top, width, height, WHITE, GRID)
     c.setFillColor(accent)
     c.rect(x, PAGE_H - top - 3, width, 3, stroke=0, fill=1)
-    _text(c, label.upper(), x + 10, top + 9, label_size, FONT_BOLD, MUTED)
-    _text(c, value, x + 10, top + 34, value_size, FONT_BOLD, NAVY)
+    _text(c, label.upper(), x + 10, top + 9, label_size, FONT_BOLD, MUTED, max_width=width - 20)
+    _text(c, value, x + 10, top + 34, value_size, FONT_BOLD, NAVY, max_width=width - 20)
     if sub:
         _wrapped(c, sub, x + 10, top + height - 16, width - 20, 7.2, 9, FONT_REGULAR, MUTED, 2)
 
 
 def _section_title(c: canvas.Canvas, title: str, subtitle: str | None = None, top: float = 62) -> None:
-    _text(c, title, 44, top, 17, FONT_BOLD, NAVY_BLUE)
+    _text(c, title, CONTENT_LEFT, top, 17, FONT_BOLD, NAVY_BLUE, max_width=CONTENT_WIDTH)
     if subtitle:
-        _text(c, subtitle, 44, top + 27, 9.5, FONT_REGULAR, MUTED)
+        _text(c, subtitle, CONTENT_LEFT, top + 27, 9.5, FONT_REGULAR, MUTED, max_width=CONTENT_WIDTH)
 
 
 def _draw_horizontal_bars(c: canvas.Canvas, x: float, top: float, width: float,
@@ -220,10 +247,10 @@ def _draw_return_chart(c: canvas.Canvas, local: loader.Local, top: float = 112) 
     x = 68
     width = 480
     height = 265
-    plot_x = x + 38
+    plot_x = x + 42
     plot_top = top + 10
     plot_bottom = top + height - 30
-    plot_w = width - 48
+    plot_w = width - 54
     plot_h = plot_bottom - plot_top
     net_investment = max(0, local.investimento - local.taxa_instalacao)
     saldo = local.saldo_mensal
@@ -289,15 +316,15 @@ def _draw_return_chart(c: canvas.Canvas, local: loader.Local, top: float = 112) 
     c.saveState()
     c.setFont(FONT_REGULAR, 8.5)
     c.setFillColor(NAVY)
-    c.translate(x - 23, PAGE_H - (top + height / 2))
+    c.translate(x - 5, PAGE_H - (top + height / 2))
     c.rotate(90)
     c.drawString(0, 0, "Saldo acumulado (R$)")
     c.restoreState()
 
 
 def _draw_projection_chart(c: canvas.Canvas, local: loader.Local, top: float = 285) -> None:
-    x = 52
-    width = 480
+    x = CONTENT_LEFT
+    width = CONTENT_WIDTH
     height = 212
     plot_x = x + 22
     plot_top = top + 8
@@ -416,8 +443,8 @@ def _page_one(c: canvas.Canvas, local: loader.Local, context: dict, page: int, t
     _text(c, "Resumo executivo", 230, 73, 30, FONT_BOLD, NAVY, "center")
     _wrapped(c, local.nome, 416, 77, 125, 8, 10, FONT_REGULAR, MUTED, 2)
 
-    card_x = [44.3, 205.3, 366.3]
-    card_w = 160.2
+    card_x = [CONTENT_LEFT + index * (CARD_WIDTH + CARD_GAP) for index in range(3)]
+    card_w = CARD_WIDTH
     _card(c, card_x[0], 114, card_w, 82, "Investimento total", _money(local.investimento), "Implantação e equipamentos", CYAN)
     _card(c, card_x[1], 114, card_w, 82, "Valor mensal", _money(local.valor_mensal), "Receita recorrente", CYAN)
     _card(c, card_x[2], 114, card_w, 82, "Saldo mensal", _money(local.saldo_mensal), "Após impostos e custos", GREEN)
@@ -439,9 +466,9 @@ def _page_one(c: canvas.Canvas, local: loader.Local, context: dict, page: int, t
     result_10 = local.saldo_mensal * 120 - max(0, local.investimento - local.taxa_instalacao)
     roi_5 = result_5 / local.investimento if local.investimento else None
     roi_10 = result_10 / local.investimento if local.investimento else None
-    _card(c, 56, 509, 160.2, 84, "Resultado em 5 anos", _money(result_5), f"ROI de {_percent(roi_5)}", GREEN)
-    _card(c, 217, 509, 160.2, 84, "Resultado em 10 anos", _money(result_10), f"ROI de {_percent(roi_10)}", GREEN)
-    _card(c, 378, 509, 160.2, 93, "Análise", "ANÁLISE PRELIMINAR", "Prazo contratual e dados cadastrais pendentes.", AMBER, 11)
+    _card(c, CONTENT_LEFT, 509, CARD_WIDTH, 84, "Resultado em 5 anos", _money(result_5), f"ROI de {_percent(roi_5)}", GREEN)
+    _card(c, CONTENT_LEFT + CARD_WIDTH + CARD_GAP, 509, CARD_WIDTH, 84, "Resultado em 10 anos", _money(result_10), f"ROI de {_percent(roi_10)}", GREEN)
+    _card(c, CONTENT_LEFT + (CARD_WIDTH + CARD_GAP) * 2, 509, CARD_WIDTH, 93, "Análise", "ANÁLISE PRELIMINAR", "Prazo contratual e dados cadastrais pendentes.", AMBER, 11)
 
 
 def _page_two(c: canvas.Canvas, local: loader.Local, page: int, total: int, date_label: str) -> None:
@@ -466,14 +493,15 @@ def _page_two(c: canvas.Canvas, local: loader.Local, page: int, total: int, date
                      "", [("Equipamentos", _money(local.equipamento)), ("Mão de obra", _money(local.mao_de_obra)),
                            ("Outros investimentos", _money(max(0, local.investimento - local.equipamento - local.mao_de_obra))),
                            ("Investimento total", _money(local.investimento)), ("Investimento líquido", _money(max(0, local.investimento - local.taxa_instalacao)))])
-    _text(c, "EFICIÊNCIA OPERACIONAL", 44, 370, 11.5, FONT_BOLD, NAVY_BLUE)
-    card_x = [56.1, 176.9, 297.6, 418.4]
+    _text(c, "EFICIÊNCIA OPERACIONAL", CONTENT_LEFT, 370, 11.5, FONT_BOLD, NAVY_BLUE)
+    efficiency_width = CONTENT_WIDTH / 4
+    card_x = [CONTENT_LEFT + index * efficiency_width for index in range(4)]
     labels = [("Receita mensal", _money(local.valor_mensal), "Valor recorrente", CYAN),
               ("Impostos + custos", _money(local.impostos + local.custos_fixos), "Comprometimento mensal", AMBER),
               ("Saldo mensal", _money(local.saldo_mensal), "Resultado operacional", GREEN),
               ("Margem operacional", _percent(local.margem), "Saldo sobre receita", GREEN)]
     for x_card, (label, value, sub, accent) in zip(card_x, labels):
-        _card(c, x_card, 387, 160.2, 84, label, value, sub, accent)
+        _card(c, x_card, 387, efficiency_width, 84, label, value, sub, accent)
 
 
 def _page_three(c: canvas.Canvas, local: loader.Local, page: int, total: int, date_label: str) -> None:
@@ -483,13 +511,14 @@ def _page_three(c: canvas.Canvas, local: loader.Local, page: int, total: int, da
     net = max(0, local.investimento - local.taxa_instalacao)
     exact = local.tempo_retorno
     rounded = ceil(exact) if exact is not None else None
-    card_x = [56.1, 176.9, 297.6, 418.4]
+    efficiency_width = CONTENT_WIDTH / 4
+    card_x = [CONTENT_LEFT + index * efficiency_width for index in range(4)]
     labels = [("Investimento inicial líquido", _money(net), "Após taxa de instalação", CYAN),
               ("Saldo mensal", _money(local.saldo_mensal), "Geração operacional", GREEN),
               ("Payback exato", f"{_number(exact)} meses", "Cálculo sem arredondamento", GREEN),
               ("Payback arredondado", f"{rounded} meses" if rounded else "Não viável", "Mês de recuperação", GREEN)]
     for x_card, (label, value, sub, accent) in zip(card_x, labels):
-        _card(c, x_card, 416, 160.2, 84, label, value, sub, accent, 15 if "Payback" not in label else 14)
+        _card(c, x_card, 416, efficiency_width, 84, label, value, sub, accent, 15 if "Payback" not in label else 14)
 
 
 def _page_four(c: canvas.Canvas, local: loader.Local, page: int, total: int, date_label: str) -> None:
@@ -499,8 +528,8 @@ def _page_four(c: canvas.Canvas, local: loader.Local, page: int, total: int, dat
     result_10 = local.saldo_mensal * 120 - max(0, local.investimento - local.taxa_instalacao)
     roi_5 = result_5 / local.investimento if local.investimento else None
     roi_10 = result_10 / local.investimento if local.investimento else None
-    _card(c, 56, 101, 160.2, 84, "5 anos", _money(result_5), f"Receita {_money(local.valor_mensal * 60)} | ROI {_percent(roi_5)}", GREEN)
-    _card(c, 297.6, 101, 160.2, 84, "10 anos", _money(result_10), f"Receita {_money(local.valor_mensal * 120)} | ROI {_percent(roi_10)}", GREEN)
+    _card(c, CONTENT_LEFT, 101, CARD_WIDTH, 84, "5 anos", _money(result_5), f"Receita {_money(local.valor_mensal * 60)} | ROI {_percent(roi_5)}", GREEN)
+    _card(c, CONTENT_LEFT + CARD_WIDTH + 80, 101, CARD_WIDTH, 84, "10 anos", _money(result_10), f"Receita {_money(local.valor_mensal * 120)} | ROI {_percent(roi_10)}", GREEN)
     _draw_table(c, 56, 191, [161, 161, 161], ["Comparativo", "5 anos", "10 anos"],
                 [["Receita", _money(local.valor_mensal * 60), _money(local.valor_mensal * 120)],
                  ["Resultado líquido", _money(result_5), _money(result_10)],
@@ -510,7 +539,7 @@ def _page_four(c: canvas.Canvas, local: loader.Local, page: int, total: int, dat
                 [["5 anos", "60", _money(local.valor_mensal * 60), _money(result_5), _percent(roi_5)],
                  ["10 anos", "120", _money(local.valor_mensal * 120), _money(result_10), _percent(roi_10)]], [19, 19])
     _text(c, "Projeções nominais considerando valores constantes, sem reajustes, inflação, juros ou custo de capital.",
-          44, 588, 8.5, FONT_REGULAR, MUTED)
+          CONTENT_LEFT, 588, 8.5, FONT_REGULAR, MUTED, max_width=CONTENT_WIDTH)
 
 
 def _page_five(c: canvas.Canvas, local: loader.Local, page: int, total: int, date_label: str) -> list[loader.Item]:
@@ -527,7 +556,7 @@ def _page_five(c: canvas.Canvas, local: loader.Local, page: int, total: int, dat
 
     cursor = 195
     first_name, first_items = categories[0]
-    _text(c, _category_label(first_name), 44, cursor, 13, FONT_BOLD, NAVY_BLUE)
+    _text(c, _category_label(first_name), CONTENT_LEFT, cursor, 13, FONT_BOLD, NAVY_BLUE)
     cursor += 20
     widths = [62, 226, 45, 84, 66]
     first_page_items = first_items[:11]
@@ -537,7 +566,7 @@ def _page_five(c: canvas.Canvas, local: loader.Local, page: int, total: int, dat
     remaining = first_items[11:]
     if len(categories) > 1 and not remaining:
         second_name, second_items = categories[1]
-        _text(c, _category_label(second_name), 44, cursor, 13, FONT_BOLD, NAVY_BLUE)
+        _text(c, _category_label(second_name), CONTENT_LEFT, cursor, 13, FONT_BOLD, NAVY_BLUE)
         cursor += 20
         second_page_items = second_items[:11]
         rows_second, heights_second = _item_rows(second_page_items)
@@ -565,7 +594,7 @@ def _page_six(c: canvas.Canvas, local: loader.Local, remaining: list[loader.Item
             subtotal_count = len(remaining)
             subtotal_value = sum(item.valor_total for item in remaining)
         cursor = _draw_subtotal(c, 56, cursor, widths, subtotal_count, subtotal_value) + 16
-    _text(c, f"Total geral dos equipamentos: {_money(local.equipamento)}", 44, cursor, 13, FONT_BOLD, NAVY_BLUE)
+    _text(c, f"Total geral dos equipamentos: {_money(local.equipamento)}", CONTENT_LEFT, cursor, 13, FONT_BOLD, NAVY_BLUE)
     cursor += 25
     _rect(c, 56, cursor, 483, 104, VERY_LIGHT, GRID)
     _text(c, "RASTREABILIDADE E PREMISSAS", 68, cursor + 14, 7.5, FONT_BOLD, MUTED)
