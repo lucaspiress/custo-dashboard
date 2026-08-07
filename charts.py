@@ -62,7 +62,7 @@ def grafico_payback(local: loader.Local) -> go.Figure:
         line_color=theme.COR["alerta"],
         line_width=1.5,
         annotation_text=f"Investimento: {_fmt_br(alvo)}",
-        annotation_position="top right",
+        annotation_position="top left",
         annotation_font=dict(color=theme.COR["alerta"], size=11.5),
     )
     fig.add_vline(
@@ -86,8 +86,9 @@ def grafico_payback(local: loader.Local) -> go.Figure:
         )
     )
     fig.update_layout(
-        **_layout(f"Curva de payback — {local.nome}", 440, x_titulo="Meses", y_titulo="Saldo acumulado (R$)")
+        **_layout(f"Curva de payback - {local.nome}", 440, x_titulo="Meses", y_titulo="Saldo acumulado (R$)")
     )
+    fig.update_layout(showlegend=False)
     fig.update_yaxes(tickprefix="R$ ", separatethousands=True)
     return fig
 
@@ -103,11 +104,15 @@ def grafico_pareto(local: loader.Local, n: int = 15) -> go.Figure:
         cat: theme.PALETA_GRAFICOS[i % len(theme.PALETA_GRAFICOS)]
         for i, cat in enumerate(categorias_ord)
     }
-    nomes = [d["material"][:45] for d in dados]
+    nomes = [d["material"][:58] for d in dados]
     valores = [d["valor"] for d in dados]
     pct_acum = [d["pct_acumulado"] for d in dados]
+    nomes_rev = nomes[::-1]
+    valores_rev = valores[::-1]
+    itens_rev = itens_top[::-1]
+    pct_rev = pct_acum[::-1]
     custom_barras = [
-        [itens_top[i].categoria, _fmt_br(valores[i]), f"{pct_acum[i]:.1f}%"]
+        [itens_rev[i].categoria, _fmt_br(valores_rev[i]), f"{pct_rev[i]:.1f}%"]
         for i in range(len(dados))
     ]
     for cat in categorias_ord:
@@ -116,58 +121,83 @@ def grafico_pareto(local: loader.Local, n: int = 15) -> go.Figure:
         )
     fig.add_trace(
         go.Bar(
-            x=nomes,
-            y=valores,
+            x=valores_rev,
+            y=nomes_rev,
+            orientation="h",
             name="Valor",
-            marker_color=[cor_por_categoria[i.categoria] for i in itens_top],
+            marker_color=[cor_por_categoria[i.categoria] for i in itens_rev],
             marker_line=dict(color="#ffffff", width=0.8),
             showlegend=False,
             customdata=custom_barras,
-            hovertemplate="<b>%{x}</b><br>Categoria: %{customdata[0]}<br>Valor: <b>%{customdata[1]}</b>"
+            hovertemplate="<b>%{y}</b><br>Categoria: %{customdata[0]}<br>Valor: <b>%{customdata[1]}</b>"
             "<br>% acumulado: %{customdata[2]}<extra></extra>",
         )
     )
     fig.add_trace(
         go.Scatter(
-            x=nomes,
-            y=pct_acum,
+            x=pct_rev,
+            y=nomes_rev,
+            xaxis="x2",
             name="% acumulado",
-            yaxis="y2",
             mode="lines+markers",
             line=dict(color=theme.COR["tinta"], width=2, dash="dot"),
             marker=dict(size=7, color=theme.COR["tinta"], line=dict(color="#ffffff", width=1)),
-            customdata=[[f"{v:.1f}%"] for v in pct_acum],
+            customdata=[[f"{v:.1f}%"] for v in pct_rev],
             hovertemplate="% acumulado: <b>%{customdata[0]}</b><extra></extra>",
         )
     )
-    fig.add_hline(
-        y=80,
-        line_dash="dash",
-        line_color="#94A3B8",
-        line_width=1,
-        yref="y2",
-        annotation_text="80% do custo",
-        annotation_position="top right",
-        annotation_font=dict(color="#94A3B8", size=10.5),
+    fig.add_shape(
+        type="line",
+        x0=80,
+        x1=80,
+        y0=-0.5,
+        y1=len(nomes_rev) - 0.5,
+        xref="x2",
+        yref="y",
+        line=dict(color="#94A3B8", width=1, dash="dash"),
+    )
+    fig.add_annotation(
+        x=80,
+        y=1.02,
+        xref="x2",
+        yref="paper",
+        text="80% do custo",
+        showarrow=False,
+        font=dict(color="#64748B", size=10.5),
+        xanchor="left",
     )
     fig.update_layout(
-        **_layout(f"Top {len(dados)} itens por valor — {local.nome}", 460, y_titulo="R$")
+        **_layout(f"Top {len(dados)} itens por valor - {local.nome}", 500, x_titulo="Valor do item (R$)")
     )
     fig.update_layout(
-        yaxis2=dict(
-            title="% acumulado",
-            overlaying="y",
-            side="right",
-            range=[0, 105],
+        xaxis=dict(
+            title="Valor do item (R$)",
             gridcolor=theme.COR["grid"],
+            zeroline=False,
+            tickfont=dict(size=11),
+            tickprefix="R$ ",
+            separatethousands=True,
+        ),
+        xaxis2=dict(
+            title="% acumulado",
+            overlaying="x",
+            side="top",
+            range=[0, 105],
+            gridcolor="rgba(0,0,0,0)",
             zeroline=False,
             tickfont=dict(size=11),
             ticksuffix="%",
         ),
-        xaxis=dict(tickangle=-45, tickfont=dict(size=10), title=None),
-        margin=dict(l=10, r=10, t=44, b=80),
+        yaxis=dict(
+            categoryorder="array",
+            categoryarray=nomes_rev,
+            gridcolor=theme.COR["grid"],
+            zeroline=False,
+            tickfont=dict(size=10),
+        ),
+        margin=dict(l=10, r=10, t=76, b=22),
+        showlegend=False,
     )
-    fig.update_yaxes(tickprefix="R$ ", separatethousands=True)
     return fig
 
 
@@ -179,7 +209,9 @@ def _grafico_donut(labels: list[str], valores: list[float], titulo: str, cores: 
             values=valores,
             hole=0.55,
             marker_colors=cores,
-            textinfo="label+value",
+            text=[_fmt_br(value) for value in valores],
+            textinfo="none",
+            texttemplate="%{label}<br>%{text}",
             textfont=dict(color=theme.COR["tinta"], size=11.5),
             textposition="outside",
             marker=dict(line=dict(color=theme.COR["superficie"], width=2)),

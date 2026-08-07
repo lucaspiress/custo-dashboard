@@ -1,4 +1,6 @@
-﻿import pandas as pd
+﻿import re
+
+import pandas as pd
 import streamlit as st
 
 import analysis
@@ -191,10 +193,11 @@ def main() -> None:
             break
 
     pdf_bytes = report.gerar_pdf(nome_snapshot, workbook.locais, uploaded_at)
+    nome_pdf = re.sub(r"[^A-Za-z0-9_-]+", "_", nome_snapshot.rsplit(".", 1)[0]).strip("_")
     st.sidebar.download_button(
         "Baixar relatório em PDF",
         data=pdf_bytes,
-        file_name="relatorio-custos.pdf",
+        file_name=f"Dashboard_Financeiro_{nome_pdf or 'Projeto'}.pdf",
         mime="application/pdf",
     )
 

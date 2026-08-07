@@ -29,9 +29,10 @@ python -m venv .venv
 - `analysis.py` — KPIs, composição, pareto, anomalias (z-score), curva de payback
 - `insights.py` — regras de insight em PT-BR (severidade: ok/atencao/alerta/dica)
 - `charts.py` — figuras plotly
-- `report.py` — relatório PDF (reportlab + matplotlib, fontes Segoe UI/Consolas)
+- `report.py` — relatório PDF vetorial (reportlab canvas, fontes Segoe UI/Helvetica)
 - `theme.py` — tokens de design (cores, severidade, paleta de gráficos, CSS do app)
 - `formatos.py` — formatação BR (moeda/número) compartilhada
+- `assets/rota_group_logo.png` — marca usada no relatório financeiro
 - `history.py` — snapshots por upload em SQLite (re-upload do mesmo arquivo substitui; `carregar_workbook` reconstrói análise completa)
 - `config.py` — schema do template (abas RELATORIO/GRÁFICOS, colunas A–O, taxa 15%)
 
@@ -47,3 +48,4 @@ python -m venv .venv
 
 - UI em PT-BR; moeda `R$ 18.733,68`; sem emojis; sem comentários no código.
 - Comandos aprovados: `python`, `pip`, `streamlit`, `git status/diff/log` etc.
+- O PDF segue o modelo financeiro de 6 páginas: resumo executivo, estrutura financeira, retorno, projeções e anexo técnico.
