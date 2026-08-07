@@ -1,10 +1,8 @@
 import sys
-import time
 
 from playwright.sync_api import sync_playwright
 
 URL = "http://localhost:8501"
-
 erros_console = []
 
 
@@ -16,41 +14,48 @@ def main() -> None:
         page.on("pageerror", lambda err: erros_console.append(f"PAGEERROR: {err}"))
 
         page.goto(URL)
-        page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(4000)
+        page.wait_for_selector(".kpi-card", timeout=30000)
+        page.wait_for_timeout(2500)
+        page.screenshot(path=r"C:\Users\assistentesolucoes\Desktop\custo-dashboard\preview_geral.png")
+        print("1. Visão Geral renderizada")
 
-        page.screenshot(path=r"C:\Users\assistentesolucoes\Desktop\custo-dashboard\preview_geral.png", full_page=False)
-        print("1. Screenshot Visão Geral salvo")
+        kpi_inicial = page.locator(".kpi-value").first.inner_text()
+        print("2. KPI inicial:", kpi_inicial)
 
-        conteudo = page.content()
-        checks = {
-            "cabeçalho com marca": "cabecalho-marca" in conteudo,
-            "kpi cards": "kpi-card" in conteudo,
-            "tabs": "Visão Geral" in conteudo and "Histórico" in conteudo,
-        }
-        for nome, ok in checks.items():
-            print(f"   {nome}: {'OK' if ok else 'FALHOU'}")
+        sel = page.locator("[data-testid='stSelectbox']").nth(0)
+        sel.click()
+        page.wait_for_timeout(800)
+        opcoes = page.locator("[role='option']")
+        print("3. Opcoes do seletor:", opcoes.count())
+        nomes = [op.inner_text() for op in opcoes.all()]
+        print("   ", nomes[:4])
+        alvo = None
+        for op in opcoes.all():
+            if "opencode base" in op.inner_text():
+                alvo = op
+                break
+        if alvo:
+            alvo.click()
+            page.wait_for_timeout(4000)
+            kpi_novo = page.locator(".kpi-value").first.inner_text()
+            print("4. Troca p/ opencode base -> KPI:", kpi_novo, "| mudou:", kpi_novo != kpi_inicial)
 
         abas = page.locator("[role='tab']")
-        print(f"2. Abas encontradas: {abas.count()}")
-        if abas.count() >= 4:
-            abas.nth(3).click()
-            page.wait_for_timeout(2500)
-            page.screenshot(path=r"C:\Users\assistentesolucoes\Desktop\custo-dashboard\preview_insights.png", full_page=False)
-            print("3. Screenshot Insights salvo")
-        if abas.count() >= 2:
-            abas.nth(1).click()
-            page.wait_for_timeout(2500)
-            page.screenshot(path=r"C:\Users\assistentesolucoes\Desktop\custo-dashboard\preview_custos.png", full_page=False)
-            print("4. Screenshot Custos salvo")
+        abas.nth(3).click()
+        page.wait_for_timeout(2000)
+        page.screenshot(path=r"C:\Users\assistentesolucoes\Desktop\custo-dashboard\preview_insights.png")
+        print("5. Insights renderizada")
 
-        erros = [e for e in erros_console]
-        print(f"5. Erros de console: {len(erros)}")
-        for e in erros:
-            print("   ", e[:200])
+        abas.nth(1).click()
+        page.wait_for_timeout(2000)
+        page.screenshot(path=r"C:\Users\assistentesolucoes\Desktop\custo-dashboard\preview_custos.png")
+        print("6. Custos renderizada")
 
+        print("7. Erros de console:", len(erros_console))
+        for e in erros_console:
+            print("   ", e[:160])
         browser.close()
-        if erros:
+        if erros_console:
             sys.exit(1)
 
 

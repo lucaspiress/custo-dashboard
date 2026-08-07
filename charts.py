@@ -70,13 +70,24 @@ def grafico_pareto(local: loader.Local, n: int = 15) -> go.Figure:
     fig = go.Figure()
     if not dados:
         return fig
+    itens_top = analysis.top_itens(local, n)
+    categorias_ord = sorted({i.categoria for i in itens_top})
+    cor_por_categoria = {
+        cat: theme.PALETA_GRAFICOS[i % len(theme.PALETA_GRAFICOS)]
+        for i, cat in enumerate(categorias_ord)
+    }
     nomes = [d["material"][:40] for d in dados]
+    for cat in categorias_ord:
+        fig.add_trace(
+            go.Bar(x=[], y=[], name=cat, marker_color=cor_por_categoria[cat], legendgroup=cat)
+        )
     fig.add_trace(
         go.Bar(
             x=nomes,
             y=[d["valor"] for d in dados],
             name="Valor",
-            marker_color=theme.COR["primaria"],
+            marker_color=[cor_por_categoria[i.categoria] for i in itens_top],
+            showlegend=False,
         )
     )
     fig.add_trace(
@@ -86,8 +97,8 @@ def grafico_pareto(local: loader.Local, n: int = 15) -> go.Figure:
             name="% acumulado",
             yaxis="y2",
             mode="lines+markers",
-            line=dict(color=theme.COR["destaque"], width=2),
-            marker=dict(size=6, color=theme.COR["destaque"]),
+            line=dict(color=theme.COR["tinta"], width=2, dash="dot"),
+            marker=dict(size=6, color=theme.COR["tinta"]),
         )
     )
     fig.update_layout(

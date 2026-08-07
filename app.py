@@ -39,12 +39,15 @@ def cabecalho() -> None:
     )
 
 
-def cartao_kpi(rotulo: str, valor: str, sub: str | None = None) -> None:
+def cartao_kpi(rotulo: str, valor: str, sub: str | None = None, cor: str = "#1E40AF", atraso: int = 0) -> None:
     sub_html = f'<div class="kpi-sub">{sub}</div>' if sub else ""
     st.markdown(
         f"""
-        <div class="kpi-card">
-            <div class="kpi-label">{rotulo}</div>
+        <div class="kpi-card" style="--kpi-cor:{cor};animation-delay:{atraso}ms">
+            <div class="kpi-topo">
+                <span class="kpi-ponto"></span>
+                <div class="kpi-label">{rotulo}</div>
+            </div>
             <div class="kpi-value">{valor}</div>
             {sub_html}
         </div>
@@ -54,7 +57,7 @@ def cartao_kpi(rotulo: str, valor: str, sub: str | None = None) -> None:
 
 
 def render_insights(local) -> None:
-    for insight in insights.gerar_insights(local):
+    for indice, insight in enumerate(insights.gerar_insights(local)):
         severidade = insight["severidade"]
         cor = theme.SEVERIDADE_COR[severidade]
         fundo = theme.SEVERIDADE_FUNDO[severidade]
@@ -62,7 +65,7 @@ def render_insights(local) -> None:
         rotulo = {"ok": "OK", "atencao": "Atenção", "alerta": "Alerta", "dica": "Dica"}[severidade]
         st.markdown(
             f"""
-            <div class="insight-card" style="--insight-cor:{cor};--insight-fundo:{fundo};--insight-borda:{borda}">
+            <div class="insight-card" style="--insight-cor:{cor};--insight-fundo:{fundo};--insight-borda:{borda};animation-delay:{indice * 60}ms">
                 <span class="insight-pill">{rotulo}</span>
                 <span class="insight-texto">{insight['texto']}</span>
             </div>
@@ -78,6 +81,7 @@ def carregar_snapshot_inicial() -> None:
     if not historico.empty:
         ultimo = int(historico.iloc[0]["upload_id"])
         st.session_state["dados"] = history.carregar_workbook(ultimo)
+        st.session_state["snapshot_ativo"] = ultimo
         st.session_state["fonte"] = (
             f"Último upload: {historico.iloc[0]['filename']} ({historico.iloc[0]['uploaded_at']})"
         )
@@ -104,6 +108,8 @@ def main() -> None:
                 st.session_state["dados"] = workbook
                 st.session_state["fonte"] = f"Upload: {arquivo.name}"
                 st.session_state["snapshot_ativo"] = upload_id
+                st.session_state.pop("ver_analise", None)
+                st.session_state.pop("local_atual", None)
                 st.success(f"Carregado: {arquivo.name}")
                 for aviso in workbook.avisos:
                     st.warning(aviso)
@@ -135,6 +141,7 @@ def main() -> None:
                 st.session_state["snapshot_ativo"] = id_escolhido
                 st.session_state["dados"] = history.carregar_workbook(id_escolhido)
                 st.session_state["fonte"] = escolha
+                st.session_state.pop("local_atual", None)
                 st.rerun()
 
     fonte = st.session_state.get("fonte")
@@ -147,7 +154,22 @@ def main() -> None:
 
     workbook = st.session_state.get("dados")
     if workbook is None:
-        st.info("Envie uma planilha no template padrão (abas RELATORIO + equipamento) para gerar o dashboard.")
+        st.markdown(
+            f"""
+            <div style="background:{theme.COR['superficie']};border:1px solid {theme.COR['borda']};
+                 border-radius:12px;padding:28px 24px;text-align:center;margin-top:8px;">
+                <div style="font-size:15px;font-weight:600;color:{theme.COR['tinta']};margin-bottom:6px;">
+                    Nenhuma análise carregada ainda
+                </div>
+                <div style="font-size:13px;color:{theme.COR['mutado']};line-height:1.6;">
+                    Envie uma planilha de custo no template padrão pela barra lateral.<br/>
+                    O arquivo precisa ter a aba <b>RELATORIO</b> (coluna LOCAL) e abas de equipamento
+                    (MATERIAL ALARME / MATERIAL CFTV) — exatamente como o template usado.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         if not uploads.empty:
             st.markdown('<div class="secao-titulo">Últimos arquivos carregados</div>', unsafe_allow_html=True)
             st.dataframe(uploads[["filename", "uploaded_at"]], hide_index=True)
@@ -161,12 +183,14 @@ def main() -> None:
     local = next(l for l in workbook.locais if l.nome == local_selecionado)
 
     uploaded_at = None
+    nome_snapshot = "planilha.xlsx"
     for _, linha in uploads.iterrows():
         if int(linha["id"]) == st.session_state.get("snapshot_ativo"):
             uploaded_at = linha["uploaded_at"]
+            nome_snapshot = linha["filename"]
             break
 
-    pdf_bytes = report.gerar_pdf(arquivo.name if arquivo is not None else "planilha.xlsx", workbook.locais, uploaded_at)
+    pdf_bytes = report.gerar_pdf(nome_snapshot, workbook.locais, uploaded_at)
     st.sidebar.download_button(
         "Baixar relatório em PDF",
         data=pdf_bytes,
@@ -182,23 +206,23 @@ def main() -> None:
         resumo = analysis.resumo(local)
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            cartao_kpi("Receita mensal", fmt_moeda(resumo["valor_mensal"]), "Mensalidade do contrato")
-            cartao_kpi("Receita anual", fmt_moeda(resumo["receita_anual"]), "12 meses + taxa de instalação")
+            cartao_kpi("Receita mensal", fmt_moeda(resumo["valor_mensal"]), "Mensalidade do contrato", theme.KPI_CORES["Receita mensal"], 0)
+            cartao_kpi("Receita anual", fmt_moeda(resumo["receita_anual"]), "12 meses + taxa de instalação", theme.KPI_CORES["Receita anual"], 60)
         with col2:
             saldo = fmt_moeda(resumo["saldo_mensal"])
             sub = None
             if resumo["margem"] is not None:
                 sub = f"Margem de {resumo['margem'] * 100:.1f}% sobre a receita"
-            cartao_kpi("Saldo mensal", saldo, sub)
-            cartao_kpi("Impostos (15%)", fmt_moeda(resumo["impostos"]), "Sobre a receita mensal")
+            cartao_kpi("Saldo mensal", saldo, sub, theme.KPI_CORES["Saldo mensal"], 120)
+            cartao_kpi("Impostos (15%)", fmt_moeda(resumo["impostos"]), "Sobre a receita mensal", theme.KPI_CORES["Impostos (15%)"], 180)
         with col3:
-            cartao_kpi("Investimento", fmt_moeda(resumo["investimento"]), "Mão de obra + equipamento")
-            cartao_kpi("Equipamento", fmt_moeda(resumo["equipamento"]), "Itens da proposta")
+            cartao_kpi("Investimento", fmt_moeda(resumo["investimento"]), "Mão de obra + equipamento", theme.KPI_CORES["Investimento"], 240)
+            cartao_kpi("Equipamento", fmt_moeda(resumo["equipamento"]), "Itens da proposta", theme.KPI_CORES["Equipamento"], 300)
         with col4:
             retorno = f"{fmt_numero(resumo['tempo_retorno'])} meses"
-            cartao_kpi("Tempo de retorno", retorno, "Payback do investimento")
+            cartao_kpi("Tempo de retorno", retorno, "Payback do investimento", theme.KPI_CORES["Tempo de retorno"], 360)
             data_inst = local.data_inst.strftime("%d/%m/%Y") if local.data_inst else "—"
-            cartao_kpi("Instalação", data_inst, "Data prevista / realizada")
+            cartao_kpi("Instalação", data_inst, "Data prevista / realizada", theme.KPI_CORES["Instalação"], 420)
 
         st.markdown('<div class="secao-titulo">Resumo do local</div>', unsafe_allow_html=True)
         linhas = []
@@ -259,19 +283,25 @@ def main() -> None:
             st.info("Nenhum histórico ainda — cada upload vira um snapshot comparável.")
         else:
             st.markdown('<div class="secao-titulo">Uploads</div>', unsafe_allow_html=True)
+            ativo = st.session_state.get("snapshot_ativo")
             for _, linha in uploads.iterrows():
-                col1, col2, col3 = st.columns([3, 2, 1])
+                col1, col2, col3, col4 = st.columns([0.4, 2.6, 2, 0.8])
                 with col1:
-                    st.write(linha["filename"])
+                    marcador = "●" if int(linha["id"]) == ativo else " "
+                    st.markdown(f"<span style='color:{theme.COR['primaria']}'>{marcador}</span>", unsafe_allow_html=True)
                 with col2:
-                    st.write(linha["uploaded_at"])
+                    st.write(linha["filename"])
                 with col3:
+                    st.write(linha["uploaded_at"])
+                with col4:
                     if st.button("Excluir", key=f"del_{linha['id']}"):
                         history.excluir_upload(int(linha["id"]))
                         st.rerun()
 
             st.markdown('<div class="secao-titulo">Evolução por local</div>', unsafe_allow_html=True)
             locais_hist = sorted(historico["local"].unique())
+            if "local_hist" in st.session_state and st.session_state["local_hist"] not in locais_hist:
+                del st.session_state["local_hist"]
             local_hist = st.selectbox("Local (histórico)", locais_hist, key="local_hist")
             df_local = historico[historico["local"] == local_hist].copy()
             df_local["uploaded_at"] = pd.to_datetime(df_local["uploaded_at"])
