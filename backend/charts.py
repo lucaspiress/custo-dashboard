@@ -298,3 +298,199 @@ def grafico_historico(df, metrica: str, titulo: str) -> go.Figure:
     if not e_meses:
         fig.update_yaxes(tickprefix="R$ ", separatethousands=True)
     return fig
+
+
+def grafico_barras_comparativo(locais, metrica: str, titulo: str, e_meses: bool = False) -> go.Figure:
+    fig = go.Figure()
+    dados = [(analysis.resumo(local), local) for local in locais]
+    dados.sort(key=lambda par: par[0][metrica], reverse=True)
+    nomes = [r["local"] for r, _ in dados]
+    valores = [r[metrica] for r, _ in dados]
+    cores = [theme.COR["primaria"]] * len(nomes)
+    for i, r in enumerate(dados):
+        res, _ = r
+        if metrica == "tempo_retorno":
+            if res["tempo_retorno"] is None:
+                cores[i] = theme.COR["alerta"]
+            elif res["tempo_retorno"] > 24:
+                cores[i] = theme.COR["alerta"]
+            elif res["tempo_retorno"] > 12:
+                cores[i] = theme.COR["destaque"]
+            else:
+                cores[i] = theme.COR["sucesso"]
+    custom = [[_fmt_br(v, 1) if not e_meses else f"{v:.1f} meses"] for v in valores]
+    fig.add_trace(
+        go.Bar(
+            x=valores,
+            y=nomes,
+            orientation="h",
+            marker_color=cores,
+            marker_line=dict(color="#ffffff", width=0.8),
+            customdata=custom,
+            hovertemplate="<b>%{y}</b><br>" + ("<b>%{customdata[0]}</b><extra></extra>" if e_meses else "<b>%{customdata[0]}</b><extra></extra>"),
+        )
+    )
+    fig.update_layout(
+        **_layout(titulo, 500, x_titulo="Meses" if e_meses else "R$"),
+        showlegend=False,
+    )
+    fig.update_layout(margin=dict(l=10, r=10, t=56, b=22))
+    fig.update_yaxes(
+        categoryorder="array",
+        categoryarray=nomes[::-1],
+        gridcolor=theme.COR["grid"],
+        zeroline=False,
+        tickfont=dict(size=10),
+    )
+    if not e_meses:
+        fig.update_xaxes(tickprefix="R$ ", separatethousands=True)
+    return fig
+
+
+def grafico_dispersao(locais) -> go.Figure:
+    fig = go.Figure()
+    pontos = []
+    for local in locais:
+        res = analysis.resumo(local)
+        pontos.append(
+            {
+                "nome": res["local"],
+                "investimento": res["investimento"],
+                "saldo": res["saldo_mensal"],
+                "receita": res["valor_mensal"],
+                "retorno": res["tempo_retorno"],
+            }
+        )
+    for p in pontos:
+        cor = theme.COR["primaria"]
+        if p["retorno"] is None:
+            cor = theme.COR["alerta"]
+        elif p["retorno"] > 24:
+            cor = theme.COR["alerta"]
+        elif p["retorno"] > 12:
+            cor = theme.COR["destaque"]
+        else:
+            cor = theme.COR["sucesso"]
+        fig.add_trace(
+            go.Scatter(
+                x=[p["investimento"]],
+                y=[p["saldo"]],
+                mode="markers+text",
+                name=p["nome"],
+                marker=dict(size=11 + (p["receita"] / max(1000, p["receita"])) * 9, color=cor, line=dict(color="#ffffff", width=1.5)),
+                text=[""],
+                customdata=[[_fmt_br(p["investimento"]), _fmt_br(p["saldo"]), _fmt_br(p["receita"]), f"{p['retorno']:.1f}" if p["retorno"] is not None else "—"]],
+                hovertemplate="<b>%{name}</b><br>Investimento: <b>%{customdata[0]}</b><br>Saldo mensal: <b>%{customdata[1]}</b><br>Receita mensal: %{customdata[2]}<br>Retorno: %{customdata[3]} meses<extra></extra>",
+            )
+        )
+    fig.update_layout(
+        **_layout("Investimento × saldo mensal por local", 480, x_titulo="Investimento (R$)", y_titulo="Saldo mensal (R$)"),
+        showlegend=False,
+    )
+    fig.update_layout(margin=dict(l=10, r=10, t=56, b=22))
+    fig.update_xaxes(tickprefix="R$ ", separatethousands=True)
+    fig.update_yaxes(tickprefix="R$ ", separatethousands=True)
+    return fig
+
+
+def grafico_fluxo_caixa(local: loader.Local, meses: int = 12) -> go.Figure:
+    fluxo = analysis.fluxo_caixa(local, meses)
+    fig = go.Figure()
+    pontos = fluxo["pontos"]
+    saldos = [p["saldo"] for p in pontos]
+    acumulados = [p["acumulado"] for p in pontos]
+    fig.add_trace(
+        go.Bar(
+            x=[p["mes"] for p in pontos],
+            y=saldos,
+            name="Saldo mensal",
+            marker_color=theme.COR["secundaria"],
+            marker_line=dict(color="#ffffff", width=0.6),
+            customdata=[[_fmt_br(v)] for v in saldos],
+            hovertemplate="Mês %{x}<br>Saldo: <b>%{customdata[0]}</b><extra></extra>",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[p["mes"] for p in pontos],
+            y=acumulados,
+            mode="lines+markers",
+            name="Acumulado",
+            line=dict(color=theme.COR["primaria"], width=3, shape="spline"),
+            marker=dict(size=7, color=theme.COR["primaria"], line=dict(color="#ffffff", width=1.5)),
+            customdata=[[_fmt_br(v)] for v in acumulados],
+            hovertemplate="Mês %{x}<br>Acumulado: <b>%{customdata[0]}</b><extra></extra>",
+        )
+    )
+    alvo = local.investimento - local.taxa_instalacao
+    if fluxo["payback_mes"]:
+        fig.add_vline(
+            x=fluxo["payback_mes"],
+            line_dash="dot",
+            line_color=theme.COR["sucesso"],
+            line_width=1.5,
+            annotation_text=f"Payback: {fluxo['payback_mes']} meses",
+            annotation_position="top left",
+            annotation_font=dict(color=theme.COR["sucesso"], size=11.5),
+        )
+    elif alvo > 0:
+        fig.add_hline(
+            y=alvo,
+            line_dash="dash",
+            line_color=theme.COR["alerta"],
+            line_width=1.5,
+            annotation_text=f"Investimento: {_fmt_br(alvo)}",
+            annotation_position="top left",
+            annotation_font=dict(color=theme.COR["alerta"], size=11.5),
+        )
+    fig.update_layout(
+        **_layout(f"Fluxo de caixa projetado — {local.nome}", 440, x_titulo="Meses", y_titulo="R$"),
+        barmode="group",
+        showlegend=True,
+    )
+    fig.update_yaxes(tickprefix="R$ ", separatethousands=True)
+    return fig
+
+
+def grafico_delta_itens(diferencas: list[dict], n: int = 10) -> go.Figure:
+    fig = go.Figure()
+    com_delta = [d for d in diferencas if d["tipo"] in ("preco", "quantidade") and d["variacao"] is not None]
+    com_delta.sort(key=lambda d: abs(d["variacao"]), reverse=True)
+    selecionados = com_delta[:n]
+    if not selecionados:
+        fig.update_layout(**_layout("Variação por item", 360))
+        fig.add_annotation(
+            text="Nenhuma variação de preço ou quantidade entre as versões",
+            showarrow=False,
+            font=dict(color=theme.COR["mutado"], size=13),
+        )
+        return fig
+    nomes = [d["material"][:58] for d in selecionados][::-1]
+    variacoes = [d["variacao"] for d in selecionados][::-1]
+    cores = [theme.COR["sucesso"] if v >= 0 else theme.COR["alerta"] for v in variacoes]
+    fig.add_trace(
+        go.Bar(
+            x=variacoes,
+            y=nomes,
+            orientation="h",
+            marker_color=cores,
+            marker_line=dict(color="#ffffff", width=0.8),
+            customdata=[[_fmt_br(v)] for v in variacoes],
+            hovertemplate="<b>%{y}</b><br>Variação: <b>%{customdata[0]}</b><extra></extra>",
+        )
+    )
+    fig.update_layout(
+        **_layout(f"Variação financeira por item (top {len(selecionados)})", 420, x_titulo="Variação (R$)"),
+        showlegend=False,
+    )
+    fig.update_layout(margin=dict(l=10, r=10, t=56, b=22))
+    fig.update_yaxes(
+        categoryorder="array",
+        categoryarray=nomes[::-1],
+        gridcolor=theme.COR["grid"],
+        zeroline=False,
+        tickfont=dict(size=10),
+    )
+    fig.update_xaxes(tickprefix="R$ ", separatethousands=True)
+    fig.update_xaxes(zeroline=True, zerolinecolor=theme.COR["cinza"], zerolinewidth=1)
+    return fig

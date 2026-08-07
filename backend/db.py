@@ -12,16 +12,7 @@ SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
 
 def database_url() -> str | None:
-    value = os.getenv("DATABASE_URL")
-    if value:
-        return value
-    try:
-        import streamlit as st
-
-        value = st.secrets.get("DATABASE_URL")
-        return str(value) if value else None
-    except Exception:
-        return None
+    return os.getenv("DATABASE_URL")
 
 
 def enabled() -> bool:

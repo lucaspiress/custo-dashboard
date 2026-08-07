@@ -1,7 +1,10 @@
 .venv/
 __pycache__/
 *.pyc
-data/*.db
-.streamlit/*
-!.streamlit/config.toml
+backend/data/*.db
 preview_*.png
+
+# frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env

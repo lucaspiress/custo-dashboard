@@ -1,0 +1,268 @@
+import math
+from statistics import mean, stdev
+
+import loader
+
+
+def resumo(local: loader.Local) -> dict:
+    retorno = local.tempo_retorno
+    return {
+        "local": local.nome,
+        "valor_mensal": local.valor_mensal,
+        "taxa_instalacao": local.taxa_instalacao,
+        "impostos": local.impostos,
+        "saldo_apos_impostos": local.saldo_apos_impostos,
+        "custo_manutencao": local.custo_manutencao,
+        "mensal_terceirizada": local.mensal_terceirizada,
+        "chip_mensal": local.chip_mensal,
+        "custos_softwares": local.custos_softwares,
+        "saldo_mensal": local.saldo_mensal,
+        "mao_de_obra": local.mao_de_obra,
+        "equipamento": local.equipamento,
+        "investimento": local.investimento,
+        "tempo_retorno": retorno,
+        "meses_retorno": _meses_retorno(local),
+        "margem": local.margem,
+        "receita_anual": local.receita_anual,
+        "data_inst": local.data_inst,
+        "num_itens": len(local.itens),
+    }
+
+
+def _meses_retorno(local: loader.Local) -> int | None:
+    if local.saldo_mensal <= 0:
+        return None
+    alvo = local.investimento - local.taxa_instalacao
+    return math.ceil(alvo / local.saldo_mensal)
+
+
+def composicao_investimento(local: loader.Local) -> list[dict]:
+    return [
+        {"nome": "Mão de obra", "valor": local.mao_de_obra},
+        {"nome": "Equipamento", "valor": local.equipamento},
+    ]
+
+
+def por_categoria(local: loader.Local) -> list[dict]:
+    totais: dict[str, float] = {}
+    for item in local.itens:
+        totais[item.categoria] = totais.get(item.categoria, 0.0) + item.valor_total
+    total = sum(totais.values()) or 1.0
+    return [
+        {"categoria": nome, "valor": valor, "pct": valor / total * 100}
+        for nome, valor in sorted(totais.items(), key=lambda x: x[1], reverse=True)
+    ]
+
+
+def top_itens(local: loader.Local, n: int = 15) -> list[loader.Item]:
+    ordenados = sorted(local.itens, key=lambda i: i.valor_total, reverse=True)
+    return ordenados[:n]
+
+
+def pareto(local: loader.Local, n: int = 15) -> list[dict]:
+    itens = top_itens(local, n)
+    total = sum(i.valor_total for i in local.itens) or 1.0
+    acumulado = 0.0
+    resultado = []
+    for item in itens:
+        acumulado += item.valor_total
+        resultado.append(
+            {
+                "material": item.material,
+                "valor": item.valor_total,
+                "pct": item.valor_total / total * 100,
+                "pct_acumulado": acumulado / total * 100,
+            }
+        )
+    return resultado
+
+
+def anomalias_preco_unitario(local: loader.Local, limite: float = 2.0) -> list[dict]:
+    anomalias = []
+    for categoria in {i.categoria for i in local.itens}:
+        itens_cat = [i for i in local.itens if i.categoria == categoria and i.qtd > 0]
+        if len(itens_cat) < 3:
+            continue
+        valores = [i.valor_unit for i in itens_cat]
+        media = mean(valores)
+        desvio = stdev(valores)
+        if desvio == 0:
+            continue
+        for item in itens_cat:
+            z = (item.valor_unit - media) / desvio
+            if z >= limite:
+                anomalias.append(
+                    {
+                        "material": item.material,
+                        "categoria": categoria,
+                        "valor_unit": item.valor_unit,
+                        "z_score": z,
+                        "media_categoria": media,
+                    }
+                )
+    anomalias.sort(key=lambda a: a["z_score"], reverse=True)
+    return anomalias
+
+
+def curva_payback(local: loader.Local) -> list[dict]:
+    if local.saldo_mensal <= 0:
+        return []
+    alvo = local.investimento - local.taxa_instalacao
+    meses = _meses_retorno(local) or 0
+    curva = [{"mes": 0, "saldo_acumulado": 0.0}]
+    for mes in range(1, meses + 1):
+        acumulado = local.saldo_mensal * mes
+        curva.append({"mes": mes, "saldo_acumulado": acumulado})
+        if acumulado >= alvo:
+            break
+    return curva
+
+
+def resumo_projeto(locais: list[loader.Local]) -> dict:
+    resumos = [resumo(local) for local in locais]
+    return {
+        "locais": resumos,
+        "totais": {
+            "receita_mensal": sum(r["valor_mensal"] for r in resumos),
+            "receita_anual": sum(r["receita_anual"] for r in resumos),
+            "saldo_mensal": sum(r["saldo_mensal"] for r in resumos),
+            "investimento": sum(r["investimento"] for r in resumos),
+            "equipamento": sum(r["equipamento"] for r in resumos),
+            "mao_de_obra": sum(r["mao_de_obra"] for r in resumos),
+            "num_locais": len(resumos),
+            "num_itens": sum(r["num_itens"] for r in resumos),
+        },
+    }
+
+
+def _chave_item(item: loader.Item) -> str:
+    return f"{item.categoria.strip().lower()}|{item.cod.strip().lower()}|{item.material.strip().lower()}"
+
+
+def comparar_locais(anterior: loader.Local, novo: loader.Local) -> dict:
+    mapa_anterior = {_chave_item(item): item for item in anterior.itens}
+    mapa_novo = {_chave_item(item): item for item in novo.itens}
+
+    itens: list[dict] = []
+    for chave, item_novo in mapa_novo.items():
+        item_antigo = mapa_anterior.get(chave)
+        if item_antigo is None:
+            itens.append(
+                {
+                    "cod": item_novo.cod,
+                    "material": item_novo.material,
+                    "categoria": item_novo.categoria,
+                    "tipo": "adicionado",
+                    "qtd_antes": None,
+                    "qtd_depois": item_novo.qtd,
+                    "valor_unit_antes": None,
+                    "valor_unit_depois": item_novo.valor_unit,
+                    "variacao": None,
+                }
+            )
+            continue
+        if item_antigo.valor_unit != item_novo.valor_unit:
+            delta = item_novo.valor_unit - item_antigo.valor_unit
+            itens.append(
+                {
+                    "cod": item_novo.cod,
+                    "material": item_novo.material,
+                    "categoria": item_novo.categoria,
+                    "tipo": "preco",
+                    "qtd_antes": item_antigo.qtd,
+                    "qtd_depois": item_novo.qtd,
+                    "valor_unit_antes": item_antigo.valor_unit,
+                    "valor_unit_depois": item_novo.valor_unit,
+                    "variacao": delta,
+                }
+            )
+        elif item_antigo.qtd != item_novo.qtd:
+            itens.append(
+                {
+                    "cod": item_novo.cod,
+                    "material": item_novo.material,
+                    "categoria": item_novo.categoria,
+                    "tipo": "quantidade",
+                    "qtd_antes": item_antigo.qtd,
+                    "qtd_depois": item_novo.qtd,
+                    "valor_unit_antes": item_antigo.valor_unit,
+                    "valor_unit_depois": item_novo.valor_unit,
+                    "variacao": item_novo.valor_total - item_antigo.valor_total,
+                }
+            )
+    for chave, item_antigo in mapa_anterior.items():
+        if chave not in mapa_novo:
+            itens.append(
+                {
+                    "cod": item_antigo.cod,
+                    "material": item_antigo.material,
+                    "categoria": item_antigo.categoria,
+                    "tipo": "removido",
+                    "qtd_antes": item_antigo.qtd,
+                    "qtd_depois": None,
+                    "valor_unit_antes": item_antigo.valor_unit,
+                    "valor_unit_depois": None,
+                    "variacao": None,
+                }
+            )
+
+    ordem_tipo = {"adicionado": 0, "removido": 1, "preco": 2, "quantidade": 3}
+    itens.sort(key=lambda i: (ordem_tipo[i["tipo"]], i["material"].lower()))
+
+    r_antes = resumo(anterior)
+    r_novo = resumo(novo)
+    campos = [
+        ("Investimento", "investimento"),
+        ("Equipamento", "equipamento"),
+        ("Mão de obra", "mao_de_obra"),
+        ("Receita mensal", "valor_mensal"),
+        ("Saldo mensal", "saldo_mensal"),
+        ("Tempo de retorno (meses)", "tempo_retorno"),
+    ]
+    kpis = []
+    for rotulo, campo in campos:
+        antes = r_antes[campo]
+        depois = r_novo[campo]
+        delta = None
+        delta_pct = None
+        if antes is not None and depois is not None:
+            delta = depois - antes
+            if antes != 0:
+                delta_pct = delta / abs(antes) * 100
+        kpis.append(
+            {
+                "rotulo": rotulo,
+                "antes": antes,
+                "depois": depois,
+                "delta": delta,
+                "delta_pct": delta_pct,
+            }
+        )
+    return {"kpis": kpis, "itens": itens}
+
+
+def fluxo_caixa(local: loader.Local, meses: int = 12) -> dict:
+    if meses <= 0:
+        meses = 12
+    alvo = local.investimento - local.taxa_instalacao
+    acumulado = 0.0
+    payback_mes = None
+    pontos = []
+    for mes in range(1, meses + 1):
+        saldo = local.saldo_mensal
+        acumulado += saldo
+        atingiu = alvo > 0 and acumulado >= alvo
+        if atingiu and payback_mes is None:
+            payback_mes = mes
+        pontos.append(
+            {
+                "mes": mes,
+                "receita": local.valor_mensal,
+                "impostos": local.impostos,
+                "custos_fixos": local.custos_fixos,
+                "saldo": saldo,
+                "acumulado": acumulado,
+                "payback": atingiu,
+            }
+        )
+    return {"local": local.nome, "meses": meses, "payback_mes": payback_mes, "pontos": pontos}

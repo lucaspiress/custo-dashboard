@@ -101,9 +101,9 @@ frontend/ (Vite + React, hospedado na Vercel)
 ## Status das fases
 
 - [x] Plano salvo no repo e enviado ao GitHub
-- [ ] Fase 0 — Estrutura
-- [ ] Fase 1 — Backend FastAPI
-- [ ] Fase 2 — Frontend React
-- [ ] Fase 3 — Polimento local
-- [ ] Fase 4 — Deploy
-- [ ] Fase 5 — Documentação
+- [x] Fase 0 — Estrutura (backend/ + frontend/, Streamlit removido)
+- [x] Fase 1 — Backend FastAPI (auth JWT/cookie, rotas, PDF/Excel, to_json, 11 testes pytest)
+- [x] Fase 2 — Frontend React (design system, login, 8 abas, 5 features)
+- [x] Fase 3 — Polimento local (paridade com planilhas reais, smoke test Playwright)
+- [ ] Fase 4 — Deploy (Render: backend + Neon; Vercel: frontend)
+- [ ] Fase 5 — Documentação (PROJECT_CONTEXT.md e CLAUDE.md)
