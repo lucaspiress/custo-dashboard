@@ -1,106 +1,130 @@
-# Custo Dashboard - Contexto do Projeto
-
-Este arquivo é a referência operacional do projeto antes da migração para web.
+# Custo Dashboard — Contexto do Projeto
 
 ## Localização
 
 - Repositório: `C:\Users\assistentesolucoes\Desktop\custo-dashboard`
-- Branch principal: `main`
-- Aplicação atual: Streamlit local
-- Banco local legado: SQLite em `data/historico.db`
-- Banco web preparado: Neon PostgreSQL
-- Entrypoint: `app.py`
+- GitHub: https://github.com/lucaspiress/custo-dashboard
+- Produção (Vercel): frontend React + backend Python na mesma aplicação
+- Banco: Neon PostgreSQL (não é Supabase)
+
+## Arquitetura
+
+```
+Vercel (uma aplicação)
+├── frontend/  SPA Vite + React + TS + Tailwind (build estático em frontend/dist)
+└── api/       Função Python (FastAPI) — api/index.py carrega main.app
+    └── backend/  código Python do servidor (importado pela função)
+        └── Neon Postgres (usuários, uploads, locais, itens)
+```
+
+O `vercel.json` na raiz faz o proxy de `/api/*` para a função Python e o fallback
+do SPA para `index.html` — tudo no mesmo domínio (cookie de sessão funciona).
 
 ## Inventário
 
-### Aplicação
+### Frontend (`frontend/`)
 
 | Arquivo | Responsabilidade |
 |---|---|
-| `app.py` | Interface Streamlit, upload, seleção de snapshots, abas e download do PDF |
-| `loader.py` | Leitura e validação do Excel, detecção de abas e normalização de itens |
-| `analysis.py` | KPIs, composição, Pareto, anomalias e payback |
-| `insights.py` | Regras de negócio e mensagens de análise em português |
-| `charts.py` | Gráficos Plotly do dashboard web |
-| `report.py` | PDF financeiro de seis páginas baseado no modelo visual aprovado |
-| `history.py` | Persistência atual em SQLite; será substituído pela camada Postgres |
-| `db.py` | Conexão Neon/Postgres, RLS, usuários, uploads e snapshots web |
-| `auth.py` | Login fechado com PBKDF2 e sessão Streamlit |
-| `schema.sql` | Schema idempotente do Postgres, índices e isolamento por usuário |
-| `seed_admin.py` | Criação única do primeiro administrador |
-| `migrar_sqlite.py` | Importação de planilhas existentes para o Postgres |
-| `config.py` | Schema do template e constantes de negócio |
-| `formatos.py` | Formatação de moeda e números em pt-BR |
-| `theme.py` | Tokens visuais, cores, CSS e paleta de gráficos |
+| `src/pages/DashboardPage.tsx` | Shell: sidebar (upload, snapshots, local, PDF/Excel), abas |
+| `src/pages/LoginPage.tsx` | Login fechado (formulário próprio) |
+| `src/components/tabs/` | Abas: Visão Geral, Custos (filtros), Payback (fluxo projetado), Insights, Comparativo, Comparar Versões, Histórico, Usuários (admin) |
+| `src/components/PlotlyChart.tsx` | Renderiza `fig.to_json()` do backend (lazy-load do plotly.js) |
+| `src/lib/api.ts` | Cliente HTTP com cookie; `api.blob` para PDF/Excel |
+| `src/lib/auth.tsx` | Contexto de sessão (me/login/logout) |
+| `src/lib/types.ts` | Tipos espelhando os payloads da API |
+| `src/lib/theme.ts` / `index.css` | Design system (tokens do antigo theme.py) |
+| `vite.config.ts` | Proxy de `/api` para `localhost:8000` em dev |
 
-### Operação e testes
+### Backend (`backend/`)
 
 | Arquivo | Responsabilidade |
 |---|---|
-| `abrir-dashboard.bat` | Inicialização local do Streamlit |
-| `requirements.txt` | Dependências Python da aplicação |
-| `test_validate.py` | Validação headless das planilhas e do PDF |
-| `teste_upload_browser.py` | Regressão do upload no navegador |
-| `teste_visual_browser.py` | Regressão visual básica, snapshots e abas |
-| `CLAUDE.md` | Convenções e comandos do projeto |
-| `.streamlit/config.toml` | Tema e configuração local do Streamlit |
-| `assets/rota_group_logo.png` | Logo usada no relatório |
+| `main.py` | App FastAPI, CORS, lifespan (schema/seed) |
+| `routers/auth.py` | login/logout/me (cookie JWT httpOnly) |
+| `routers/users.py` | Gestão de usuários (admin, máx. 3 admins) |
+| `routers/uploads.py` | Uploads, análise, project-summary, compare, cashflow, histórico |
+| `routers/files.py` | PDF (reportlab) e Excel (openpyxl) |
+| `security.py` | JWT HS256 + cookie (Secure em produção, SameSite lax) |
+| `store.py` | Facade: Postgres (`db.py`) em prod / SQLite (`history.py`) em dev |
+| `loader.py` | Leitura/validação do template (.xlsx, fórmulas e abas) |
+| `analysis.py` | KPIs, resumo_projeto, comparar_locais, fluxo_caixa |
+| `insights.py` | Regras de insight em PT-BR (ok/atencao/alerta/dica) |
+| `charts.py` | Figuras Plotly (serializadas com `to_json()`) |
+| `report.py` | PDF financeiro de 6 páginas |
+| `export.py` | Exportação Excel (Resumo, Itens, Comparativo) |
+| `db.py` / `history.py` | Persistência Postgres com RLS / SQLite local com usuários |
+| `schema.sql` | Schema Neon (RLS por usuário) |
+| `seed_admin.py` | Criação de administradores |
+| `tests/` | 11 testes pytest (fixtures .xlsx sintéticas) |
+| `smoke_ui.py` | Smoke test Playwright do frontend completo |
 
-### Arquivos locais que não entram no repositório
+### Deploy
 
-- `.venv/`: ambiente Python local
-- `__pycache__/`: cache do Python
-- `data/historico.db`: histórico local temporário
-- Planilhas de entrada e PDFs de referência permanecem fora do repositório para não expor dados de negócio
-- Connection strings, senhas e secrets nunca devem ser salvos neste arquivo ou no Git
+| Arquivo | Responsabilidade |
+|---|---|
+| `vercel.json` (raiz) | Função Python (api/index.py), maxDuration 60, excludeFiles, rewrites /api/* e fallback SPA |
+| `requirements.txt` (raiz) | Dependências instaladas pela função Python da Vercel (sem pandas!) |
+| `backend/requirements.txt` | Runtime do backend (espelho do raiz) |
+| `backend/requirements-dev.txt` | pytest + httpx para testes locais |
+| `backend/Dockerfile` | Plano B: Render (não usado — Vercel resolveu) |
+| `render.yaml` | Plano B: blueprint do Render (não usado) |
 
-## Estado atual
+## Como rodar localmente
 
-O fluxo local já suporta:
+Backend (SQLite, sem banco externo):
 
-1. Upload de planilhas `.xlsx` no template padrão
-2. Mais de um formato de aba de equipamento
-3. Histórico local por snapshot
-4. Dashboard com KPIs, custos, payback, insights e histórico
-5. Exportação PDF com layout financeiro aprovado
-6. Validação das planilhas base e Santa Rosa
-
-## Migração web aprovada
-
-```text
-Navegador
-  -> Streamlit Cloud
-  -> Neon PostgreSQL
-       -> usuarios
-       -> uploads
-       -> locais
-       -> itens
+```
+cd backend
+$env:DATABASE_URL=""
+..\.venv\Scripts\python -m uvicorn main:app --port 8000
 ```
 
-### Regras de acesso
+Frontend (proxy para o backend):
 
-- Cadastro fechado
-- Três administradores no máximo
-- Administradores criam, ativam, desativam e redefinem usuários pelo próprio app
-- Todos os usuários só enxergam seus próprios uploads e relatórios
-- Usuários são desativados, não excluídos, para preservar histórico
-- O login web usa formulário próprio; `st.login` não é usado porque a API nativa é OIDC-only
+```
+cd frontend
+npm run dev
+```
 
-### Arquivos web adicionados
+Acessar http://localhost:5173 — login local: `admin` / `admin123456`
+(ou troque via `ADMIN_INITIAL_PASSWORD` no ambiente).
 
-- `db.py`: conexão e operações Postgres por `user_id`
-- `auth.py`: login fechado com formulário próprio, PBKDF2 e sessão
-- `schema.sql`: criação idempotente do banco, índices e RLS
-- `seed_admin.py`: criação única do primeiro administrador
-- `migrar_sqlite.py`: importação de planilhas existentes para o usuário inicial
+Testes:
 
-O schema Neon foi aplicado, o administrador principal foi criado e duas planilhas de referência foram importadas para a conta inicial. O deploy no Streamlit Cloud ainda é a próxima fase; a `DATABASE_URL` não está armazenada neste repositório.
+```
+cd backend
+$env:DATABASE_URL=""
+..\.venv\Scripts\python -m pytest -q
+```
 
-## Cuidados de implementação
+## Como publicar (deploy)
 
-- Usar `psycopg` v3 e a `DATABASE_URL` somente por secret do ambiente
-- Armazenar o arquivo original como `bytea` no Postgres ou em storage separado, conforme o limite de uso
-- Manter o cálculo de valores derivados no código, sem confiar em cache de fórmulas do Excel
-- Preservar o fallback de fonte do `report.py` para execução Linux no Streamlit Cloud
-- Testar isolamento entre dois usuários antes do deploy público
-- Não iniciar o deploy antes de validar schema, autenticação, migração e backup
+O push para `main` dispara o deploy automático na Vercel.
+
+Configuração do projeto na Vercel (importante, não mexer):
+
+- Framework Preset: `Other`
+- Root Directory: (vazio — raiz do repo)
+- Build Command: `cd frontend && npm install && npm run build`
+- Output Directory: `frontend/dist`
+
+Variáveis de ambiente:
+
+- `DATABASE_URL` — connection string do Neon (Production obrigatório)
+- `SESSION_SECRET` — string com 32+ caracteres (Production obrigatório)
+
+Validação pós-deploy:
+
+- `https://<projeto>.vercel.app/api/health` → `{"ok":true,"modo":"postgres"}`
+- Login + upload + abas + PDF/Excel
+
+## Cuidados
+
+- Nunca commitar `DATABASE_URL`, `SESSION_SECRET` ou senhas.
+- O bundle da função Python precisa ficar abaixo de 225MB — **não adicionar pandas**;
+  usar Python puro (listas de dicts) como hoje.
+- `vercel.json` usa `excludeFiles` para manter node_modules/testes fora do bundle.
+- Upload de planilhas limitado a 4,5MB na Vercel (planilhas do projeto têm ~60KB).
+- Primeira requisição após inatividade demora (cold start da função).
+- Backend usa Postgres em produção (RLS por usuário) e SQLite em dev.

@@ -105,5 +105,16 @@ frontend/ (Vite + React, hospedado na Vercel)
 - [x] Fase 1 — Backend FastAPI (auth JWT/cookie, rotas, PDF/Excel, to_json, 11 testes pytest)
 - [x] Fase 2 — Frontend React (design system, login, 8 abas, 5 features)
 - [x] Fase 3 — Polimento local (paridade com planilhas reais, smoke test Playwright)
-- [ ] Fase 4 — Deploy (Render: backend + Neon; Vercel: frontend)
-- [ ] Fase 5 — Documentação (PROJECT_CONTEXT.md e CLAUDE.md)
+- [x] Fase 4 — Deploy na Vercel (backend Python + frontend React, sem Render/cartão)
+- [x] Fase 5 — Documentação (PROJECT_CONTEXT.md e CLAUDE.md)
+
+## Ajustes durante a execução
+
+- Host do backend mudou de Render para **função Python da Vercel** (Render exigia
+  cartão de crédito). Tudo fica na Vercel: frontend + API no mesmo domínio.
+- `vercel.json` na raiz: função `api/index.py`, rewrites `/api/*` e fallback SPA.
+- **Pandas removido** do backend: bundle da função estourou o limite de 225MB
+  (245MB) — refatorado para Python puro (listas de dicts), bundle final ~132MB.
+- `requirements.txt` na raiz (a Vercel lê da raiz) + `backend/requirements-dev.txt`
+  para testes locais.
+- `render.yaml` e `backend/Dockerfile` permanecem como plano B (não usados).
