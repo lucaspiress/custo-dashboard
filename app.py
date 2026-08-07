@@ -4,7 +4,10 @@ import pandas as pd
 import streamlit as st
 
 import analysis
+import auth
 import charts
+import config
+import db
 import formatos
 import history
 import insights
@@ -76,13 +79,25 @@ def render_insights(local) -> None:
         )
 
 
-def carregar_snapshot_inicial() -> None:
+def _listar_uploads(user: dict | None) -> pd.DataFrame:
+    return db.list_uploads(user["id"]) if user and db.enabled() else history.listar_uploads()
+
+
+def _carregar_workbook(user: dict | None, upload_id: int) -> loader.WorkbookData:
+    return db.load_workbook(user["id"], upload_id) if user and db.enabled() else history.carregar_workbook(upload_id)
+
+
+def _historico_locais(user: dict | None) -> pd.DataFrame:
+    return db.history_locais(user["id"]) if user and db.enabled() else history.carregar_historico_locais()
+
+
+def carregar_snapshot_inicial(user: dict | None = None) -> None:
     if "dados" in st.session_state:
         return
-    historico = history.carregar_historico_locais()
+    historico = _historico_locais(user)
     if not historico.empty:
         ultimo = int(historico.iloc[0]["upload_id"])
-        st.session_state["dados"] = history.carregar_workbook(ultimo)
+        st.session_state["dados"] = _carregar_workbook(user, ultimo)
         st.session_state["snapshot_ativo"] = ultimo
         st.session_state["fonte"] = (
             f"Último upload: {historico.iloc[0]['filename']} ({historico.iloc[0]['uploaded_at']})"
@@ -91,13 +106,97 @@ def carregar_snapshot_inicial() -> None:
         st.session_state["fonte"] = None
 
 
-def main() -> None:
-    cabecalho()
-    carregar_snapshot_inicial()
+def render_admin_users(current_user: dict) -> None:
+    st.markdown('<div class="secao-titulo">Administração de usuários</div>', unsafe_allow_html=True)
+    admins = db.count_admins()
+    st.info(f"Administradores cadastrados: {admins}/{config.MAX_ADMINS}")
 
-    uploads = history.listar_uploads()
+    with st.expander("Criar usuário", expanded=True):
+        with st.form("create_user_form", clear_on_submit=True):
+            nome = st.text_input("Nome")
+            username = st.text_input("Usuário")
+            password = st.text_input("Senha", type="password")
+            papel = st.selectbox("Perfil", ["usuario", "admin"])
+            submit = st.form_submit_button("Criar usuário", type="primary")
+        if submit:
+            username_normalized = username.strip().lower()
+            if not nome.strip() or not username_normalized or len(password) < 8:
+                st.error("Informe nome, usuário e uma senha com pelo menos 8 caracteres.")
+            elif papel == "admin" and admins >= config.MAX_ADMINS:
+                st.error(f"O limite de {config.MAX_ADMINS} administradores já foi atingido.")
+            elif db.get_user_by_username(username_normalized):
+                st.error("Esse usuário já existe.")
+            else:
+                senha_hash, salt = auth.password_hash(password)
+                db.create_user(username_normalized, nome, senha_hash, salt, papel)
+                st.success("Usuário criado.")
+                st.rerun()
+
+    users = db.list_users()
+    if not users:
+        st.info("Nenhum usuário cadastrado.")
+        return
+    users_df = pd.DataFrame(
+        [
+            {
+                "ID": user["id"],
+                "Nome": user["nome"],
+                "Usuário": user["username"],
+                "Perfil": user["papel"],
+                "Ativo": "Sim" if user["ativo"] else "Não",
+            }
+            for user in users
+        ]
+    )
+    st.dataframe(users_df, hide_index=True, width="stretch")
+
+    choices = {f"{item['nome']} ({item['username']})": item for item in users}
+    selected_label = st.selectbox("Usuário para gerenciar", list(choices), key="admin_user_selected")
+    selected = choices[selected_label]
+    col1, col2 = st.columns(2)
+    with col1:
+        if int(selected["id"]) != int(current_user["id"]):
+            action = "Desativar" if selected["ativo"] else "Ativar"
+            if st.button(action, key=f"toggle_user_{selected['id']}", width="stretch"):
+                db.set_user_active(int(selected["id"]), not selected["ativo"])
+                st.rerun()
+    with col2:
+        with st.form(f"reset_password_{selected['id']}", clear_on_submit=True):
+            new_password = st.text_input("Nova senha", type="password")
+            reset = st.form_submit_button("Redefinir senha", width="stretch")
+        if reset:
+            if len(new_password) < 8:
+                st.error("A senha precisa ter pelo menos 8 caracteres.")
+            else:
+                senha_hash, salt = auth.password_hash(new_password)
+                db.reset_password(int(selected["id"]), senha_hash, salt)
+                st.success("Senha redefinida.")
+
+
+def main() -> None:
+    user = None
+    if db.enabled():
+        try:
+            if not st.session_state.get("schema_ready"):
+                db.ensure_schema()
+                st.session_state["schema_ready"] = True
+            user = auth.login_gate()
+        except Exception as erro:
+            st.error(f"Não foi possível conectar ao banco de dados: {erro}")
+            return
+        if user is None:
+            return
+
+    cabecalho()
+    carregar_snapshot_inicial(user)
+
+    uploads = _listar_uploads(user)
 
     with st.sidebar:
+        if user:
+            st.caption(f"{user['nome']} · {user['papel'].upper()}")
+            if st.button("Sair", key="logout", type="secondary", width="stretch"):
+                auth.logout()
         st.header("Entrada de dados")
         arquivo = st.file_uploader("Planilha de custo (.xlsx)", type=["xlsx"])
 
@@ -106,7 +205,11 @@ def main() -> None:
                 dados_bytes = arquivo.getvalue()
                 sha = history.sha256_de_bytes(dados_bytes)
                 workbook = loader.carregar(dados_bytes)
-                upload_id = history.salvar_snapshot(sha, arquivo.name, workbook.locais)
+                upload_id = (
+                    db.save_snapshot(user["id"], sha, arquivo.name, dados_bytes, workbook.locais)
+                    if user and db.enabled()
+                    else history.salvar_snapshot(sha, arquivo.name, workbook.locais)
+                )
                 st.session_state["dados"] = workbook
                 st.session_state["fonte"] = f"Upload: {arquivo.name}"
                 st.session_state["snapshot_ativo"] = upload_id
@@ -141,7 +244,7 @@ def main() -> None:
             id_escolhido = mapa[escolha]
             if id_escolhido != st.session_state.get("snapshot_ativo"):
                 st.session_state["snapshot_ativo"] = id_escolhido
-                st.session_state["dados"] = history.carregar_workbook(id_escolhido)
+                st.session_state["dados"] = _carregar_workbook(user, id_escolhido)
                 st.session_state["fonte"] = escolha
                 st.session_state.pop("local_atual", None)
                 st.rerun()
@@ -201,9 +304,12 @@ def main() -> None:
         mime="application/pdf",
     )
 
-    aba_geral, aba_custos, aba_payback, aba_insights, aba_historico = st.tabs(
-        ["Visão Geral", "Custos", "Payback", "Insights", "Histórico"]
-    )
+    nomes_abas = ["Visão Geral", "Custos", "Payback", "Insights", "Histórico"]
+    if user and user["papel"] == "admin":
+        nomes_abas.append("Usuários")
+    abas = st.tabs(nomes_abas)
+    aba_geral, aba_custos, aba_payback, aba_insights, aba_historico = abas[:5]
+    aba_usuarios = abas[5] if len(abas) > 5 else None
 
     with aba_geral:
         resumo = analysis.resumo(local)
@@ -281,7 +387,7 @@ def main() -> None:
         render_insights(local)
 
     with aba_historico:
-        historico = history.carregar_historico_locais()
+        historico = _historico_locais(user)
         if historico.empty:
             st.info("Nenhum histórico ainda — cada upload vira um snapshot comparável.")
         else:
@@ -298,7 +404,10 @@ def main() -> None:
                     st.write(linha["uploaded_at"])
                 with col4:
                     if st.button("Excluir", key=f"del_{linha['id']}"):
-                        history.excluir_upload(int(linha["id"]))
+                        if user and db.enabled():
+                            db.delete_upload(user["id"], int(linha["id"]))
+                        else:
+                            history.excluir_upload(int(linha["id"]))
                         st.rerun()
 
             st.markdown('<div class="secao-titulo">Evolução por local</div>', unsafe_allow_html=True)
@@ -323,6 +432,10 @@ def main() -> None:
                     charts.grafico_historico(df_retorno, "tempo_retorno", "Tempo de retorno (meses) por upload"),
                     width="stretch",
                 )
+
+    if aba_usuarios is not None:
+        with aba_usuarios:
+            render_admin_users(user)
 
 
 if __name__ == "__main__":

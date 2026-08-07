@@ -2,5 +2,6 @@
 __pycache__/
 *.pyc
 data/*.db
-.streamlit/
+.streamlit/*
+!.streamlit/config.toml
 preview_*.png

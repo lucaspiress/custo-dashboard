@@ -34,6 +34,10 @@ python -m venv .venv
 - `formatos.py` — formatação BR (moeda/número) compartilhada
 - `assets/rota_group_logo.png` — marca usada no relatório financeiro
 - `history.py` — snapshots por upload em SQLite (re-upload do mesmo arquivo substitui; `carregar_workbook` reconstrói análise completa)
+- `db.py` — camada Neon/Postgres com isolamento por usuário e armazenamento dos arquivos
+- `auth.py` — login fechado, hash PBKDF2 e sessão de usuário
+- `schema.sql` — tabelas, índices e RLS do banco web
+- `seed_admin.py` / `migrar_sqlite.py` — bootstrap do primeiro admin e importação de dados
 - `config.py` — schema do template (abas RELATORIO/GRÁFICOS, colunas A–O, taxa 15%)
 
 ## Template esperado
@@ -49,3 +53,5 @@ python -m venv .venv
 - UI em PT-BR; moeda `R$ 18.733,68`; sem emojis; sem comentários no código.
 - Comandos aprovados: `python`, `pip`, `streamlit`, `git status/diff/log` etc.
 - O PDF segue o modelo financeiro de 6 páginas: resumo executivo, estrutura financeira, retorno, projeções e anexo técnico.
+- Com `DATABASE_URL` definido, o app usa Neon/Postgres e exige login; sem ela, mantém o modo SQLite local para desenvolvimento.
+- Nunca registrar `DATABASE_URL` ou senhas em arquivos versionados; usar secrets do Streamlit Cloud ou variáveis de ambiente.
