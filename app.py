@@ -1,6 +1,4 @@
-﻿import datetime
-
-import pandas as pd
+﻿import pandas as pd
 import streamlit as st
 
 import analysis
@@ -10,23 +8,45 @@ import history
 import insights
 import loader
 import report
+import theme
 
 st.set_page_config(page_title="Custo Dashboard", layout="wide")
 
-CORES = {"ok": "#16a34a", "atencao": "#d97706", "alerta": "#dc2626", "dica": "#2563eb"}
-TITULOS = {"ok": "OK", "atencao": "AtenÃ§Ã£o", "alerta": "Alerta", "dica": "Dica"}
+st.markdown(f"<style>{theme.CSS_APP}</style>", unsafe_allow_html=True)
 
 fmt_moeda = formatos.fmt_moeda
 fmt_numero = formatos.fmt_numero
 
+MARCA_SVG = (
+    '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" '
+    'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20V7"/></svg>'
+)
 
-def cartao_kpi(rotulo: str, valor: str, cor: str = "#2563eb") -> None:
+
+def cabecalho() -> None:
     st.markdown(
         f"""
-        <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;
-             padding:14px 18px;margin-bottom:10px;border-left:4px solid {cor};">
-            <div style="font-size:12px;color:#6b7280;text-transform:uppercase;">{rotulo}</div>
-            <div style="font-size:24px;font-weight:700;color:#111827;">{valor}</div>
+        <div class="cabecalho-marca">
+            <div class="marca">{MARCA_SVG}</div>
+            <div>
+                <div class="titulo">Custo Dashboard</div>
+                <div class="subtitulo">Análise automática de planilhas de custo — relatório, payback e insights</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def cartao_kpi(rotulo: str, valor: str, sub: str | None = None) -> None:
+    sub_html = f'<div class="kpi-sub">{sub}</div>' if sub else ""
+    st.markdown(
+        f"""
+        <div class="kpi-card">
+            <div class="kpi-label">{rotulo}</div>
+            <div class="kpi-value">{valor}</div>
+            {sub_html}
         </div>
         """,
         unsafe_allow_html=True,
@@ -35,13 +55,16 @@ def cartao_kpi(rotulo: str, valor: str, cor: str = "#2563eb") -> None:
 
 def render_insights(local) -> None:
     for insight in insights.gerar_insights(local):
-        cor = CORES[insight["severidade"]]
+        severidade = insight["severidade"]
+        cor = theme.SEVERIDADE_COR[severidade]
+        fundo = theme.SEVERIDADE_FUNDO[severidade]
+        borda = theme.SEVERIDADE_BORDA[severidade]
+        rotulo = {"ok": "OK", "atencao": "Atenção", "alerta": "Alerta", "dica": "Dica"}[severidade]
         st.markdown(
             f"""
-            <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;
-                 padding:10px 14px;margin-bottom:8px;border-left:4px solid {cor};">
-                <span style="color:{cor};font-weight:700;font-size:12px;">{TITULOS[insight['severidade']]}</span>
-                <span style="color:#111827;"> â€” {insight['texto']}</span>
+            <div class="insight-card" style="--insight-cor:{cor};--insight-fundo:{fundo};--insight-borda:{borda}">
+                <span class="insight-pill">{rotulo}</span>
+                <span class="insight-texto">{insight['texto']}</span>
             </div>
             """,
             unsafe_allow_html=True,
@@ -55,14 +78,15 @@ def carregar_snapshot_inicial() -> None:
     if not historico.empty:
         ultimo = int(historico.iloc[0]["upload_id"])
         st.session_state["dados"] = history.carregar_workbook(ultimo)
-        st.session_state["fonte"] = f"Ãšltimo upload: {historico.iloc[0]['filename']} ({historico.iloc[0]['uploaded_at']})"
+        st.session_state["fonte"] = (
+            f"Último upload: {historico.iloc[0]['filename']} ({historico.iloc[0]['uploaded_at']})"
+        )
     else:
         st.session_state["fonte"] = None
 
 
 def main() -> None:
-    st.title("Custo Dashboard")
-    st.caption("Upload de planilha de custo (.xlsx) no template padrÃ£o â†’ anÃ¡lise automÃ¡tica por arquivo.")
+    cabecalho()
     carregar_snapshot_inicial()
 
     uploads = history.listar_uploads()
@@ -115,13 +139,17 @@ def main() -> None:
 
     fonte = st.session_state.get("fonte")
     if fonte:
-        st.caption(fonte)
+        nome_arquivo = fonte.split(": ", 1)[-1] if ": " in fonte else fonte
+        st.markdown(
+            f'<div class="cabecalho-fonte">Exibindo: <span>{nome_arquivo}</span></div>',
+            unsafe_allow_html=True,
+        )
 
     workbook = st.session_state.get("dados")
     if workbook is None:
-        st.info("Envie uma planilha no template padrÃ£o (abas RELATORIO + equipamento) para gerar o dashboard.")
+        st.info("Envie uma planilha no template padrão (abas RELATORIO + equipamento) para gerar o dashboard.")
         if not uploads.empty:
-            st.subheader("Ãšltimos arquivos carregados")
+            st.markdown('<div class="secao-titulo">Últimos arquivos carregados</div>', unsafe_allow_html=True)
             st.dataframe(uploads[["filename", "uploaded_at"]], hide_index=True)
         return
 
@@ -140,34 +168,39 @@ def main() -> None:
 
     pdf_bytes = report.gerar_pdf(arquivo.name if arquivo is not None else "planilha.xlsx", workbook.locais, uploaded_at)
     st.sidebar.download_button(
-        "Baixar relatÃ³rio em PDF",
+        "Baixar relatório em PDF",
         data=pdf_bytes,
         file_name="relatorio-custos.pdf",
         mime="application/pdf",
     )
 
     aba_geral, aba_custos, aba_payback, aba_insights, aba_historico = st.tabs(
-        ["VisÃ£o Geral", "Custos", "Payback", "Insights", "HistÃ³rico"]
+        ["Visão Geral", "Custos", "Payback", "Insights", "Histórico"]
     )
 
     with aba_geral:
         resumo = analysis.resumo(local)
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            cartao_kpi("Receita mensal", fmt_moeda(resumo["valor_mensal"]), "#2563eb")
-            cartao_kpi("Receita anual", fmt_moeda(resumo["receita_anual"]), "#2563eb")
+            cartao_kpi("Receita mensal", fmt_moeda(resumo["valor_mensal"]), "Mensalidade do contrato")
+            cartao_kpi("Receita anual", fmt_moeda(resumo["receita_anual"]), "12 meses + taxa de instalação")
         with col2:
-            cartao_kpi("Saldo mensal", fmt_moeda(resumo["saldo_mensal"]), "#16a34a")
-            cartao_kpi("Impostos (15%)", fmt_moeda(resumo["impostos"]), "#6b7280")
+            saldo = fmt_moeda(resumo["saldo_mensal"])
+            sub = None
+            if resumo["margem"] is not None:
+                sub = f"Margem de {resumo['margem'] * 100:.1f}% sobre a receita"
+            cartao_kpi("Saldo mensal", saldo, sub)
+            cartao_kpi("Impostos (15%)", fmt_moeda(resumo["impostos"]), "Sobre a receita mensal")
         with col3:
-            cartao_kpi("Investimento", fmt_moeda(resumo["investimento"]), "#f59e0b")
-            cartao_kpi("Equipamento", fmt_moeda(resumo["equipamento"]), "#f59e0b")
+            cartao_kpi("Investimento", fmt_moeda(resumo["investimento"]), "Mão de obra + equipamento")
+            cartao_kpi("Equipamento", fmt_moeda(resumo["equipamento"]), "Itens da proposta")
         with col4:
-            cartao_kpi("Tempo de retorno", f"{fmt_numero(resumo['tempo_retorno'])} meses", "#dc2626")
-            data_inst = local.data_inst.strftime("%d/%m/%Y") if local.data_inst else "â€”"
-            cartao_kpi("InstalaÃ§Ã£o", data_inst, "#6b7280")
+            retorno = f"{fmt_numero(resumo['tempo_retorno'])} meses"
+            cartao_kpi("Tempo de retorno", retorno, "Payback do investimento")
+            data_inst = local.data_inst.strftime("%d/%m/%Y") if local.data_inst else "—"
+            cartao_kpi("Instalação", data_inst, "Data prevista / realizada")
 
-        st.subheader("Resumo do local")
+        st.markdown('<div class="secao-titulo">Resumo do local</div>', unsafe_allow_html=True)
         linhas = []
         for l in workbook.locais:
             r = analysis.resumo(l)
@@ -176,7 +209,7 @@ def main() -> None:
                     "Local": r["local"],
                     "Receita mensal": fmt_moeda(r["valor_mensal"]),
                     "Saldo mensal": fmt_moeda(r["saldo_mensal"]),
-                    "MÃ£o de obra": fmt_moeda(r["mao_de_obra"]),
+                    "Mão de obra": fmt_moeda(r["mao_de_obra"]),
                     "Equipamento": fmt_moeda(r["equipamento"]),
                     "Investimento": fmt_moeda(r["investimento"]),
                     "Retorno (meses)": fmt_numero(r["tempo_retorno"]),
@@ -193,12 +226,12 @@ def main() -> None:
             st.plotly_chart(charts.grafico_categorias(local), width="stretch")
         st.plotly_chart(charts.grafico_pareto(local), width="stretch")
 
-        st.subheader("Itens de equipamento")
+        st.markdown('<div class="secao-titulo">Itens de equipamento</div>', unsafe_allow_html=True)
         itens_df = pd.DataFrame(
             [
                 {
                     "Categoria": item.categoria,
-                    "CÃ³digo": item.cod,
+                    "Código": item.cod,
                     "Material": item.material,
                     "Qtd": item.qtd,
                     "Valor unit.": fmt_moeda(item.valor_unit),
@@ -214,7 +247,7 @@ def main() -> None:
         curva = analysis.curva_payback(local)
         if curva:
             st.caption(
-                f"Payback em {curva[-1]['mes']} meses com saldo constante de {fmt_moeda(local.saldo_mensal)}/mÃªs."
+                f"Payback em {curva[-1]['mes']} meses com saldo constante de {fmt_moeda(local.saldo_mensal)}/mês."
             )
 
     with aba_insights:
@@ -223,9 +256,9 @@ def main() -> None:
     with aba_historico:
         historico = history.carregar_historico_locais()
         if historico.empty:
-            st.info("Nenhum histÃ³rico ainda â€” cada upload vira um snapshot comparÃ¡vel.")
+            st.info("Nenhum histórico ainda — cada upload vira um snapshot comparável.")
         else:
-            st.subheader("Uploads")
+            st.markdown('<div class="secao-titulo">Uploads</div>', unsafe_allow_html=True)
             for _, linha in uploads.iterrows():
                 col1, col2, col3 = st.columns([3, 2, 1])
                 with col1:
@@ -237,9 +270,9 @@ def main() -> None:
                         history.excluir_upload(int(linha["id"]))
                         st.rerun()
 
-            st.subheader("EvoluÃ§Ã£o por local")
+            st.markdown('<div class="secao-titulo">Evolução por local</div>', unsafe_allow_html=True)
             locais_hist = sorted(historico["local"].unique())
-            local_hist = st.selectbox("Local (histÃ³rico)", locais_hist, key="local_hist")
+            local_hist = st.selectbox("Local (histórico)", locais_hist, key="local_hist")
             df_local = historico[historico["local"] == local_hist].copy()
             df_local["uploaded_at"] = pd.to_datetime(df_local["uploaded_at"])
             df_local = df_local.sort_values("uploaded_at")

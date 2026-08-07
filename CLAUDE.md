@@ -29,7 +29,8 @@ python -m venv .venv
 - `analysis.py` — KPIs, composição, pareto, anomalias (z-score), curva de payback
 - `insights.py` — regras de insight em PT-BR (severidade: ok/atencao/alerta/dica)
 - `charts.py` — figuras plotly
-- `report.py` — relatório PDF (reportlab + matplotlib)
+- `report.py` — relatório PDF (reportlab + matplotlib, fontes Segoe UI/Consolas)
+- `theme.py` — tokens de design (cores, severidade, paleta de gráficos, CSS do app)
 - `formatos.py` — formatação BR (moeda/número) compartilhada
 - `history.py` — snapshots por upload em SQLite (re-upload do mesmo arquivo substitui; `carregar_workbook` reconstrói análise completa)
 - `config.py` — schema do template (abas RELATORIO/GRÁFICOS, colunas A–O, taxa 15%)
