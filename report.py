@@ -132,9 +132,9 @@ def _header_footer(c: canvas.Canvas, local_name: str, page: int, total_pages: in
     if LOGO_PATH.exists():
         c.drawImage(ImageReader(str(LOGO_PATH)), 11, PAGE_H - 36, width=76, height=12, mask="auto")
     _line(c, 11, 43, PAGE_W - 11, 43, GRID, 0.7)
-    local_lines = _wrap(local_name, FONT_REGULAR, 7.5, 180)
+    local_lines = _wrap(local_name, FONT_REGULAR, 7.2, 145)
     for index, line in enumerate(local_lines[:2]):
-        _text(c, line, PAGE_W - 12, 19 + index * 9, 7.5, FONT_REGULAR, MUTED, "right")
+        _text(c, line, PAGE_W - 18, 19 + index * 9, 7.2, FONT_REGULAR, MUTED, "right")
     footer = f"Rota Smart | Uso interno | Projeto não informado | Página {page} de {total_pages} | {date_label}"
     _text(c, footer, 11, PAGE_H - 23, 7.5, FONT_REGULAR, MUTED)
 
@@ -418,17 +418,17 @@ def _page_one(c: canvas.Canvas, local: loader.Local, context: dict, page: int, t
 
     card_x = [44.3, 205.3, 366.3]
     card_w = 160.2
-    _card(c, card_x[0], 114, card_w, 84, "Investimento total", _money(local.investimento), "Implantação e equipamentos", CYAN)
-    _card(c, card_x[1], 114, card_w, 84, "Valor mensal", _money(local.valor_mensal), "Receita recorrente", CYAN)
-    _card(c, card_x[2], 114, card_w, 84, "Saldo mensal", _money(local.saldo_mensal), "Após impostos e custos", GREEN)
-    _card(c, card_x[0], 184, card_w, 84, "Margem mensal", _percent(local.margem), "Saldo sobre a receita", GREEN)
+    _card(c, card_x[0], 114, card_w, 82, "Investimento total", _money(local.investimento), "Implantação e equipamentos", CYAN)
+    _card(c, card_x[1], 114, card_w, 82, "Valor mensal", _money(local.valor_mensal), "Receita recorrente", CYAN)
+    _card(c, card_x[2], 114, card_w, 82, "Saldo mensal", _money(local.saldo_mensal), "Após impostos e custos", GREEN)
+    _card(c, card_x[0], 208, card_w, 82, "Margem mensal", _percent(local.margem), "Saldo sobre a receita", GREEN)
     payback = ceil(local.tempo_retorno) if local.tempo_retorno is not None else None
-    _card(c, card_x[1], 184, card_w, 84, "Payback", f"{payback} meses" if payback else "Não viável", "Retorno arredondado", GREEN)
-    _card(c, card_x[2], 184, card_w, 84, "Investimento em equipamentos", _money(local.equipamento), "Componentes de equipamento", CYAN)
+    _card(c, card_x[1], 208, card_w, 82, "Payback", f"{payback} meses" if payback else "Não viável", "Retorno arredondado", GREEN)
+    _card(c, card_x[2], 208, card_w, 82, "Investimento em equipamentos", _money(local.equipamento), "Componentes de equipamento", CYAN)
 
-    _summary_box(c, local)
+    _summary_box(c, local, 306)
     _key_value_table(
-        c, 56, 379, 483,
+        c, 56, 421, 483,
         "Estrutura recorrente",
         [("Impostos mensais", _money(local.impostos)), ("Custos operacionais", _money(local.custos_fixos)),
          ("Margem operacional", _percent(local.margem))],
@@ -439,9 +439,9 @@ def _page_one(c: canvas.Canvas, local: loader.Local, context: dict, page: int, t
     result_10 = local.saldo_mensal * 120 - max(0, local.investimento - local.taxa_instalacao)
     roi_5 = result_5 / local.investimento if local.investimento else None
     roi_10 = result_10 / local.investimento if local.investimento else None
-    _card(c, 56, 459, 160.2, 84, "Resultado em 5 anos", _money(result_5), f"ROI de {_percent(roi_5)}", GREEN)
-    _card(c, 217, 459, 160.2, 84, "Resultado em 10 anos", _money(result_10), f"ROI de {_percent(roi_10)}", GREEN)
-    _card(c, 378, 459, 160.2, 93, "Análise", "ANÁLISE PRELIMINAR", "Prazo contratual e dados cadastrais pendentes.", AMBER, 11)
+    _card(c, 56, 509, 160.2, 84, "Resultado em 5 anos", _money(result_5), f"ROI de {_percent(roi_5)}", GREEN)
+    _card(c, 217, 509, 160.2, 84, "Resultado em 10 anos", _money(result_10), f"ROI de {_percent(roi_10)}", GREEN)
+    _card(c, 378, 509, 160.2, 93, "Análise", "ANÁLISE PRELIMINAR", "Prazo contratual e dados cadastrais pendentes.", AMBER, 11)
 
 
 def _page_two(c: canvas.Canvas, local: loader.Local, page: int, total: int, date_label: str) -> None:
