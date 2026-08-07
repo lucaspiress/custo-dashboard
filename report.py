@@ -7,7 +7,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase.ttfonts import TTFError, TTFont
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
@@ -46,7 +46,7 @@ try:
     pdfmetrics.registerFont(TTFont("SegoeUI-Bold", r"C:\Windows\Fonts\segoeuib.ttf"))
     FONT_REGULAR = "SegoeUI"
     FONT_BOLD = "SegoeUI-Bold"
-except OSError:
+except (OSError, TTFError):
     pass
 
 
