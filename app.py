@@ -76,12 +76,14 @@ def main() -> None:
                 dados_bytes = arquivo.getvalue()
                 sha = history.sha256_de_bytes(dados_bytes)
                 workbook = loader.carregar(dados_bytes)
-                history.salvar_snapshot(sha, arquivo.name, workbook.locais)
+                upload_id = history.salvar_snapshot(sha, arquivo.name, workbook.locais)
                 st.session_state["dados"] = workbook
                 st.session_state["fonte"] = f"Upload: {arquivo.name}"
+                st.session_state["snapshot_ativo"] = upload_id
                 st.success(f"Carregado: {arquivo.name}")
                 for aviso in workbook.avisos:
                     st.warning(aviso)
+                st.rerun()
             except ValueError as erro:
                 st.error(str(erro))
                 st.warning(
@@ -101,12 +103,15 @@ def main() -> None:
                 rotulo = f"{linha['filename']} ({linha['uploaded_at']})"
                 opcoes.append(rotulo)
                 mapa[rotulo] = int(linha["id"])
-            escolha = st.selectbox("Ver anÃ¡lise de", opcoes)
+            if "ver_analise" in st.session_state and st.session_state["ver_analise"] not in opcoes:
+                del st.session_state["ver_analise"]
+            escolha = st.selectbox("Ver análise de", opcoes, key="ver_analise")
             id_escolhido = mapa[escolha]
             if id_escolhido != st.session_state.get("snapshot_ativo"):
                 st.session_state["snapshot_ativo"] = id_escolhido
                 st.session_state["dados"] = history.carregar_workbook(id_escolhido)
                 st.session_state["fonte"] = escolha
+                st.rerun()
 
     fonte = st.session_state.get("fonte")
     if fonte:
