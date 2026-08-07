@@ -199,7 +199,7 @@ def _key_value_table(c: canvas.Canvas, x: float, top: float, width: float,
         _line(c, x + half + 10, row_top + 16, x + width - 10, row_top + 16, GRID, 0.45)
 
 
-def _summary_box(c: canvas.Canvas, local: loader.Local, top: float = 263) -> None:
+def _summary_box(c: canvas.Canvas, local: loader.Local, top: float = 270) -> None:
     width = 483
     height = 99
     x = 56
@@ -413,7 +413,7 @@ def _page_one(c: canvas.Canvas, local: loader.Local, context: dict, page: int, t
     c.setFillColor(MUTED)
     c.roundRect(465, PAGE_H - 75, 74, 17, 4, stroke=0, fill=1)
     _text(c, "INCOMPLETO", 502, 63, 7.5, FONT_BOLD, WHITE, "center")
-    _text(c, "Resumo executivo", 230, 80, 30, FONT_BOLD, NAVY, "center")
+    _text(c, "Resumo executivo", 230, 73, 30, FONT_BOLD, NAVY, "center")
     _wrapped(c, local.nome, 416, 77, 125, 8, 10, FONT_REGULAR, MUTED, 2)
 
     card_x = [44.3, 205.3, 366.3]
