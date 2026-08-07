@@ -4,6 +4,7 @@ import analysis
 import history
 import insights
 import loader
+import report
 
 CAMINHO_DEFAULT = r"C:\Users\assistentesolucoes\Desktop\opencode base.xlsx"
 
@@ -76,6 +77,21 @@ def main() -> None:
     print(f"  Histórico: {len(historico)} linha(s)")
     assert not historico.empty
     assert upload_id in historico["upload_id"].tolist()
+
+    print("\nReconstruindo análise a partir do banco...")
+    wb2 = history.carregar_workbook(upload_id)
+    l2 = wb2.locais[0]
+    assert abs(local.equipamento - l2.equipamento) < 0.01, "equipamento divergiu"
+    assert abs(local.investimento - l2.investimento) < 0.01, "investimento divergiu"
+    assert abs(local.saldo_mensal - l2.saldo_mensal) < 0.01, "saldo divergiu"
+    assert len(local.itens) == len(l2.itens), "itens divergiram"
+    assert l2.data_inst is not None, "data de instalação não reconstruída"
+    print("  Reconstrução OK")
+
+    print("\nGerando PDF...")
+    pdf = report.gerar_pdf(caminho.split("\\")[-1], workbook.locais, "teste")
+    assert pdf[:4] == b"%PDF", "PDF inválido"
+    print(f"  PDF: {len(pdf)} bytes OK")
 
     print("\nTODOS OS TESTES PASSARAM")
 

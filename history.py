@@ -5,6 +5,8 @@ from datetime import datetime
 
 import pandas as pd
 
+import loader
+
 PASTA_DADOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 CAMINHO_DB = os.path.join(PASTA_DADOS, "historico.db")
 
@@ -24,12 +26,19 @@ def _inicializar(conn: sqlite3.Connection) -> None:
             sha256 TEXT UNIQUE NOT NULL,
             filename TEXT NOT NULL,
             uploaded_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS locais (
+        );"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS locais (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             upload_id INTEGER NOT NULL REFERENCES uploads(id) ON DELETE CASCADE,
             nome TEXT NOT NULL,
             valor_mensal REAL NOT NULL,
+            taxa_instalacao REAL NOT NULL DEFAULT 0,
+            custo_manutencao REAL NOT NULL DEFAULT 0,
+            mensal_terceirizada REAL NOT NULL DEFAULT 0,
+            chip_mensal REAL NOT NULL DEFAULT 0,
+            custos_softwares REAL NOT NULL DEFAULT 0,
             saldo_mensal REAL NOT NULL,
             investimento REAL NOT NULL,
             equipamento REAL NOT NULL,
@@ -38,8 +47,10 @@ def _inicializar(conn: sqlite3.Connection) -> None:
             meses_retorno INTEGER,
             margem REAL,
             data_inst TEXT
-        );
-        CREATE TABLE IF NOT EXISTS itens (
+        );"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS itens (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             upload_id INTEGER NOT NULL REFERENCES uploads(id) ON DELETE CASCADE,
             categoria TEXT NOT NULL,
@@ -48,9 +59,19 @@ def _inicializar(conn: sqlite3.Connection) -> None:
             qtd REAL NOT NULL,
             valor_unit REAL NOT NULL,
             valor_total REAL NOT NULL
-        );
-        """
+        );"""
     )
+    colunas_existentes = {linha[1] for linha in conn.execute("PRAGMA table_info(locais)")}
+    colunas_novas = {
+        "taxa_instalacao": "REAL NOT NULL DEFAULT 0",
+        "custo_manutencao": "REAL NOT NULL DEFAULT 0",
+        "mensal_terceirizada": "REAL NOT NULL DEFAULT 0",
+        "chip_mensal": "REAL NOT NULL DEFAULT 0",
+        "custos_softwares": "REAL NOT NULL DEFAULT 0",
+    }
+    for coluna, definicao in colunas_novas.items():
+        if coluna not in colunas_existentes:
+            conn.execute(f"ALTER TABLE locais ADD COLUMN {coluna} {definicao}")
     conn.commit()
 
 
@@ -71,13 +92,20 @@ def salvar_snapshot(sha256: str, filename: str, locais) -> int:
         for local in locais:
             conn.execute(
                 """INSERT INTO locais
-                   (upload_id, nome, valor_mensal, saldo_mensal, investimento,
-                    equipamento, mao_de_obra, tempo_retorno, meses_retorno, margem, data_inst)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   (upload_id, nome, valor_mensal, taxa_instalacao, custo_manutencao,
+                    mensal_terceirizada, chip_mensal, custos_softwares,
+                    saldo_mensal, investimento, equipamento, mao_de_obra,
+                    tempo_retorno, meses_retorno, margem, data_inst)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     upload_id,
                     local.nome,
                     local.valor_mensal,
+                    local.taxa_instalacao,
+                    local.custo_manutencao,
+                    local.mensal_terceirizada,
+                    local.chip_mensal,
+                    local.custos_softwares,
                     local.saldo_mensal,
                     local.investimento,
                     local.equipamento,
@@ -151,5 +179,55 @@ def excluir_upload(upload_id: int) -> None:
         _inicializar(conn)
         conn.execute("DELETE FROM uploads WHERE id = ?", (upload_id,))
         conn.commit()
+    finally:
+        conn.close()
+
+
+def carregar_workbook(upload_id: int) -> loader.WorkbookData:
+    from datetime import datetime
+
+    conn = _conexao()
+    try:
+        _inicializar(conn)
+        locais = []
+        linhas = conn.execute(
+            """SELECT nome, valor_mensal, taxa_instalacao, custo_manutencao,
+                      mensal_terceirizada, chip_mensal, custos_softwares,
+                      mao_de_obra, data_inst
+               FROM locais WHERE upload_id = ?""",
+            (upload_id,),
+        ).fetchall()
+        for linha in linhas:
+            nome, valor_mensal, taxa, manutencao, terceirizada, chip, softwares, mao_obra, data_inst = linha
+            itens = [
+                loader.Item(
+                    cod=str(cod) if cod is not None else "",
+                    material=material,
+                    qtd=qtd,
+                    valor_unit=valor_unit,
+                    valor_total=valor_total,
+                    categoria=categoria,
+                )
+                for categoria, cod, material, qtd, valor_unit, valor_total in conn.execute(
+                    """SELECT categoria, cod, material, qtd, valor_unit, valor_total
+                       FROM itens WHERE upload_id = ? ORDER BY id""",
+                    (upload_id,),
+                ).fetchall()
+            ]
+            locais.append(
+                loader.Local(
+                    nome=nome,
+                    valor_mensal=valor_mensal,
+                    taxa_instalacao=taxa,
+                    custo_manutencao=manutencao,
+                    mensal_terceirizada=terceirizada,
+                    chip_mensal=chip,
+                    custos_softwares=softwares,
+                    mao_de_obra=mao_obra,
+                    data_inst=loader._to_date(data_inst),
+                    itens=itens,
+                )
+            )
+        return loader.WorkbookData(locais=locais)
     finally:
         conn.close()

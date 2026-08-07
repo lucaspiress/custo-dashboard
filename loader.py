@@ -110,7 +110,7 @@ def _to_date(valor) -> datetime | None:
     if isinstance(valor, (int, float)):
         return EXCEL_EPOCH + timedelta(days=float(valor))
     texto = str(valor).strip()
-    for fmt in ("%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d"):
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d"):
         try:
             return datetime.strptime(texto, fmt)
         except ValueError:
