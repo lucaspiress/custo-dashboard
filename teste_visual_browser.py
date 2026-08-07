@@ -29,16 +29,15 @@ def main() -> None:
         print("3. Opcoes do seletor:", opcoes.count())
         nomes = [op.inner_text() for op in opcoes.all()]
         print("   ", nomes[:4])
-        alvo = None
-        for op in opcoes.all():
-            if "opencode base" in op.inner_text():
-                alvo = op
-                break
-        if alvo:
+        alvo = opcoes.filter(has_text="opencode base.xlsx").first
+        if alvo.count():
             alvo.click()
-            page.wait_for_timeout(4000)
+            page.wait_for_timeout(7000)
             kpi_novo = page.locator(".kpi-value").first.inner_text()
-            print("4. Troca p/ opencode base -> KPI:", kpi_novo, "| mudou:", kpi_novo != kpi_inicial)
+            fonte_nova = page.locator(".cabecalho-fonte").inner_text()
+            print("4. Troca p/ opencode base -> KPI:", kpi_novo, "| mudou:", kpi_novo != kpi_inicial, "|", fonte_nova)
+            if "opencode base.xlsx" not in fonte_nova:
+                raise AssertionError("O seletor de snapshot não trocou para opencode base")
 
         abas = page.locator("[role='tab']")
         abas.nth(3).click()
