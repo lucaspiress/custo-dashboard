@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: custo-dashboard-api
+    runtime: docker
+    rootDir: backend
+    healthCheckPath: /api/health
+    envVars:
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: https://custo-dashboard.vercel.app
+      - key: DATABASE_URL
+        sync: false
