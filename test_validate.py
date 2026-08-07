@@ -7,45 +7,81 @@ import loader
 import report
 
 CAMINHO_DEFAULT = r"C:\Users\assistentesolucoes\Desktop\opencode base.xlsx"
+CAMINHO_SEGUNDA = r"C:\Users\assistentesolucoes\Downloads\1- CUSTOS DISPENSA ELETRÔNICA 9074-2026 (14ª CRS SANTA ROSA ) RETORNO 20 MESES.xlsx"
 
 
 def aproximado(real, esperado, tolerancia=0.01) -> bool:
     return real is not None and abs(real - esperado) <= tolerancia
 
 
-def main() -> None:
-    caminho = sys.argv[1] if len(sys.argv) > 1 else CAMINHO_DEFAULT
-    print(f"Carregando: {caminho}")
+def testar_arquivo(caminho: str, locais_esperados: int, campos_esperados: list[tuple]) -> None:
+    print(f"\n=== Arquivo: {caminho.split(chr(92))[-1]} ===")
     workbook = loader.carregar(caminho)
     if workbook.avisos:
         print("AVISOS:")
         for aviso in workbook.avisos:
             print(f"  - {aviso}")
-
-    assert len(workbook.locais) == 1, f"Esperava 1 local, veio {len(workbook.locais)}"
+    assert len(workbook.locais) == locais_esperados, (
+        f"Esperava {locais_esperados} local(is), veio {len(workbook.locais)}"
+    )
     local = workbook.locais[0]
-    print(f"\nLocal: {local.nome}")
-
+    print(f"Local: {local.nome}")
     resumo = analysis.resumo(local)
-    campos = [
-        ("valor_mensal", 1150.00),
-        ("taxa_instalacao", 0.00),
-        ("impostos", 172.50),
-        ("saldo_apos_impostos", 977.50),
-        ("saldo_mensal", 800.73),
-        ("mao_de_obra", 2000.00),
-        ("equipamento", 16733.28),
-        ("investimento", 18733.28),
-        ("tempo_retorno", 23.40),
-        ("meses_retorno", 24),
-        ("margem", 0.6963),
-        ("receita_anual", 13800.00),
-    ]
-    for campo, esperado in campos:
+    for campo, esperado in campos_esperados:
         real = resumo[campo]
         ok = aproximado(real, esperado) or real == esperado
         print(f"  {campo:22s} = {real!r:>12}  {'OK' if ok else 'FALHOU (esperado ' + str(esperado) + ')'}")
         assert ok, f"{campo}: esperado {esperado}, veio {real}"
+    return workbook
+
+
+def main() -> None:
+    caminho = sys.argv[1] if len(sys.argv) > 1 else CAMINHO_DEFAULT
+    print(f"Carregando: {caminho}")
+
+    if caminho == CAMINHO_DEFAULT:
+        workbook = testar_arquivo(
+            caminho,
+            1,
+            [
+                ("valor_mensal", 1150.00),
+                ("taxa_instalacao", 0.00),
+                ("impostos", 172.50),
+                ("saldo_apos_impostos", 977.50),
+                ("saldo_mensal", 800.73),
+                ("mao_de_obra", 2000.00),
+                ("equipamento", 16733.28),
+                ("investimento", 18733.28),
+                ("tempo_retorno", 23.40),
+                ("meses_retorno", 24),
+                ("margem", 0.6963),
+                ("receita_anual", 13800.00),
+            ],
+        )
+    else:
+        workbook = testar_arquivo(
+            caminho,
+            1,
+            [
+                ("valor_mensal", 470.00),
+                ("taxa_instalacao", 0.00),
+                ("impostos", 70.50),
+                ("saldo_apos_impostos", 399.50),
+                ("saldo_mensal", 252.73),
+                ("mao_de_obra", 700.00),
+                ("equipamento", 4439.12),
+                ("investimento", 5139.12),
+                ("tempo_retorno", 20.33),
+                ("meses_retorno", 21),
+                ("margem", 0.5377),
+            ],
+        )
+
+    if caminho != CAMINHO_DEFAULT:
+        print("\nSegunda planilha validada — encerrando")
+        return
+
+    local = workbook.locais[0]
 
     print(f"\nData de instalação: {local.data_inst}")
 

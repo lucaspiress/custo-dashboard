@@ -1,4 +1,5 @@
 import io
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -169,6 +170,16 @@ def _parse_itens(ws, nome_aba: str) -> list[Item]:
     return itens
 
 
+def _aba_equipamento_formula(ws_relatorio, linha: int) -> str | None:
+    celula = ws_relatorio[f"{config.RELATORIO_COLUNAS['equipamento']}{linha}"].value
+    if not isinstance(celula, str) or not celula.startswith("="):
+        return None
+    correspondencia = re.search(r"'([^']+)'!", celula)
+    if correspondencia:
+        return correspondencia.group(1)
+    return None
+
+
 def _aba_para_local(ws_names: list[str], nome_local: str) -> str | None:
     nome_local_norm = nome_local.strip().lower()
     melhores = []
@@ -178,6 +189,11 @@ def _aba_para_local(ws_names: list[str], nome_local: str) -> str | None:
         nome_norm = nome.strip().lower()
         if nome_local_norm.startswith(nome_norm) or nome_norm.startswith(nome_local_norm) or nome_norm in nome_local_norm:
             melhores.append((len(nome_norm), nome))
+            continue
+        nucleo_local = re.sub(r"\s*\(.*?\)", "", nome_local_norm).strip()
+        nucleo_aba = re.sub(r"\s*\(.*?\)", "", nome_norm).strip()
+        if nucleo_local and nucleo_aba and (nucleo_local.startswith(nucleo_aba) or nucleo_aba.startswith(nucleo_local)):
+            melhores.append((len(nucleo_aba), nome))
     if not melhores:
         return None
     melhores.sort(key=lambda x: x[0], reverse=True)
@@ -227,7 +243,9 @@ def carregar(origem) -> WorkbookData:
             mao_de_obra=_to_float(ws_relatorio[f"{mapa['mao_de_obra']}{linha}"].value),
             data_inst=data_inst,
         )
-        aba_itens = _aba_para_local(nome_abas, nome)
+        aba_itens = _aba_equipamento_formula(ws_relatorio, linha)
+        if aba_itens is None or aba_itens not in nome_abas:
+            aba_itens = _aba_para_local(nome_abas, nome)
         if aba_itens is None:
             avisos.append(f"Local '{nome}': nenhuma aba de equipamento encontrada (itens zerados).")
         else:
