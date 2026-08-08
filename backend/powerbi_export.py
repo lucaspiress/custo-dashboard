@@ -3,8 +3,6 @@ import os
 import tempfile
 import uuid
 
-import pbix_mcp.server as srv
-
 from formatos import fmt_moeda, fmt_numero
 
 HORIZONTES_FLUXO = (6, 12, 24, 36)
@@ -170,6 +168,8 @@ def _tabela_locais(locais: list[dict]) -> dict:
 
 
 def gerar_powerbi(payload: dict) -> bytes:
+    import pbix_mcp.server as srv
+
     locais = payload.get("locais", [])
     if not locais:
         raise ValueError("Nenhum dado de análise para gerar o Power BI.")
@@ -260,6 +260,8 @@ def gerar_powerbi(payload: dict) -> bytes:
 
 
 def _adicionar_visuais(alias: str, locais: list[dict]) -> None:
+    import pbix_mcp.server as srv
+
     posicoes_kpi = [(40, 40, 280, 110), (340, 40, 280, 110), (640, 40, 280, 110), (940, 40, 280, 110)]
     for (x, y, w, h), spec in zip(posicoes_kpi, _kpi(locais)):
         srv.pbix_add_html_visual(alias, 0, template="kpi_card", template_spec_json=json.dumps(spec), x=x, y=y, width=w, height=h)

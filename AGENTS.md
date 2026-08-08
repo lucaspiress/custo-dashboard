@@ -3,7 +3,7 @@
 Sistema web que transforma planilhas de custo (.xlsx, template padrão) em dashboards
 automatizados com insights por regras, em português.
 
-**Produção (no ar):** https://custo-dashboard-m13fiwhbx-rotacad.vercel.app
+**Produção (no ar):** https://custo-dashboard-rotacad.vercel.app
 **Repo:** https://github.com/lucaspiress/custo-dashboard (push em `main` = deploy automático na Vercel)
 
 ## Documentação de referência (leia antes de mexer)
