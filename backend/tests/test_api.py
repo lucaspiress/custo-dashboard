@@ -1,4 +1,4 @@
-from fixtures import planilha_base, planilha_revisada
+from fixtures import planilha_base
 
 
 def _enviar(cliente, planilha, nome="planilha.xlsx"):
@@ -27,12 +27,9 @@ def test_me_sem_sessao(cliente):
 
 def test_upload_e_analise(cliente, admin):
     dados = _enviar(cliente, planilha_base())
-    upload_id = dados["id"]
-    assert upload_id > 0
-
-    analise = cliente.get(f"/api/uploads/{upload_id}").json()
-    assert len(analise["locais"]) == 2
-    sesc = next(l for l in analise["locais"] if l["nome"] == "SESC TESTE")
+    assert dados["filename"] == "planilha.xlsx"
+    assert len(dados["locais"]) == 2
+    sesc = next(l for l in dados["locais"] if l["nome"] == "SESC TESTE")
     assert sesc["resumo"]["valor_mensal"] == 10000
     assert sesc["resumo"]["impostos"] == 1500
     assert sesc["resumo"]["saldo_mensal"] == 8500
@@ -45,9 +42,9 @@ def test_upload_e_analise(cliente, admin):
     assert sesc["graficos"]["payback"].startswith("{")
 
 
-def test_projeto(cliente, admin):
+def test_projeto_no_payload(cliente, admin):
     dados = _enviar(cliente, planilha_base())
-    projeto = cliente.get(f"/api/uploads/{dados['id']}/project").json()
+    projeto = dados["projeto"]
     assert projeto["totais"]["num_locais"] == 2
     assert projeto["totais"]["receita_mensal"] == 16000
     assert projeto["totais"]["num_itens"] == 5
@@ -55,59 +52,39 @@ def test_projeto(cliente, admin):
     assert "dispersao" in projeto["graficos"]
 
 
-def test_cashflow(cliente, admin):
+def test_cashflow_no_payload(cliente, admin):
     dados = _enviar(cliente, planilha_base())
-    fluxo = cliente.get(f"/api/uploads/{dados['id']}/cashflow", params={"meses": 24, "local": "SESC TESTE"}).json()
+    sesc = next(l for l in dados["locais"] if l["nome"] == "SESC TESTE")
+    fluxo = sesc["fluxo"]["24"]
     assert fluxo["meses"] == 24
     assert len(fluxo["pontos"]) == 24
     assert fluxo["grafico"].startswith("{")
-
-
-def test_comparar_versoes(cliente, admin):
-    base = _enviar(cliente, planilha_base())
-    rev = _enviar(cliente, planilha_revisada(), nome="planilha_v2.xlsx")
-    comparacao = cliente.get(
-        f"/api/uploads/{rev['id']}/compare", params={"vs": base["id"], "local": "SESC TESTE"}
-    ).json()
-    tipos = {i["tipo"] for i in comparacao["itens"]}
-    assert "preco" in tipos
-    assert "quantidade" in tipos
-    assert "adicionado" in tipos
-    assert "removido" in tipos
-    central = next(i for i in comparacao["itens"] if i["material"] == "Central de alarme")
-    assert central["valor_unit_antes"] == 1500
-    assert central["valor_unit_depois"] == 1600
-    investimento = next(k for k in comparacao["kpis"] if k["rotulo"] == "Investimento")
-    assert investimento["depois"] - investimento["antes"] == (1600 + 10 * 120 + 4 * 850 + 700) - (1500 + 8 * 120 + 4 * 850 + 1400)
+    assert len({l["fluxo"][h]["meses"] for l in dados["locais"] for h in ("6", "12", "24", "36")}) == 4
 
 
 def test_pdf_e_excel(cliente, admin):
     dados = _enviar(cliente, planilha_base())
-    pdf = cliente.get(f"/api/uploads/{dados['id']}/report")
+    payload = {
+        "filename": dados["filename"],
+        "locais": [
+            {"nome": l["nome"], "resumo": l["resumo"], "itens": l["itens"]}
+            for l in dados["locais"]
+        ],
+    }
+    pdf = cliente.post("/api/uploads/report", json=payload)
     assert pdf.status_code == 200
     assert pdf.content[:4] == b"%PDF"
-    xlsx = cliente.get(f"/api/uploads/{dados['id']}/export")
+    xlsx = cliente.post("/api/uploads/export", json=payload)
     assert xlsx.status_code == 200
     assert xlsx.content[:2] == b"PK"
 
 
-def test_isolamento_entre_usuarios(cliente, admin):
-    cliente.post(
-        "/api/users",
-        json={"nome": "Segundo Usuário", "username": "usuario2", "senha": "senha12345", "papel": "usuario"},
+def test_upload_sem_sessao(cliente):
+    resposta = cliente.post(
+        "/api/uploads",
+        files={"arquivo": ("p.xlsx", b"nao-e-xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
     )
-    admin_id = admin["id"]
-
-    dados_admin = _enviar(cliente, planilha_base(), nome="do_admin.xlsx")
-    ids_admin = [u["id"] for u in cliente.get("/api/uploads").json()]
-    assert dados_admin["id"] in ids_admin
-
-    cliente.post("/api/auth/logout")
-    usuario = cliente.post("/api/auth/login", json={"username": "usuario2", "senha": "senha12345"}).json()
-    assert usuario["id"] != admin_id
-    uploads_usuario2 = cliente.get("/api/uploads").json()
-    assert uploads_usuario2 == []
-    assert cliente.get(f"/api/uploads/{dados_admin['id']}").status_code == 404
+    assert resposta.status_code == 401
 
 
 def test_admin_limita_usuarios(cliente, admin):

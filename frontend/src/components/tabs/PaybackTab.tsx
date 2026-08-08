@@ -1,39 +1,17 @@
-import { useEffect, useState } from 'react'
-import type { FluxoCaixa, Local } from '../../lib/types'
+import { useState } from 'react'
+import type { Local } from '../../lib/types'
 import { fmtMoeda } from '../../lib/format'
-import { api } from '../../lib/api'
 import PlotlyChart from '../PlotlyChart'
 
 interface Props {
-  uploadId: number
   local: Local
 }
 
 const HORIZONTES = [6, 12, 24, 36]
 
-export default function PaybackTab({ uploadId, local }: Props) {
+export default function PaybackTab({ local }: Props) {
   const [meses, setMeses] = useState(12)
-  const [fluxo, setFluxo] = useState<FluxoCaixa | null>(null)
-  const [carregando, setCarregando] = useState(false)
-
-  useEffect(() => {
-    let ativo = true
-    setCarregando(true)
-    api
-      .get<FluxoCaixa>(`/api/uploads/${uploadId}/cashflow?meses=${meses}&local=${encodeURIComponent(local.nome)}`)
-      .then((dados) => {
-        if (ativo) setFluxo(dados)
-      })
-      .catch(() => {
-        if (ativo) setFluxo(null)
-      })
-      .finally(() => {
-        if (ativo) setCarregando(false)
-      })
-    return () => {
-      ativo = false
-    }
-  }, [uploadId, local, meses])
+  const fluxo = local.fluxo[String(meses)]
 
   return (
     <div>
@@ -56,8 +34,7 @@ export default function PaybackTab({ uploadId, local }: Props) {
             </button>
           ))}
         </div>
-        {carregando && <div className="text-sm text-mutado">Calculando projeção…</div>}
-        {!carregando && fluxo && (
+        {fluxo && (
           <>
             <PlotlyChart figJson={fluxo.grafico} />
             <div className="mt-3 overflow-x-auto rounded-xl border border-borda bg-superficie">

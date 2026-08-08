@@ -1,44 +1,19 @@
-import { useEffect, useState } from 'react'
 import type { ProjetoSummary } from '../../lib/types'
 import { fmtMoeda, fmtNumero } from '../../lib/format'
-import { api } from '../../lib/api'
 import KpiCard from '../KpiCard'
 import PlotlyChart from '../PlotlyChart'
 
 interface Props {
-  uploadId: number
+  projeto: ProjetoSummary
 }
 
-export default function ComparativoTab({ uploadId }: Props) {
-  const [dados, setDados] = useState<ProjetoSummary | null>(null)
-  const [erro, setErro] = useState('')
-
-  useEffect(() => {
-    let ativo = true
-    setDados(null)
-    setErro('')
-    api
-      .get<ProjetoSummary>(`/api/uploads/${uploadId}/project`)
-      .then((d) => {
-        if (ativo) setDados(d)
-      })
-      .catch((e) => {
-        if (ativo) setErro(e instanceof Error ? e.message : 'Erro ao carregar o comparativo.')
-      })
-    return () => {
-      ativo = false
-    }
-  }, [uploadId])
-
-  if (erro) return <div className="text-sm text-alerta">{erro}</div>
-  if (!dados) return <div className="text-sm text-mutado">Carregando comparativo…</div>
-
-  const t = dados.totais
-  const retornoMedio = dados.locais
+export default function ComparativoTab({ projeto }: Props) {
+  const t = projeto.totais
+  const retornoMedio = projeto.locais
     .filter((l) => l.tempo_retorno !== null && l.tempo_retorno !== undefined)
     .reduce((soma, l) => soma + (l.tempo_retorno as number), 0)
-  const retornoMedioFinal = dados.locais.some((l) => l.tempo_retorno !== null)
-    ? retornoMedio / dados.locais.filter((l) => l.tempo_retorno !== null).length
+  const retornoMedioFinal = projeto.locais.some((l) => l.tempo_retorno !== null)
+    ? retornoMedio / projeto.locais.filter((l) => l.tempo_retorno !== null).length
     : null
 
   return (
@@ -57,12 +32,12 @@ export default function ComparativoTab({ uploadId }: Props) {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <PlotlyChart figJson={dados.graficos.investimento} />
-        <PlotlyChart figJson={dados.graficos.saldo} />
+        <PlotlyChart figJson={projeto.graficos.investimento} />
+        <PlotlyChart figJson={projeto.graficos.saldo} />
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <PlotlyChart figJson={dados.graficos.retorno} />
-        <PlotlyChart figJson={dados.graficos.dispersao} />
+        <PlotlyChart figJson={projeto.graficos.retorno} />
+        <PlotlyChart figJson={projeto.graficos.dispersao} />
       </div>
 
       <div className="mt-2">
@@ -80,7 +55,7 @@ export default function ComparativoTab({ uploadId }: Props) {
               </tr>
             </thead>
             <tbody>
-              {[...dados.locais]
+              {[...projeto.locais]
                 .sort((a, b) => (b.tempo_retorno ?? Infinity) - (a.tempo_retorno ?? Infinity))
                 .map((l) => (
                   <tr key={l.local} className="border-b border-borda last:border-0 font-mono">

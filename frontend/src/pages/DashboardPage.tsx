@@ -1,19 +1,17 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+﻿import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
 import { baixarBlob } from '../lib/format'
 import { COR } from '../lib/theme'
-import type { AnaliseUpload, Upload } from '../lib/types'
+import type { AnaliseUpload } from '../lib/types'
 import VisaoGeralTab from '../components/tabs/VisaoGeralTab'
 import CustosTab from '../components/tabs/CustosTab'
 import PaybackTab from '../components/tabs/PaybackTab'
 import InsightsTab from '../components/tabs/InsightsTab'
 import ComparativoTab from '../components/tabs/ComparativoTab'
-import CompararVersoesTab from '../components/tabs/CompararVersoesTab'
-import HistoricoTab from '../components/tabs/HistoricoTab'
 import UsuariosTab from '../components/tabs/UsuariosTab'
 
-const ABAS_PADRAO = ['Visão Geral', 'Custos', 'Payback', 'Insights', 'Comparativo', 'Comparar Versões', 'Histórico']
+const ABAS_PADRAO = ['Visão Geral', 'Custos', 'Payback', 'Insights', 'Comparativo']
 
 const ICONE_PDF = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" /></svg>)
 const ICONE_EXCEL = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="21" x2="9" y2="9" /></svg>)
@@ -26,73 +24,20 @@ const ICONES_ABAS: Record<string, ReactNode> = {
   Payback: (<><polyline points="3 17 9 11 13 15 21 7" /><polyline points="15 7 21 7 21 13" /></>),
   Insights: (<><path d="M9 18h6" /><path d="M10 21h4" /><path d="M12 3a6 6 0 0 0-4 10.5c.8.7 1.3 1.6 1.5 2.5h5c.2-.9.7-1.8 1.5-2.5A6 6 0 0 0 12 3z" /></>),
   Comparativo: (<><path d="M4 20V10" /><path d="M10 20V4" /><path d="M16 20v-7" /><path d="M22 20V7" /></>),
-  'Comparar Versões': (<><circle cx="18" cy="18" r="3" /><circle cx="6" cy="6" r="3" /><path d="M13 6h3a2 2 0 0 1 2 2v7" /><path d="M11 18H8a2 2 0 0 1-2-2V9" /></>),
-  Histórico: (<><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></>),
   Usuários: (<><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" /><circle cx="10" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>),
 }
 
 export default function DashboardPage() {
   const { usuario, logout } = useAuth()
-  const [uploads, setUploads] = useState<Upload[]>([])
-  const [uploadId, setUploadId] = useState<number | null>(null)
   const [analise, setAnalise] = useState<AnaliseUpload | null>(null)
   const [localNome, setLocalNome] = useState<string | null>(null)
   const [aba, setAba] = useState('Visão Geral')
   const [categoriasFiltro, setCategoriasFiltro] = useState<string[]>([])
-  const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const abas = usuario?.papel === 'admin' ? [...ABAS_PADRAO, 'Usuários'] : ABAS_PADRAO
-
-  const carregarUploads = useCallback(() => {
-    api
-      .get<Upload[]>('/api/uploads')
-      .then((lista) => {
-        setUploads(lista)
-        if (lista.length > 0) {
-          setUploadId((atual) => {
-            const existe = lista.some((u) => u.id === atual)
-            return existe ? atual : lista[0].id
-          })
-        } else {
-          setUploadId(null)
-          setAnalise(null)
-          setLocalNome(null)
-        }
-      })
-      .catch((e) => setErro(e instanceof Error ? e.message : 'Erro ao listar uploads.'))
-      .finally(() => setCarregando(false))
-  }, [])
-
-  useEffect(carregarUploads, [carregarUploads])
-
-  useEffect(() => {
-    if (uploadId === null) return
-    let ativo = true
-    setCarregando(true)
-    setAnalise(null)
-    api
-      .get<AnaliseUpload>(`/api/uploads/${uploadId}`)
-      .then((dados) => {
-        if (!ativo) return
-        setAnalise(dados)
-        setLocalNome((atual) => {
-          const nomes = dados.locais.map((l) => l.nome)
-          return atual && nomes.includes(atual) ? atual : (nomes[0] ?? null)
-        })
-      })
-      .catch((e) => {
-        if (ativo) setErro(e instanceof Error ? e.message : 'Erro ao carregar a análise.')
-      })
-      .finally(() => {
-        if (ativo) setCarregando(false)
-      })
-    return () => {
-      ativo = false
-    }
-  }, [uploadId])
 
   const local = analise?.locais.find((l) => l.nome === localNome) ?? analise?.locais[0] ?? null
 
@@ -113,10 +58,10 @@ export default function DashboardPage() {
     try {
       const form = new FormData()
       form.append('arquivo', file)
-      const resposta = await api.postForm<{ id: number; avisos: string[] }>('/api/uploads', form)
-      setUploadId(resposta.id)
+      const resposta = await api.postForm<AnaliseUpload>('/api/uploads', form)
+      setAnalise(resposta)
+      setLocalNome(resposta.locais[0]?.nome ?? null)
       setCategoriasFiltro([])
-      await carregarUploads()
       setAba('Visão Geral')
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao enviar o arquivo.')
@@ -127,8 +72,13 @@ export default function DashboardPage() {
   }
 
   async function baixar(caminho: string, nome: string) {
+    if (!analise) return
+    const payload = {
+      filename: analise.filename,
+      locais: analise.locais.map((l) => ({ nome: l.nome, resumo: l.resumo, itens: l.itens })),
+    }
     try {
-      const blob = await api.blob(caminho)
+      const blob = await api.postBlob(caminho, payload)
       baixarBlob(blob, nome)
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao gerar o arquivo.')
@@ -157,17 +107,17 @@ export default function DashboardPage() {
               if (file) void enviarArquivo(file)
             }}
           />
-          {uploadId !== null && (
+          {analise && (
             <>
               <button
-                onClick={() => void baixar(`/api/uploads/${uploadId}/report`, `Dashboard_Financeiro.pdf`)}
+                onClick={() => void baixar('/api/uploads/report', 'Dashboard_Financeiro.pdf')}
                 className="h-9 rounded-lg px-3.5 text-[13px] font-medium bg-[#16243c] border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors inline-flex items-center gap-2"
               >
                 {ICONE_PDF}
                 Relatório PDF
               </button>
               <button
-                onClick={() => void baixar(`/api/uploads/${uploadId}/export`, 'Custos_export.xlsx')}
+                onClick={() => void baixar('/api/uploads/export', 'Custos_export.xlsx')}
                 className="h-9 rounded-lg px-3.5 text-[13px] font-medium bg-[#16243c] border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors inline-flex items-center gap-2"
               >
                 {ICONE_EXCEL}
@@ -225,94 +175,70 @@ export default function DashboardPage() {
             ))}
           </nav>
 
-          <div className="p-4 flex flex-col gap-4 border-t border-[#1a2138]">
-            {uploads.length > 0 && (
-              <>
+          {analise && analise.locais.length > 0 && (
+            <div className="p-4 flex flex-col gap-4 border-t border-[#1a2138]">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8fa3c7] mb-2">
+                  Local
+                </div>
+                <select
+                  value={localNome ?? ''}
+                  onChange={(e) => setLocalNome(e.target.value)}
+                  className="w-full rounded-lg px-2 py-1.5 text-sm border border-borda outline-none bg-superficie text-tinta"
+                >
+                  {analise.locais.map((l) => (
+                    <option key={l.nome} value={l.nome}>{l.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              {categorias.length > 0 && (
                 <div>
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8fa3c7] mb-2">
-                    Ver análise de
+                    Categorias
                   </div>
-                  <select
-                    value={uploadId ?? ''}
-                    onChange={(e) => setUploadId(Number(e.target.value))}
-                    className="w-full rounded-lg px-2 py-1.5 text-sm border border-borda outline-none bg-superficie text-tinta"
-                  >
-                    {uploads.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.filename} ({u.uploaded_at})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {analise && analise.locais.length > 0 && (
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8fa3c7] mb-2">
-                      Local
-                    </div>
-                    <select
-                      value={localNome ?? ''}
-                      onChange={(e) => setLocalNome(e.target.value)}
-                      className="w-full rounded-lg px-2 py-1.5 text-sm border border-borda outline-none bg-superficie text-tinta"
+                  <div className="flex flex-col gap-1">
+                    <button
+                      onClick={() => setCategoriasFiltro([])}
+                      className={`text-left text-[12.5px] px-2.5 py-1.5 rounded-md border transition-colors ${
+                        categoriasFiltro.length === 0
+                          ? 'border-[#10a0a0] text-white bg-[rgba(16,160,160,0.12)]'
+                          : 'border-transparent text-[#8fa3c7] hover:bg-superficie hover:text-white'
+                      }`}
                     >
-                      {analise.locais.map((l) => (
-                        <option key={l.nome} value={l.nome}>{l.nome}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {categorias.length > 0 && (
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8fa3c7] mb-2">
-                      Categorias
-                    </div>
-                    <div className="flex flex-col gap-1">
+                      Todas
+                    </button>
+                    {categorias.map((c) => (
                       <button
-                        onClick={() => setCategoriasFiltro([])}
+                        key={c}
+                        onClick={() => alternarCategoria(c)}
                         className={`text-left text-[12.5px] px-2.5 py-1.5 rounded-md border transition-colors ${
-                          categoriasFiltro.length === 0
+                          categoriasFiltro.includes(c)
                             ? 'border-[#10a0a0] text-white bg-[rgba(16,160,160,0.12)]'
                             : 'border-transparent text-[#8fa3c7] hover:bg-superficie hover:text-white'
                         }`}
                       >
-                        Todas
+                        {c}
                       </button>
-                      {categorias.map((c) => (
-                        <button
-                          key={c}
-                          onClick={() => alternarCategoria(c)}
-                          className={`text-left text-[12.5px] px-2.5 py-1.5 rounded-md border transition-colors ${
-                            categoriasFiltro.includes(c)
-                              ? 'border-[#10a0a0] text-white bg-[rgba(16,160,160,0.12)]'
-                              : 'border-transparent text-[#8fa3c7] hover:bg-superficie hover:text-white'
-                          }`}
-                        >
-                          {c}
-                        </button>
-                      ))}
-                    </div>
+                    ))}
                   </div>
-                )}
-              </>
-            )}
-          </div>
+                </div>
+              )}
+            </div>
+          )}
         </aside>
 
         <main className="flex-1 min-w-0">
           {analise && analise.filename && (
             <div className="px-6 pt-4 text-[12.5px] text-mutado">
               Exibindo: <span className="text-[#10a0a0] font-semibold">{analise.filename}</span>
-              {analise.uploaded_at && <span className="ml-1">({analise.uploaded_at})</span>}
             </div>
           )}
 
           <div className="p-6">
             {erro && <div className="text-sm text-alerta mb-4">{erro}</div>}
 
-            {carregando && uploadId !== null && <div className="text-sm text-mutado">Carregando análise…</div>}
-
-            {!carregando && !analise && uploads.length === 0 && (
+            {!analise && (
               <div className="rounded-xl border border-borda bg-superficie p-7 text-center">
                 <div className="text-[15px] font-semibold text-tinta mb-1.5">Nenhuma análise carregada ainda</div>
                 <div className="text-[13px] text-mutado leading-relaxed">
@@ -324,7 +250,7 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {!carregando && analise && (
+            {analise && (
               <>
                 {analise.avisos.map((aviso, indice) => (
                   <div key={indice} className="text-sm text-destaque bg-[rgba(224,123,26,0.10)] border border-[rgba(224,123,26,0.35)] rounded-lg px-3 py-2 mb-3">
@@ -335,15 +261,9 @@ export default function DashboardPage() {
                 {aba === 'Custos' && local && (
                   <CustosTab local={local} categorias={categoriasFiltro} onCategorias={setCategoriasFiltro} />
                 )}
-                {aba === 'Payback' && local && uploadId !== null && (
-                  <PaybackTab uploadId={uploadId} local={local} />
-                )}
+                {aba === 'Payback' && local && <PaybackTab local={local} />}
                 {aba === 'Insights' && local && <InsightsTab local={local} />}
-                {aba === 'Comparativo' && uploadId !== null && <ComparativoTab uploadId={uploadId} />}
-                {aba === 'Comparar Versões' && local && uploadId !== null && (
-                  <CompararVersoesTab uploads={uploads} uploadId={uploadId} local={local} />
-                )}
-                {aba === 'Histórico' && <HistoricoTab uploads={uploads} uploadAtivo={uploadId} onUploadsChanged={carregarUploads} />}
+                {aba === 'Comparativo' && <ComparativoTab projeto={analise.projeto} />}
                 {aba === 'Usuários' && usuario?.papel === 'admin' && <UsuariosTab />}
               </>
             )}

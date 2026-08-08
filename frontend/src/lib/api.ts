@@ -45,4 +45,23 @@ export const api = {
     if (!resposta.ok) throw new ApiError(resposta.status, `Erro ${resposta.status}`)
     return resposta.blob()
   },
+  postBlob: async (path: string, body: unknown): Promise<Blob> => {
+    const resposta = await fetch(`${BASE}${path}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!resposta.ok) {
+      let detalhe = `Erro ${resposta.status}`
+      try {
+        const corpo = await resposta.json()
+        if (corpo && typeof corpo.detail === 'string') detalhe = corpo.detail
+      } catch {
+        // corpo não-JSON
+      }
+      throw new ApiError(resposta.status, detalhe)
+    }
+    return resposta.blob()
+  },
 }

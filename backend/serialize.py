@@ -46,3 +46,40 @@ def workbook_payload(workbook: loader.WorkbookData, insights_fn, graficos_fn) ->
         "avisos": workbook.avisos,
         "locais": locais,
     }
+
+
+def workbook_from_payload(payload: dict) -> loader.WorkbookData:
+    locais = []
+    for registro in payload.get("locais", []):
+        resumo = registro.get("resumo", {})
+        local = loader.Local(
+            nome=resumo.get("local") or registro.get("nome", ""),
+            valor_mensal=_numero(resumo.get("valor_mensal")),
+            taxa_instalacao=_numero(resumo.get("taxa_instalacao")),
+            custo_manutencao=_numero(resumo.get("custo_manutencao")),
+            mensal_terceirizada=_numero(resumo.get("mensal_terceirizada")),
+            chip_mensal=_numero(resumo.get("chip_mensal")),
+            custos_softwares=_numero(resumo.get("custos_softwares")),
+            mao_de_obra=_numero(resumo.get("mao_de_obra")),
+            data_inst=loader._to_date(resumo.get("data_inst")),
+            itens=[
+                loader.Item(
+                    cod=str(item.get("cod") or ""),
+                    material=str(item.get("material") or ""),
+                    qtd=_numero(item.get("qtd")),
+                    valor_unit=_numero(item.get("valor_unit")),
+                    valor_total=_numero(item.get("valor_total")),
+                    categoria=str(item.get("categoria") or ""),
+                )
+                for item in registro.get("itens", [])
+            ],
+        )
+        locais.append(local)
+    return loader.WorkbookData(locais=locais, avisos=payload.get("avisos", []))
+
+
+def _numero(valor) -> float:
+    try:
+        return float(valor or 0)
+    except (TypeError, ValueError):
+        return 0.0

@@ -48,20 +48,14 @@ export interface Local {
   itens: Item[]
   insights: Insight[]
   graficos: Record<string, string>
+  fluxo: Record<string, FluxoCaixa>
 }
 
 export interface AnaliseUpload {
-  upload_id: number
   filename: string | null
-  uploaded_at: string | null
   avisos: string[]
   locais: Local[]
-}
-
-export interface Upload {
-  id: number
-  filename: string
-  uploaded_at: string
+  projeto: ProjetoSummary
 }
 
 export interface ProjetoSummary {
@@ -77,35 +71,6 @@ export interface ProjetoSummary {
     num_itens: number
   }
   graficos: Record<string, string>
-}
-
-export interface DiferencaItem {
-  cod: string
-  material: string
-  categoria: string
-  tipo: 'adicionado' | 'removido' | 'preco' | 'quantidade'
-  qtd_antes: number | null
-  qtd_depois: number | null
-  valor_unit_antes: number | null
-  valor_unit_depois: number | null
-  variacao: number | null
-}
-
-export interface KpiComparacao {
-  rotulo: string
-  antes: number | null
-  depois: number | null
-  delta: number | null
-  delta_pct: number | null
-}
-
-export interface ComparacaoVersoes {
-  upload_base: number
-  upload_comparado: number
-  local: string
-  kpis: KpiComparacao[]
-  itens: DiferencaItem[]
-  grafico: string
 }
 
 export interface PontoFluxo {

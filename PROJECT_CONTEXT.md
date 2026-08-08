@@ -26,11 +26,11 @@ do SPA para `index.html` — tudo no mesmo domínio (cookie de sessão funciona)
 
 | Arquivo | Responsabilidade |
 |---|---|
-| `src/pages/DashboardPage.tsx` | Shell: sidebar (upload, snapshots, local, PDF/Excel), abas |
+| `src/pages/DashboardPage.tsx` | Shell: sidebar (upload, local, categorias, PDF/Excel), abas |
 | `src/pages/LoginPage.tsx` | Login fechado (formulário próprio) |
-| `src/components/tabs/` | Abas: Visão Geral, Custos (filtros), Payback (fluxo projetado), Insights, Comparativo, Comparar Versões, Histórico, Usuários (admin) |
+| `src/components/tabs/` | Abas: Visão Geral, Custos (filtros), Payback (fluxo projetado), Insights, Comparativo, Usuários (admin) |
 | `src/components/PlotlyChart.tsx` | Renderiza `fig.to_json()` do backend (lazy-load do plotly.js) |
-| `src/lib/api.ts` | Cliente HTTP com cookie; `api.blob` para PDF/Excel |
+| `src/lib/api.ts` | Cliente HTTP com cookie; `api.postBlob` para PDF/Excel |
 | `src/lib/auth.tsx` | Contexto de sessão (me/login/logout) |
 | `src/lib/types.ts` | Tipos espelhando os payloads da API |
 | `src/lib/theme.ts` / `index.css` | Design system (tokens do antigo theme.py) |
@@ -43,10 +43,10 @@ do SPA para `index.html` — tudo no mesmo domínio (cookie de sessão funciona)
 | `main.py` | App FastAPI, CORS, lifespan (schema/seed) |
 | `routers/auth.py` | login/logout/me (cookie JWT httpOnly) |
 | `routers/users.py` | Gestão de usuários (admin, máx. 3 admins) |
-| `routers/uploads.py` | Uploads, análise, project-summary, compare, cashflow, histórico |
-| `routers/files.py` | PDF (reportlab) e Excel (openpyxl) |
+| `routers/uploads.py` | `POST /api/uploads`: analisa em memória e devolve payload completo (locais, insights, gráficos, projeto, fluxo 6/12/24/36) |
+| `routers/files.py` | PDF (reportlab) e Excel (openpyxl) via POST com payload |
 | `security.py` | JWT HS256 + cookie (Secure em produção, SameSite lax) |
-| `store.py` | Facade: Postgres (`db.py`) em prod / SQLite (`history.py`) em dev |
+| `store.py` | Facade: Postgres (`db.py`) em prod / SQLite (`history.py`) em dev — só usuários |
 | `loader.py` | Leitura/validação do template (.xlsx, fórmulas e abas) |
 | `analysis.py` | KPIs, resumo_projeto, comparar_locais, fluxo_caixa |
 | `insights.py` | Regras de insight em PT-BR (ok/atencao/alerta/dica) |

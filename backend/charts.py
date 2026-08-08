@@ -263,44 +263,6 @@ def grafico_categorias(local: loader.Local) -> go.Figure:
     )
 
 
-def grafico_historico(registros: list[dict], metrica: str, titulo: str) -> go.Figure:
-    fig = go.Figure()
-    cores = theme.PALETA_GRAFICOS
-    e_meses = "retorno" in metrica
-    locais = sorted({r["local"] for r in registros})
-    for indice, nome_local in enumerate(locais):
-        dados = [r for r in registros if r["local"] == nome_local]
-        dados.sort(key=lambda r: r["uploaded_at"])
-        y = [r[metrica] for r in dados]
-        custom = [[_fmt_br(v, 1) if not e_meses else f"{v:.1f} meses"] for v in y]
-        fig.add_trace(
-            go.Scatter(
-                x=[r["uploaded_at"] for r in dados],
-                y=y,
-                mode="lines+markers",
-                name=nome_local,
-                line=dict(width=2.5, color=cores[indice % len(cores)], shape="spline"),
-                fill="tozeroy",
-                fillcolor="rgba(16, 160, 160, 0.08)",
-                marker=dict(size=8, color=cores[indice % len(cores)], line=dict(color="#ffffff", width=1.5)),
-                customdata=custom,
-                hovertemplate="%{x|%d/%m/%Y %H:%M}<br><b>%{customdata[0]}</b><extra></extra>",
-            )
-        )
-    fig.update_layout(
-        **_layout(
-            titulo,
-            420,
-            x_titulo="Data do upload",
-            y_titulo="Meses" if e_meses else "R$",
-        )
-    )
-    fig.update_xaxes(tickformat="%d/%m/%Y", type="date")
-    if not e_meses:
-        fig.update_yaxes(tickprefix="R$ ", separatethousands=True)
-    return fig
-
-
 def grafico_barras_comparativo(locais, metrica: str, titulo: str, e_meses: bool = False) -> go.Figure:
     fig = go.Figure()
     dados = [(analysis.resumo(local), local) for local in locais]
@@ -452,46 +414,3 @@ def grafico_fluxo_caixa(local: loader.Local, meses: int = 12) -> go.Figure:
     fig.update_yaxes(tickprefix="R$ ", separatethousands=True)
     return fig
 
-
-def grafico_delta_itens(diferencas: list[dict], n: int = 10) -> go.Figure:
-    fig = go.Figure()
-    com_delta = [d for d in diferencas if d["tipo"] in ("preco", "quantidade") and d["variacao"] is not None]
-    com_delta.sort(key=lambda d: abs(d["variacao"]), reverse=True)
-    selecionados = com_delta[:n]
-    if not selecionados:
-        fig.update_layout(**_layout("Variação por item", 360))
-        fig.add_annotation(
-            text="Nenhuma variação de preço ou quantidade entre as versões",
-            showarrow=False,
-            font=dict(color=theme.COR["mutado"], size=13),
-        )
-        return fig
-    nomes = [d["material"][:58] for d in selecionados][::-1]
-    variacoes = [d["variacao"] for d in selecionados][::-1]
-    cores = [theme.COR["sucesso"] if v >= 0 else theme.COR["alerta"] for v in variacoes]
-    fig.add_trace(
-        go.Bar(
-            x=variacoes,
-            y=nomes,
-            orientation="h",
-            marker_color=cores,
-            marker_line=dict(color="#ffffff", width=0.8),
-            customdata=[[_fmt_br(v)] for v in variacoes],
-            hovertemplate="<b>%{y}</b><br>Variação: <b>%{customdata[0]}</b><extra></extra>",
-        )
-    )
-    fig.update_layout(
-        **_layout(f"Variação financeira por item (top {len(selecionados)})", 420, x_titulo="Variação (R$)"),
-        showlegend=False,
-    )
-    fig.update_layout(margin=dict(l=10, r=10, t=56, b=22))
-    fig.update_yaxes(
-        categoryorder="array",
-        categoryarray=nomes[::-1],
-        gridcolor=theme.COR["grid"],
-        zeroline=False,
-        tickfont=dict(size=10),
-    )
-    fig.update_xaxes(tickprefix="R$ ", separatethousands=True)
-    fig.update_xaxes(zeroline=True, zerolinecolor=theme.COR["cinza"], zerolinewidth=1)
-    return fig

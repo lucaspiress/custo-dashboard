@@ -18,11 +18,14 @@ frontend/ (Vite + React + TS + Tailwind)  →  /api/* (rewrite no vercel.json)
 - `store.py` — facade: `db.py` (Postgres/Neon) em prod, `history.py` (SQLite) em dev
 - `loader.py` — leitura do template (aba RELATORIO, colunas A–O, abas por local,
   fórmulas para descobrir a aba de equipamento, taxa 15%)
-- `analysis.py` — KPIs, resumo_projeto, comparar_locais, fluxo_caixa
+- `analysis.py` — KPIs, resumo_projeto, fluxo_caixa
 - `insights.py` — regras em PT-BR (severidade: ok/atencao/alerta/dica)
 - `charts.py` — figuras Plotly serializadas com `to_json()`
 - `report.py` — PDF financeiro de 6 páginas (reportlab, fallback Helvetica no Linux)
 - `export.py` — Excel (Resumo por local, Itens, Comparativo)
+- `serialize.py` — payloads das análises; `workbook_from_payload` reconstrói os dados
+  para PDF/Excel (o banco guarda apenas usuários)
+- `planilha_teste.py` — gera planilha sintética para smoke/previews
 - `api/index.py` — entrypoint da Vercel (ajusta sys.path e expõe `app`)
 - `vercel.json` — função Python (maxDuration 60, excludeFiles) + rewrites `/api/*`
   e fallback SPA para `index.html`

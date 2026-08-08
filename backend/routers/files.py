@@ -5,20 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 
 import export
-import loader
 import report
 import serialize
-import store
 from deps import usuario_atual
 
 router = APIRouter(prefix="/uploads", tags=["files"])
-
-
-def _carregar(usuario: dict, upload_id: int) -> loader.WorkbookData:
-    try:
-        return store.load_workbook(usuario["id"], upload_id)
-    except ValueError as erro:
-        raise HTTPException(status_code=404, detail=str(erro))
 
 
 def _nome_arquivo(nome: str) -> str:
@@ -26,18 +17,16 @@ def _nome_arquivo(nome: str) -> str:
     return quote(f"{base}")
 
 
-@router.get("/{upload_id}/report")
-def relatorio(upload_id: int, usuario: dict = Depends(usuario_atual)) -> Response:
-    workbook = _carregar(usuario, upload_id)
-    uploads = store.list_uploads(usuario["id"])
-    nome_snapshot = "planilha.xlsx"
-    uploaded_at = None
-    for u in uploads:
-        if int(u["id"]) == upload_id:
-            nome_snapshot = u["filename"]
-            uploaded_at = u["uploaded_at"]
-            break
-    pdf_bytes = report.gerar_pdf(nome_snapshot, workbook.locais, str(uploaded_at) if uploaded_at else None)
+@router.post("/report")
+def relatorio(payload: dict, usuario: dict = Depends(usuario_atual)) -> Response:
+    if not payload.get("locais"):
+        raise HTTPException(status_code=400, detail="Nenhum dado de análise para gerar o relatório.")
+    try:
+        workbook = serialize.workbook_from_payload(payload)
+    except ValueError as erro:
+        raise HTTPException(status_code=400, detail=str(erro))
+    nome_snapshot = payload.get("filename") or "planilha.xlsx"
+    pdf_bytes = report.gerar_pdf(nome_snapshot, workbook.locais)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
@@ -47,15 +36,15 @@ def relatorio(upload_id: int, usuario: dict = Depends(usuario_atual)) -> Respons
     )
 
 
-@router.get("/{upload_id}/export")
-def exportar(upload_id: int, usuario: dict = Depends(usuario_atual)) -> Response:
-    workbook = _carregar(usuario, upload_id)
-    uploads = store.list_uploads(usuario["id"])
-    nome_snapshot = "planilha.xlsx"
-    for u in uploads:
-        if int(u["id"]) == upload_id:
-            nome_snapshot = u["filename"]
-            break
+@router.post("/export")
+def exportar(payload: dict, usuario: dict = Depends(usuario_atual)) -> Response:
+    if not payload.get("locais"):
+        raise HTTPException(status_code=400, detail="Nenhum dado de análise para exportar.")
+    try:
+        workbook = serialize.workbook_from_payload(payload)
+    except ValueError as erro:
+        raise HTTPException(status_code=400, detail=str(erro))
+    nome_snapshot = payload.get("filename") or "planilha.xlsx"
     buffer = export.exportar_excel(workbook.locais)
     return Response(
         content=buffer.getvalue(),

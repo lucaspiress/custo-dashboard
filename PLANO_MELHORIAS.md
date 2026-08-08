@@ -30,7 +30,12 @@ Referência visual: https://360.rotagroup.com.br (Rota 360)
   `backend/previews/` (login.png, dashboard.png).
 
 ## 2. Desempenho — cache de análise
-- payload jsonb em uploads; GET vira leitura; lazy import (plotly/reportlab)
+- ~~payload jsonb em uploads; GET vira leitura~~ **SUPERSEDIDO em 08/08/2026**: o banco passou a ser
+  usado **apenas para usuários**. O upload não é mais persistido: `POST /api/uploads` devolve o
+  payload completo (locais + insights + gráficos + projeto + fluxo de caixa 6/12/24/36) e o
+  frontend guarda em memória; PDF/Excel recebem o payload de volta (`POST`). Removidos:
+  "Comparar Versões", "Histórico", select "Ver análise de", tabelas uploads/locais/itens
+  (dropadas no Neon via `backend/migrar_drop_snapshots.py`). Análise some ao atualizar a página.
 
 ## 3. Plataforma — projetos e dados cadastrais (pela interface)
 - tabela projetos + uploads.projeto_id; renomear análises; cliente/projeto/licitação na UI
