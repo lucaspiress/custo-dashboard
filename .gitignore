@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 backend/data/*.db
 preview_*.png
+backend/previews/
 
 # frontend
 frontend/node_modules/

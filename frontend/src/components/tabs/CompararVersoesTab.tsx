@@ -146,9 +146,9 @@ export default function CompararVersoesTab({ uploads, uploadId, local }: Props) 
                             ? 'text-alerta'
                             : 'text-sucesso'
                     return (
-                      <tr key={indice} className="border-b border-borda last:border-0 font-mono hover:bg-[#EFF6FF] transition-colors">
+                      <tr key={indice} className="border-b border-borda last:border-0 font-mono hover:bg-hover transition-colors">
                         <td className="px-3 py-2">
-                          <span className={`text-[10.5px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 text-white ${item.tipo === 'adicionado' ? 'bg-sucesso' : item.tipo === 'removido' ? 'bg-alerta' : 'bg-mutado'}`}>
+                          <span className={`text-[10.5px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 ${item.tipo === 'adicionado' ? 'text-white bg-sucesso' : item.tipo === 'removido' ? 'text-white bg-alerta' : 'text-tinta bg-mutado'}`}>
                             {ROTULO_TIPO[item.tipo]}
                           </span>
                         </td>

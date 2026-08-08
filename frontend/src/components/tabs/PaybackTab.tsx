@@ -48,7 +48,7 @@ export default function PaybackTab({ uploadId, local }: Props) {
               onClick={() => setMeses(h)}
               className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
                 meses === h
-                  ? 'bg-primaria border-primaria text-white'
+                  ? 'botao-marca border-transparent text-white'
                   : 'bg-superficie border-borda text-mutado hover:text-primaria hover:border-primaria'
               }`}
             >

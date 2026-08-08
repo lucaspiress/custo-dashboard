@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { COR } from '../lib/theme'
 
 interface Props {
   rotulo: string
@@ -8,7 +9,7 @@ interface Props {
   atraso?: number
 }
 
-export default function KpiCard({ rotulo, valor, sub, cor = '#1E40AF', atraso = 0 }: Props) {
+export default function KpiCard({ rotulo, valor, sub, cor = COR.primaria, atraso = 0 }: Props) {
   const estilo = { '--kpi-cor': cor, animationDelay: `${atraso}ms` } as CSSProperties
   return (
     <div className="kpi-card" style={estilo}>

@@ -23,14 +23,16 @@ export default function PlotlyChart({ figJson }: Props) {
 
   if (!fig) return null
   return (
-    <Suspense fallback={<div className="h-[360px] flex items-center justify-center text-sm text-mutado">Carregando gráfico…</div>}>
-      <Plot
-        data={fig.data ?? []}
-        layout={fig.layout ?? {}}
-        config={{ responsive: true, ...fig.config }}
-        useResizeHandler
-        style={{ width: '100%', height: (fig.layout?.height ?? 440) as number }}
-      />
-    </Suspense>
+    <div className="grafico-caixa">
+      <Suspense fallback={<div className="h-[360px] flex items-center justify-center text-sm text-mutado">Carregando gráfico…</div>}>
+        <Plot
+          data={fig.data ?? []}
+          layout={fig.layout ?? {}}
+          config={{ responsive: true, ...fig.config }}
+          useResizeHandler
+          style={{ width: '100%', height: (fig.layout?.height ?? 440) as number }}
+        />
+      </Suspense>
+    </div>
   )
 }

@@ -16,11 +16,11 @@ def main() -> None:
 
         pagina.goto(BASE + "/login", wait_until="networkidle")
         assert "Custo Dashboard" in pagina.content()
-        pagina.fill("input[placeholder='Usuário']", "admin")
-        pagina.fill("input[placeholder='Senha']", "admin123456")
+        pagina.fill("#idOperador", "admin")
+        pagina.fill("#senha", "admin123456")
         pagina.click("button[type='submit']")
-        pagina.wait_for_url("**/", timeout=15000)
-        pagina.wait_for_selector("text=Visão Geral", timeout=15000)
+        pagina.wait_for_url("**/", timeout=20000)
+        pagina.wait_for_selector("text=Visão Geral", timeout=20000)
         print("LOGIN OK, abas visíveis")
 
         pagina.wait_for_timeout(1500)

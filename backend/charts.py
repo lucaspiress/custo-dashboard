@@ -21,7 +21,7 @@ def _layout(titulo: str, altura: int, x_titulo: str | None = None, y_titulo: str
         yaxis=dict(title=y_titulo, gridcolor=theme.COR["grid"], zeroline=False, tickfont=dict(size=11)),
         height=altura,
         margin=dict(l=10, r=10, t=44, b=10),
-        hoverlabel=dict(bgcolor="#0F172A", font=dict(color="#ffffff", family=theme.FONTE_UI, size=12)),
+        hoverlabel=dict(bgcolor=theme.COR["fundo"], font=dict(color="#ffffff", family=theme.FONTE_UI, size=12)),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0, font=dict(size=11)),
     )
 
@@ -49,7 +49,7 @@ def grafico_payback(local: loader.Local) -> go.Figure:
             name="Saldo acumulado",
             line=dict(color=theme.COR["primaria"], width=3, shape="spline"),
             fill="tozeroy",
-            fillcolor="rgba(30, 64, 175, 0.07)",
+            fillcolor="rgba(16, 160, 160, 0.10)",
             marker=dict(size=7, color=theme.COR["primaria"], line=dict(color="#ffffff", width=1.5)),
             customdata=custom,
             hovertemplate="Mês %{x}<br>Saldo acumulado: <b>%{customdata[0]}</b><extra></extra>",
@@ -281,7 +281,7 @@ def grafico_historico(registros: list[dict], metrica: str, titulo: str) -> go.Fi
                 name=nome_local,
                 line=dict(width=2.5, color=cores[indice % len(cores)], shape="spline"),
                 fill="tozeroy",
-                fillcolor="rgba(30, 64, 175, 0.04)",
+                fillcolor="rgba(16, 160, 160, 0.08)",
                 marker=dict(size=8, color=cores[indice % len(cores)], line=dict(color="#ffffff", width=1.5)),
                 customdata=custom,
                 hovertemplate="%{x|%d/%m/%Y %H:%M}<br><b>%{customdata[0]}</b><extra></extra>",

@@ -8,7 +8,7 @@ import analysis
 
 
 def _estilo_cabecalho(ws, linha: int, n_colunas: int) -> None:
-    preenchimento = PatternFill(start_color="1E40AF", end_color="1E40AF", fill_type="solid")
+    preenchimento = PatternFill(start_color="0050A0", end_color="0050A0", fill_type="solid")
     fonte = Font(color="FFFFFF", bold=True, size=11)
     for coluna in range(1, n_colunas + 1):
         celula = ws.cell(row=linha, column=coluna)

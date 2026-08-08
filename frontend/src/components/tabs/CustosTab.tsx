@@ -103,7 +103,7 @@ export default function CustosTab({ local }: Props) {
             </thead>
             <tbody>
               {itens.map((item, indice) => (
-                <tr key={`${item.cod}-${item.material}-${indice}`} className="border-b border-borda last:border-0 font-mono hover:bg-[#EFF6FF] transition-colors">
+                <tr key={`${item.cod}-${item.material}-${indice}`} className="border-b border-borda last:border-0 font-mono hover:bg-hover transition-colors">
                   <td className="px-3 py-2 font-sans">{item.categoria}</td>
                   <td className="px-3 py-2">{item.cod}</td>
                   <td className="px-3 py-2 font-sans">{item.material}</td>

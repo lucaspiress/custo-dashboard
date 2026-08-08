@@ -77,7 +77,7 @@ export default function HistoricoTab({ uploads, uploadAtivo, onUploadsChanged }:
             <div key={u.id} className="flex items-center gap-3 px-3 py-2.5 text-sm">
               <span
                 className="text-sm"
-                style={{ color: uploadAtivo === u.id ? '#1E40AF' : 'transparent' }}
+                style={{ color: uploadAtivo === u.id ? '#e07b1a' : 'transparent' }}
               >
                 ●
               </span>

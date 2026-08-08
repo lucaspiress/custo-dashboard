@@ -104,7 +104,7 @@ export default function UsuariosTab() {
             <option value="usuario">Usuário</option>
             <option value="admin">Admin</option>
           </select>
-          <button type="submit" className="rounded-lg px-4 py-2 text-sm font-medium text-white bg-primaria hover:bg-[#1E3A8A]">
+          <button type="submit" className="botao-marca rounded-lg px-4 py-2 text-sm font-medium">
             Criar usuário
           </button>
         </div>
