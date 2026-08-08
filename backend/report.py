@@ -177,6 +177,37 @@ def _card(c: canvas.Canvas, x: float, top: float, width: float, height: float, l
         _wrapped(c, sub, x + 10, top + height - 16, width - 20, 7.2, 9, FONT_REGULAR, MUTED, 2)
 
 
+def _card_solid(c: canvas.Canvas, x: float, top: float, width: float, height: float, label: str, value: str,
+                sub: str = "", accent=GREEN, value_size: float = 15, label_size: float = 7.5) -> None:
+    _rect(c, x, top, width, height, accent, accent)
+    _text(c, label.upper(), x + 10, top + 9, label_size, FONT_BOLD, WHITE, max_width=width - 20)
+    _text(c, value, x + 10, top + 34, value_size, FONT_BOLD, WHITE, max_width=width - 20)
+    if sub:
+        _wrapped(c, sub, x + 10, top + height - 16, width - 20, 7.2, 9, FONT_REGULAR, WHITE, 2)
+
+
+def _panel_projecoes(c: canvas.Canvas, local: loader.Local, top: float = 101) -> None:
+    x = CONTENT_LEFT
+    width = CONTENT_WIDTH
+    height = 116
+    half = width / 2
+    result_5 = local.saldo_mensal * 60 - max(0, local.investimento - local.taxa_instalacao)
+    result_10 = local.saldo_mensal * 120 - max(0, local.investimento - local.taxa_instalacao)
+    roi_5 = result_5 / local.investimento if local.investimento else None
+    roi_10 = result_10 / local.investimento if local.investimento else None
+    _rect(c, x, top, width, height, GREEN, GREEN)
+    _text(c, "PROJEÇÕES FINANCEIRAS", x + 14, top + 8, 7.5, FONT_BOLD, WHITE)
+    _line(c, x + half, top + 24, x + half, top + height - 10, WHITE, 1.0)
+    for coluna, rotulo, resultado, receita, roi in (
+        (0, "5 ANOS", result_5, local.valor_mensal * 60, roi_5),
+        (1, "10 ANOS", result_10, local.valor_mensal * 120, roi_10),
+    ):
+        cx = x + coluna * half
+        _text(c, rotulo, cx + 16, top + 32, 9, FONT_BOLD, WHITE)
+        _text(c, _money(resultado), cx + 16, top + 60, 22, FONT_BOLD, WHITE, max_width=half - 32)
+        _text(c, f"Receita {_money(receita)}  |  ROI {_percent(roi)}", cx + 16, top + 92, 8, FONT_REGULAR, WHITE, max_width=half - 32)
+
+
 def _section_title(c: canvas.Canvas, title: str, subtitle: str | None = None, top: float = 62) -> None:
     _text(c, title, CONTENT_LEFT, top, 17, FONT_BOLD, NAVY_BLUE, max_width=CONTENT_WIDTH)
     if subtitle:
@@ -346,13 +377,13 @@ def _draw_projection_chart(c: canvas.Canvas, local: loader.Local, top: float = 2
         value = ymax * tick / 4
         tick_top = PAGE_H - py(value)
         _line(c, plot_x, tick_top, plot_x + plot_w, tick_top, GRID, 0.45)
-    groups = [(0.52, "5 anos", values[0], values[2]), (1.48, "10 anos", values[1], values[3])]
-    bar_w = 0.28
+    groups = [(0.45, "5 anos", values[0], values[2]), (1.55, "10 anos", values[1], values[3])]
+    bar_w = 0.40
     for group_x, label, revenue, result in groups:
         bars = [(group_x - bar_w / 2, revenue, CYAN), (group_x + bar_w / 2, result, GREEN)]
         for bar_x, value, color in bars:
-            left = plot_x + plot_w * (bar_x / 2) - 28
-            bar_width = 56
+            left = plot_x + plot_w * (bar_x / 2) - 34
+            bar_width = 68
             bar_top = py(max(value, 0))
             base_y = py(0)
             c.setFillColor(color)
@@ -466,9 +497,20 @@ def _page_one(c: canvas.Canvas, local: loader.Local, context: dict, page: int, t
     result_10 = local.saldo_mensal * 120 - max(0, local.investimento - local.taxa_instalacao)
     roi_5 = result_5 / local.investimento if local.investimento else None
     roi_10 = result_10 / local.investimento if local.investimento else None
-    _card(c, CONTENT_LEFT, 509, CARD_WIDTH, 84, "Resultado em 5 anos", _money(result_5), f"ROI de {_percent(roi_5)}", GREEN)
-    _card(c, CONTENT_LEFT + CARD_WIDTH + CARD_GAP, 509, CARD_WIDTH, 84, "Resultado em 10 anos", _money(result_10), f"ROI de {_percent(roi_10)}", GREEN)
-    _card(c, CONTENT_LEFT + (CARD_WIDTH + CARD_GAP) * 2, 509, CARD_WIDTH, 93, "Análise", "ANÁLISE PRELIMINAR", "Prazo contratual e dados cadastrais pendentes.", AMBER, 11)
+    altura_resultado = 112
+    top_resultado = 505
+    _card(c, CONTENT_LEFT, top_resultado, CARD_WIDTH, altura_resultado, "Resultado em 5 anos",
+          _money(result_5), f"ROI de {_percent(roi_5)}", GREEN, 17)
+    _card(c, CONTENT_LEFT + CARD_WIDTH + CARD_GAP, top_resultado, CARD_WIDTH, altura_resultado, "Resultado em 10 anos",
+          _money(result_10), f"ROI de {_percent(roi_10)}", GREEN, 17)
+    if local.saldo_mensal > 0 and local.tempo_retorno is not None:
+        veredito = "PROJETO VIÁVEL"
+        sub_veredito = f"Recuperação em {_number(local.tempo_retorno)} meses · margem de {_percent(local.margem)}"
+    else:
+        veredito = "REVER VIABILIDADE"
+        sub_veredito = "Saldo mensal insuficiente para recuperar o investimento"
+    _card_solid(c, CONTENT_LEFT + (CARD_WIDTH + CARD_GAP) * 2, top_resultado, CARD_WIDTH, altura_resultado,
+                "Análise", veredito, sub_veredito, GREEN, 15)
 
 
 def _page_two(c: canvas.Canvas, local: loader.Local, page: int, total: int, date_label: str) -> None:
@@ -528,18 +570,17 @@ def _page_four(c: canvas.Canvas, local: loader.Local, page: int, total: int, dat
     result_10 = local.saldo_mensal * 120 - max(0, local.investimento - local.taxa_instalacao)
     roi_5 = result_5 / local.investimento if local.investimento else None
     roi_10 = result_10 / local.investimento if local.investimento else None
-    _card(c, CONTENT_LEFT, 101, CARD_WIDTH, 84, "5 anos", _money(result_5), f"Receita {_money(local.valor_mensal * 60)} | ROI {_percent(roi_5)}", GREEN)
-    _card(c, CONTENT_LEFT + CARD_WIDTH + 80, 101, CARD_WIDTH, 84, "10 anos", _money(result_10), f"Receita {_money(local.valor_mensal * 120)} | ROI {_percent(roi_10)}", GREEN)
-    _draw_table(c, 56, 191, [161, 161, 161], ["Comparativo", "5 anos", "10 anos"],
+    _panel_projecoes(c, local, 101)
+    _draw_table(c, 56, 229, [161, 161, 161], ["Comparativo", "5 anos", "10 anos"],
                 [["Receita", _money(local.valor_mensal * 60), _money(local.valor_mensal * 120)],
                  ["Resultado líquido", _money(result_5), _money(result_10)],
                  ["ROI", _percent(roi_5), _percent(roi_10)]], [19, 29, 29])
-    _draw_projection_chart(c, local, 285)
-    _draw_table(c, 56, 525, [100, 65, 125, 145, 48], ["Período", "Meses", "Receita", "Resultado líquido", "ROI"],
+    _draw_projection_chart(c, local, 321)
+    _draw_table(c, 56, 563, [100, 65, 125, 145, 48], ["Período", "Meses", "Receita", "Resultado líquido", "ROI"],
                 [["5 anos", "60", _money(local.valor_mensal * 60), _money(result_5), _percent(roi_5)],
                  ["10 anos", "120", _money(local.valor_mensal * 120), _money(result_10), _percent(roi_10)]], [19, 19])
     _text(c, "Projeções nominais considerando valores constantes, sem reajustes, inflação, juros ou custo de capital.",
-          CONTENT_LEFT, 588, 8.5, FONT_REGULAR, MUTED, max_width=CONTENT_WIDTH)
+          CONTENT_LEFT, 640, 8.5, FONT_REGULAR, MUTED, max_width=CONTENT_WIDTH)
 
 
 def _page_five(c: canvas.Canvas, local: loader.Local, page: int, total: int, date_label: str) -> list[loader.Item]:

@@ -22,9 +22,9 @@ frontend/ (Vite + React + TS + Tailwind)  →  /api/* (rewrite no vercel.json)
 - `insights.py` — regras em PT-BR (severidade: ok/atencao/alerta/dica)
 - `charts.py` — figuras Plotly serializadas com `to_json()`
 - `report.py` — PDF financeiro de 6 páginas (reportlab, fallback Helvetica no Linux)
-- `export.py` — Excel (Resumo por local, Itens, Comparativo)
+- `powerbi_export.py` — gera .pbix (tabelas Locais/Itens/FluxoCaixa, medidas DAX, página com visuais) via pbix-mcp
 - `serialize.py` — payloads das análises; `workbook_from_payload` reconstrói os dados
-  para PDF/Excel (o banco guarda apenas usuários)
+  para PDF (o banco guarda apenas usuários)
 - `planilha_teste.py` — gera planilha sintética para smoke/previews
 - `api/index.py` — entrypoint da Vercel (ajusta sys.path e expõe `app`)
 - `vercel.json` — função Python (maxDuration 60, excludeFiles) + rewrites `/api/*`

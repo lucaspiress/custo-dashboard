@@ -62,21 +62,38 @@ def test_cashflow_no_payload(cliente, admin):
     assert len({l["fluxo"][h]["meses"] for l in dados["locais"] for h in ("6", "12", "24", "36")}) == 4
 
 
-def test_pdf_e_excel(cliente, admin):
+def test_pdf_e_powerbi(cliente, admin, tmp_path):
     dados = _enviar(cliente, planilha_base())
     payload = {
         "filename": dados["filename"],
         "locais": [
-            {"nome": l["nome"], "resumo": l["resumo"], "itens": l["itens"]}
+            {"nome": l["nome"], "resumo": l["resumo"], "itens": l["itens"], "fluxo": l["fluxo"]}
             for l in dados["locais"]
         ],
     }
     pdf = cliente.post("/api/uploads/report", json=payload)
     assert pdf.status_code == 200
     assert pdf.content[:4] == b"%PDF"
-    xlsx = cliente.post("/api/uploads/export", json=payload)
-    assert xlsx.status_code == 200
-    assert xlsx.content[:2] == b"PK"
+    pbix = cliente.post("/api/uploads/powerbi", json=payload)
+    assert pbix.status_code == 200, pbix.text
+    assert pbix.content[:2] == b"PK"
+    caminho = tmp_path / "analise.pbix"
+    caminho.write_bytes(pbix.content)
+    import zipfile
+
+    with zipfile.ZipFile(caminho) as z:
+        nomes = z.namelist()
+        assert "[Content_Types].xml" in nomes
+        assert "DataModel" in nomes
+    import pbix_mcp.server as srv
+
+    srv.pbix_open(str(caminho), "teste_pbix")
+    try:
+        tabelas = srv.pbix_list_tables("teste_pbix")
+        for nome_tabela in ("Locais", "Itens", "FluxoCaixa"):
+            assert nome_tabela in tabelas
+    finally:
+        srv.pbix_close("teste_pbix")
 
 
 def test_upload_sem_sessao(cliente):

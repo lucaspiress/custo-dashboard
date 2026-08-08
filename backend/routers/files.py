@@ -4,7 +4,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 
-import export
+import powerbi_export
 import report
 import serialize
 from deps import usuario_atual
@@ -36,20 +36,21 @@ def relatorio(payload: dict, usuario: dict = Depends(usuario_atual)) -> Response
     )
 
 
-@router.post("/export")
-def exportar(payload: dict, usuario: dict = Depends(usuario_atual)) -> Response:
+@router.post("/powerbi")
+def powerbi(payload: dict, usuario: dict = Depends(usuario_atual)) -> Response:
     if not payload.get("locais"):
         raise HTTPException(status_code=400, detail="Nenhum dado de análise para exportar.")
+    nome_snapshot = payload.get("filename") or "planilha.xlsx"
     try:
-        workbook = serialize.workbook_from_payload(payload)
+        pbix_bytes = powerbi_export.gerar_powerbi(payload)
     except ValueError as erro:
         raise HTTPException(status_code=400, detail=str(erro))
-    nome_snapshot = payload.get("filename") or "planilha.xlsx"
-    buffer = export.exportar_excel(workbook.locais)
+    except Exception as erro:
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar o Power BI: {erro}")
     return Response(
-        content=buffer.getvalue(),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        content=pbix_bytes,
+        media_type="application/octet-stream",
         headers={
-            "Content-Disposition": f"attachment; filename*=UTF-8''Custos_{_nome_arquivo(nome_snapshot)}.xlsx"
+            "Content-Disposition": f"attachment; filename*=UTF-8''Analise_{_nome_arquivo(nome_snapshot)}.pbix"
         },
     )

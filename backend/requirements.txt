@@ -7,3 +7,4 @@ plotly>=5.20
 reportlab>=4.2
 PyJWT>=2.8
 pydantic>=2.7
+pbix-mcp==0.9.79

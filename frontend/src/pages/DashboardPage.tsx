@@ -14,7 +14,7 @@ import UsuariosTab from '../components/tabs/UsuariosTab'
 const ABAS_PADRAO = ['Visão Geral', 'Custos', 'Payback', 'Insights', 'Comparativo']
 
 const ICONE_PDF = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" /></svg>)
-const ICONE_EXCEL = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="21" x2="9" y2="9" /></svg>)
+const ICONE_PBI = (<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="10" width="4" height="10" rx="0.8" /><rect x="10" y="4" width="4" height="16" rx="0.8" /><rect x="17" y="13" width="4" height="7" rx="0.8" /></svg>)
 const ICONE_UPLOAD = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>)
 const ICONE_SAIR = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>)
 
@@ -75,7 +75,7 @@ export default function DashboardPage() {
     if (!analise) return
     const payload = {
       filename: analise.filename,
-      locais: analise.locais.map((l) => ({ nome: l.nome, resumo: l.resumo, itens: l.itens })),
+      locais: analise.locais.map((l) => ({ nome: l.nome, resumo: l.resumo, itens: l.itens, fluxo: l.fluxo })),
     }
     try {
       const blob = await api.postBlob(caminho, payload)
@@ -117,11 +117,11 @@ export default function DashboardPage() {
                 Relatório PDF
               </button>
               <button
-                onClick={() => void baixar('/api/uploads/export', 'Custos_export.xlsx')}
+                onClick={() => void baixar('/api/uploads/powerbi', 'Analise.pbix')}
                 className="h-9 rounded-lg px-3.5 text-[13px] font-medium bg-[#16243c] border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors inline-flex items-center gap-2"
               >
-                {ICONE_EXCEL}
-                Exportar Excel
+                {ICONE_PBI}
+                Exportar Power BI
               </button>
               <span className="w-px h-6 bg-[#2a3a56] shrink-0" />
             </>

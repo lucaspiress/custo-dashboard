@@ -26,11 +26,11 @@ do SPA para `index.html` — tudo no mesmo domínio (cookie de sessão funciona)
 
 | Arquivo | Responsabilidade |
 |---|---|
-| `src/pages/DashboardPage.tsx` | Shell: sidebar (upload, local, categorias, PDF/Excel), abas |
+| `src/pages/DashboardPage.tsx` | Shell: sidebar (upload, local, categorias, PDF/Power BI), abas |
 | `src/pages/LoginPage.tsx` | Login fechado (formulário próprio) |
 | `src/components/tabs/` | Abas: Visão Geral, Custos (filtros), Payback (fluxo projetado), Insights, Comparativo, Usuários (admin) |
 | `src/components/PlotlyChart.tsx` | Renderiza `fig.to_json()` do backend (lazy-load do plotly.js) |
-| `src/lib/api.ts` | Cliente HTTP com cookie; `api.postBlob` para PDF/Excel |
+| `src/lib/api.ts` | Cliente HTTP com cookie; `api.postBlob` para PDF/Power BI |
 | `src/lib/auth.tsx` | Contexto de sessão (me/login/logout) |
 | `src/lib/types.ts` | Tipos espelhando os payloads da API |
 | `src/lib/theme.ts` / `index.css` | Design system (tokens do antigo theme.py) |
@@ -44,15 +44,15 @@ do SPA para `index.html` — tudo no mesmo domínio (cookie de sessão funciona)
 | `routers/auth.py` | login/logout/me (cookie JWT httpOnly) |
 | `routers/users.py` | Gestão de usuários (admin, máx. 3 admins) |
 | `routers/uploads.py` | `POST /api/uploads`: analisa em memória e devolve payload completo (locais, insights, gráficos, projeto, fluxo 6/12/24/36) |
-| `routers/files.py` | PDF (reportlab) e Excel (openpyxl) via POST com payload |
+| `routers/files.py` | PDF (reportlab) e Power BI (.pbix via pbix-mcp) via POST com payload |
 | `security.py` | JWT HS256 + cookie (Secure em produção, SameSite lax) |
 | `store.py` | Facade: Postgres (`db.py`) em prod / SQLite (`history.py`) em dev — só usuários |
+| `powerbi_export.py` | Gera .pbix: tabelas Locais/Itens/FluxoCaixa, medidas DAX, página Visão Geral |
 | `loader.py` | Leitura/validação do template (.xlsx, fórmulas e abas) |
-| `analysis.py` | KPIs, resumo_projeto, comparar_locais, fluxo_caixa |
+| `analysis.py` | KPIs, resumo_projeto, fluxo_caixa |
 | `insights.py` | Regras de insight em PT-BR (ok/atencao/alerta/dica) |
 | `charts.py` | Figuras Plotly (serializadas com `to_json()`) |
 | `report.py` | PDF financeiro de 6 páginas |
-| `export.py` | Exportação Excel (Resumo, Itens, Comparativo) |
 | `db.py` / `history.py` | Persistência Postgres com RLS / SQLite local com usuários |
 | `schema.sql` | Schema Neon (RLS por usuário) |
 | `seed_admin.py` | Criação de administradores |

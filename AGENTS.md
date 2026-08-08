@@ -44,7 +44,8 @@ frontend/ (Vite + React + TS + Tailwind)  →  /api/* (rewrite no vercel.json)
 Migração completa e publicada. Usuários admin: `lucaspires` e `giusepe` (Neon).
 **Banco usado apenas para usuários** — uploads não são persistidos: `POST /api/uploads` analisa
 em memória e devolve o payload completo (locais + insights + gráficos + projeto + fluxo de caixa
-6/12/24/36); o frontend guarda no estado (some ao atualizar a página). PDF e Excel via
-`POST /api/uploads/report|export` com o payload. Abas: Visão Geral, Custos, Payback, Insights,
+6/12/24/36); o frontend guarda no estado (some ao atualizar a página). PDF via
+`POST /api/uploads/report` e export **Power BI** (.pbix via `pbix-mcp`) via
+`POST /api/uploads/powerbi`, ambos com o payload. Abas: Visão Geral, Custos, Payback, Insights,
 Comparativo (ranking entre locais), Usuários (admin). Tabelas legadas uploads/locais/itens
 foram dropadas no Neon (`backend/migrar_drop_snapshots.py`).
