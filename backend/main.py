@@ -32,7 +32,7 @@ def criar_app() -> FastAPI:
 
     @app.get("/api/health")
     def health() -> dict:
-        return {"ok": True, "modo": store.modo_atual()}
+        return {"ok": True, "modo": store.modo_atual(), "versao": 3}
 
     app.include_router(auth.router, prefix="/api")
     app.include_router(users.router, prefix="/api")
