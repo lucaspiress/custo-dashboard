@@ -43,13 +43,13 @@ export default function ComparativoTab({ uploadId }: Props) {
 
   return (
     <div>
-      <div className="grid grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-4 gap-6 mb-6">
         <KpiCard rotulo="Locais" valor={String(t.num_locais)} sub={`${t.num_itens} itens no total`} cor="#2090b0" />
         <KpiCard rotulo="Receita mensal" valor={fmtMoeda(t.receita_mensal)} sub="Somada dos locais" cor="#6ba3d7" atraso={60} />
         <KpiCard rotulo="Saldo mensal" valor={fmtMoeda(t.saldo_mensal)} sub="Somada dos locais" cor="#10b981" atraso={120} />
         <KpiCard rotulo="Investimento" valor={fmtMoeda(t.investimento)} sub="Mão de obra + equipamento" cor="#e07b1a" atraso={180} />
       </div>
-      <div className="grid grid-cols-4 gap-4 mb-2">
+      <div className="grid grid-cols-4 gap-6 mb-2">
         <KpiCard rotulo="Receita anual" valor={fmtMoeda(t.receita_anual)} sub="12 meses + taxas" cor="#2090b0" atraso={240} />
         <KpiCard rotulo="Equipamento" valor={fmtMoeda(t.equipamento)} sub="Itens da proposta" cor="#10a0a0" atraso={300} />
         <KpiCard rotulo="Mão de obra" valor={fmtMoeda(t.mao_de_obra)} sub="Instalação" cor="#c98f35" atraso={360} />

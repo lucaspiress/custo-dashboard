@@ -3,32 +3,105 @@ import { useAuth } from '../lib/auth'
 
 const ESTADOS = { IDLE: 'idle', AUTENTICANDO: 'autenticando' } as const
 
-function horaUtc(): string {
-  return new Date().toISOString().slice(11, 19) + ' UTC'
+function horaBrasilia(): string {
+  return (
+    new Date().toLocaleTimeString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }) + ' BRT'
+  )
 }
 
 function useRelogio(): string {
-  const [hora, setHora] = useState(horaUtc)
+  const [hora, setHora] = useState(horaBrasilia)
   useEffect(() => {
-    const id = setInterval(() => setHora(horaUtc()), 1000)
+    const id = setInterval(() => setHora(horaBrasilia()), 1000)
     return () => clearInterval(id)
   }, [])
   return hora
 }
 
-function useTelemetria() {
-  const [lat, setLat] = useState(-29.6842)
-  const [lon, setLon] = useState(-53.8069)
-  const [hdg, setHdg] = useState(214)
+function useGalaxia() {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
-    const id = setInterval(() => {
-      setLat((v) => v + (Math.random() - 0.5) * 0.0006)
-      setLon((v) => v + (Math.random() - 0.5) * 0.0006)
-      setHdg((v) => (v + (Math.random() - 0.5) * 1.4 + 360) % 360)
-    }, 1400)
-    return () => clearInterval(id)
+    const canvas = canvasRef.current
+    if (!canvas) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    let raf = 0
+    let w = 0
+    let h = 0
+    const redimensionar = () => {
+      w = canvas.width = window.innerWidth
+      h = canvas.height = window.innerHeight
+    }
+    redimensionar()
+    window.addEventListener('resize', redimensionar)
+    const particulas: { x: number; y: number; vx: number; vy: number; vida: number; max: number; t: number; cor: string }[] = []
+    const CORES = ['16, 160, 160', '107, 163, 215', '237, 241, 247']
+    let mx = -999
+    let my = -999
+    let cx = -999
+    let cy = -999
+    function emitir(x: number, y: number) {
+      if (particulas.length > 80) return
+      const ang = Math.random() * Math.PI * 2
+      const vel = 0.2 + Math.random() * 0.9
+      particulas.push({
+        x,
+        y,
+        vx: Math.cos(ang) * vel,
+        vy: Math.sin(ang) * vel - 0.15,
+        vida: 0,
+        max: 60 + Math.random() * 40,
+        t: 0.6 + Math.random() * 1.6,
+        cor: CORES[Math.floor(Math.random() * CORES.length)],
+      })
+    }
+    const passo = () => {
+      ctx.clearRect(0, 0, w, h)
+      cx += (mx - cx) * 0.08
+      cy += (my - cy) * 0.08
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 170)
+      g.addColorStop(0, 'rgba(16, 160, 160, 0.06)')
+      g.addColorStop(1, 'rgba(16, 160, 160, 0)')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, w, h)
+      for (let i = particulas.length - 1; i >= 0; i--) {
+        const p = particulas[i]
+        p.vida++
+        p.x += p.vx
+        p.y += p.vy
+        p.vx *= 0.99
+        if (p.vida > p.max || p.x < -10 || p.x > w + 10 || p.y < -10 || p.y > h + 10) {
+          particulas.splice(i, 1)
+          continue
+        }
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, p.t, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(${p.cor}, ${0.7 * (1 - p.vida / p.max)})`
+        ctx.fill()
+      }
+      raf = requestAnimationFrame(passo)
+    }
+    raf = requestAnimationFrame(passo)
+    function aoMover(e: globalThis.MouseEvent) {
+      mx = e.clientX
+      my = e.clientY
+      emitir(e.clientX, e.clientY)
+    }
+    window.addEventListener('mousemove', aoMover)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', redimensionar)
+      window.removeEventListener('mousemove', aoMover)
+    }
   }, [])
-  return { lat, lon, hdg }
+  return canvasRef
 }
 
 function Starfield() {
@@ -78,7 +151,7 @@ export default function LoginPage() {
   const alvoRef = useRef({ x: 0, y: 0 })
   const atualRef = useRef({ x: 0, y: 0 })
   const hora = useRelogio()
-  const { lat, lon, hdg } = useTelemetria()
+  const galaxiaRef = useGalaxia()
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
@@ -135,6 +208,8 @@ export default function LoginPage() {
 
   return (
     <div className="login-app">
+      <canvas ref={galaxiaRef} className="galaxy-canvas" aria-hidden="true" />
+      <img src="/logo-sistema.png" alt="" aria-hidden="true" className="login-watermark" />
       <header className="login-header">
         <span className="login-header-mark">
           <img src="/icon-atalho.png" alt="" className="header-icon" />
@@ -158,16 +233,8 @@ export default function LoginPage() {
           <span className="corner-bracket br" />
           <div className="logo-lockup" ref={lockupRef}>
             <span className="logo-halo" />
-            <img src="/logo-prince.png" alt="Rota Group" className="logo-word" />
+            <img src="/icon-atalho.png" alt="Rota Group" className="logo-icon" />
             <span className="logo-tag">Custo Dashboard</span>
-          </div>
-          <div className="telemetry tl">
-            <div><span className="lead">LAT</span> {lat.toFixed(4)}</div>
-            <div><span className="lead">LON</span> {lon.toFixed(4)}</div>
-          </div>
-          <div className="telemetry br">
-            <div><span className="lead">HDG</span> {hdg.toFixed(1)}°</div>
-            <div><span className="lead">ALT</span> 11.280 M</div>
           </div>
           <p className="instrument-caption">Rota Group · aguardando credenciais</p>
         </section>

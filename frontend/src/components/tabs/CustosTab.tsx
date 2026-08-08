@@ -5,6 +5,8 @@ import PlotlyChart from '../PlotlyChart'
 
 interface Props {
   local: Local
+  categorias: string[]
+  onCategorias: (categorias: string[]) => void
 }
 
 const ORDENACOES = [
@@ -14,15 +16,9 @@ const ORDENACOES = [
   { valor: 'material', rotulo: 'Material (A–Z)' },
 ] as const
 
-export default function CustosTab({ local }: Props) {
+export default function CustosTab({ local, categorias }: Props) {
   const [busca, setBusca] = useState('')
-  const [categorias, setCategorias] = useState<string[]>([])
   const [ordenacao, setOrdenacao] = useState<string>('desc')
-
-  const todasCategorias = useMemo(
-    () => Array.from(new Set(local.itens.map((i) => i.categoria))).sort(),
-    [local],
-  )
 
   const itens = useMemo(() => {
     let lista = [...local.itens]
@@ -66,17 +62,6 @@ export default function CustosTab({ local }: Props) {
             className="rounded-lg px-3 py-1.5 text-sm border border-borda outline-none focus:border-primaria w-64"
           />
           <select
-            multiple
-            value={categorias}
-            onChange={(e) => setCategorias(Array.from(e.target.selectedOptions, (o) => o.value))}
-            className="rounded-lg px-2 py-1.5 text-sm border border-borda outline-none min-w-44"
-            title="Filtrar por categoria (Ctrl+clique)"
-          >
-            {todasCategorias.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-          <select
             value={ordenacao}
             onChange={(e) => setOrdenacao(e.target.value)}
             className="rounded-lg px-2 py-1.5 text-sm border border-borda outline-none"
@@ -87,6 +72,7 @@ export default function CustosTab({ local }: Props) {
           </select>
           <span className="text-xs text-mutado self-center">
             {itens.length} de {local.itens.length} itens
+            {categorias.length > 0 && ` · filtrado por ${categorias.length} categoria(s)`}
           </span>
         </div>
         <div className="overflow-x-auto rounded-xl border border-borda bg-superficie">

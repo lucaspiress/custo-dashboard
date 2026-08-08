@@ -68,5 +68,5 @@ PALETA_GRAFICOS = [
     "#f59e0b",
 ]
 
-FONTE_UI = "Inter, Segoe UI, sans-serif"
-FONTE_NUMERO = "Inter, Segoe UI, sans-serif"
+FONTE_UI = "IBM Plex Sans, Segoe UI, sans-serif"
+FONTE_NUMERO = "IBM Plex Mono, Consolas, monospace"
