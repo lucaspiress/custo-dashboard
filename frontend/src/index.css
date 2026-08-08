@@ -85,28 +85,17 @@ html, body, #root {
   border-bottom: 3px solid var(--kpi-cor, var(--cor-primaria));
   border-radius: 12px;
   padding: 18px 20px;
-  animation:
-    fadeInUp 0.4s ease-out both,
-    kpi-glow 3.5s ease-in-out infinite;
+  animation: fadeInUp 0.4s ease-out both;
   transition: transform 200ms ease, border-color 200ms ease;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--kpi-cor, var(--cor-primaria)) 14%, transparent),
+    0 0 14px -4px color-mix(in srgb, var(--kpi-cor, var(--cor-primaria)) 45%, transparent),
+    0 4px 14px rgba(0, 0, 0, 0.2);
 }
 
 .kpi-card:hover {
   transform: translateY(-2px);
   border-color: var(--kpi-cor, var(--cor-primaria));
-}
-
-@keyframes kpi-glow {
-  0%, 100% {
-    box-shadow:
-      0 0 0 0 color-mix(in srgb, var(--kpi-cor, var(--cor-primaria)) 25%, transparent),
-      0 6px 18px rgba(0, 0, 0, 0.28);
-  }
-  50% {
-    box-shadow:
-      0 0 20px 3px color-mix(in srgb, var(--kpi-cor, var(--cor-primaria)) 45%, transparent),
-      0 6px 18px rgba(0, 0, 0, 0.28);
-  }
 }
 
 .kpi-value {
@@ -209,13 +198,13 @@ select, input {
 }
 
 .login-watermark {
-  position: fixed;
+  position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: min(560px, 68vw);
-  opacity: 0.05;
-  z-index: 1;
+  width: min(680px, 120vw);
+  aspect-ratio: 1;
+  opacity: 0.045;
   pointer-events: none;
 }
 
@@ -326,12 +315,19 @@ select, input {
   position: absolute;
   border-radius: 50%;
   background: #edf1f7;
-  animation: twinkle 4s ease-in-out infinite;
+  animation:
+    twinkle 4s ease-in-out infinite,
+    star-drift var(--drift-dur, 12s) ease-in-out var(--drift-delay, 0s) infinite alternate;
 }
 
 @keyframes twinkle {
   0%, 100% { opacity: var(--min-o, 0.15); }
   50% { opacity: var(--max-o, 0.8); }
+}
+
+@keyframes star-drift {
+  from { transform: translate(0, 0); }
+  to { transform: translate(var(--drift-x, 12px), var(--drift-y, -10px)); }
 }
 
 .corner-bracket {
@@ -435,6 +431,7 @@ select, input {
 }
 
 .login-side {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;

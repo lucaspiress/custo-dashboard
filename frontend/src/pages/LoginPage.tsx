@@ -107,14 +107,18 @@ function useGalaxia() {
 function Starfield() {
   const estrelas = useMemo(
     () =>
-      Array.from({ length: 46 }, (_, i) => ({
+      Array.from({ length: 90 }, (_, i) => ({
         id: i,
         top: Math.random() * 100,
         left: Math.random() * 100,
-        size: Math.random() < 0.85 ? 1 : 2,
+        size: Math.random() < 0.7 ? 1 : 2,
         delay: Math.random() * 4,
-        minO: 0.08 + Math.random() * 0.15,
-        maxO: 0.4 + Math.random() * 0.5,
+        minO: 0.15 + Math.random() * 0.2,
+        maxO: 0.55 + Math.random() * 0.35,
+        driftX: (Math.random() - 0.5) * 28,
+        driftY: (Math.random() - 0.5) * 28,
+        driftDur: 9 + Math.random() * 10,
+        driftDelay: Math.random() * 6,
       })),
     []
   )
@@ -132,6 +136,10 @@ function Starfield() {
             animationDelay: s.delay + 's',
             '--min-o': s.minO,
             '--max-o': s.maxO,
+            '--drift-x': s.driftX + 'px',
+            '--drift-y': s.driftY + 'px',
+            '--drift-dur': s.driftDur + 's',
+            '--drift-delay': s.driftDelay + 's',
           } as CSSProperties}
         />
       ))}
@@ -209,7 +217,6 @@ export default function LoginPage() {
   return (
     <div className="login-app">
       <canvas ref={galaxiaRef} className="galaxy-canvas" aria-hidden="true" />
-      <img src="/logo-sistema.png" alt="" aria-hidden="true" className="login-watermark" />
       <header className="login-header">
         <span className="login-header-mark">
           <img src="/icon-atalho.png" alt="" className="header-icon" />
@@ -240,6 +247,7 @@ export default function LoginPage() {
         </section>
 
         <div className="login-side">
+          <img src="/icon-atalho.png" alt="" aria-hidden="true" className="login-watermark" />
           <div className="login-card">
             <div className="brand">
               <img src="/icon-atalho.png" alt="" className="brand-mark" />
