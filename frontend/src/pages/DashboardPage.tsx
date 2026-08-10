@@ -1,4 +1,5 @@
-﻿import { useMemo, useRef, useState, type ReactNode } from 'react'
+﻿import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
 import { baixarBlob } from '../lib/format'
@@ -14,8 +15,9 @@ import UsuariosTab from '../components/tabs/UsuariosTab'
 const ABAS_PADRAO = ['Visão Geral', 'Custos', 'Payback', 'Insights', 'Comparativo']
 
 const ICONE_PDF = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" /></svg>)
-const ICONE_PBI = (<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="10" width="4" height="10" rx="0.8" /><rect x="10" y="4" width="4" height="16" rx="0.8" /><rect x="17" y="13" width="4" height="7" rx="0.8" /></svg>)
-const ICONE_UPLOAD = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>)
+const ICONE_XLSX = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /></svg>)
+const ICONE_PLANILHA = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /></svg>)
+const ICONE_VOLTAR = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>)
 const ICONE_SAIR = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>)
 
 const ICONES_ABAS: Record<string, ReactNode> = {
@@ -28,14 +30,15 @@ const ICONES_ABAS: Record<string, ReactNode> = {
 }
 
 export default function DashboardPage() {
+  const { id } = useParams<{ id: string }>()
+  const projetoId = Number(id)
   const { usuario, logout } = useAuth()
   const [analise, setAnalise] = useState<AnaliseUpload | null>(null)
   const [localNome, setLocalNome] = useState<string | null>(null)
   const [aba, setAba] = useState('Visão Geral')
   const [categoriasFiltro, setCategoriasFiltro] = useState<string[]>([])
   const [erro, setErro] = useState('')
-  const [enviando, setEnviando] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const [carregando, setCarregando] = useState(true)
 
   const abas = usuario?.papel === 'admin' ? [...ABAS_PADRAO, 'Usuários'] : ABAS_PADRAO
 
@@ -46,43 +49,51 @@ export default function DashboardPage() {
     [local]
   )
 
+  useEffect(() => {
+    setCarregando(true)
+    setErro('')
+    api
+      .get<AnaliseUpload>(`/api/projetos/${projetoId}`)
+      .then((dados) => {
+        setAnalise(dados)
+        setLocalNome(dados.locais[0]?.nome ?? null)
+        setCategoriasFiltro([])
+        setAba('Visão Geral')
+      })
+      .catch((e) => setErro(e instanceof Error ? e.message : 'Erro ao carregar projeto.'))
+      .finally(() => setCarregando(false))
+  }, [projetoId])
+
   function alternarCategoria(categoria: string) {
     setCategoriasFiltro((atual) =>
       atual.includes(categoria) ? atual.filter((c) => c !== categoria) : [...atual, categoria]
     )
   }
 
-  async function enviarArquivo(file: File) {
-    setEnviando(true)
-    setErro('')
+  async function baixarPdf() {
     try {
-      const form = new FormData()
-      form.append('arquivo', file)
-      const resposta = await api.postForm<AnaliseUpload>('/api/uploads', form)
-      setAnalise(resposta)
-      setLocalNome(resposta.locais[0]?.nome ?? null)
-      setCategoriasFiltro([])
-      setAba('Visão Geral')
+      const blob = await api.postBlob(`/api/projetos/${projetoId}/relatorio`, {})
+      baixarBlob(blob, `Dashboard_Financeiro_${analise?.filename ?? 'Projeto'}.pdf`)
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao enviar o arquivo.')
-    } finally {
-      setEnviando(false)
-      if (fileRef.current) fileRef.current.value = ''
+      setErro(e instanceof Error ? e.message : 'Erro ao gerar o PDF.')
     }
   }
 
-  async function baixar(caminho: string, nome: string) {
-    if (!analise) return
-    const payload = {
-      filename: analise.filename,
-      locais: analise.locais.map((l) => ({ nome: l.nome, resumo: l.resumo, itens: l.itens, fluxo: l.fluxo })),
-    }
+  async function baixarPlanilha() {
     try {
-      const blob = await api.postBlob(caminho, payload)
-      baixarBlob(blob, nome)
+      const blob = await api.blob(`/api/projetos/${projetoId}/planilha.xlsx`)
+      baixarBlob(blob, `Planilha_${analise?.filename ?? 'Projeto'}.xlsx`)
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao gerar o arquivo.')
+      setErro(e instanceof Error ? e.message : 'Erro ao exportar planilha.')
     }
+  }
+
+  if (carregando) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-mutado text-sm">
+        Carregando projeto…
+      </div>
+    )
   }
 
   return (
@@ -92,50 +103,46 @@ export default function DashboardPage() {
         style={{ background: '#111e34' }}
       >
         <div className="flex items-center gap-3.5 min-w-0">
+          <Link
+            to="/"
+            className="rounded-lg p-2 text-[#93a5c8] hover:text-white hover:bg-[#16243c] transition-colors"
+            title="Voltar aos projetos"
+          >
+            {ICONE_VOLTAR}
+          </Link>
           <img src="/logo-sistema.png" alt="Rota Group" className="h-[32px] w-auto object-contain shrink-0" />
           <span className="w-px h-6 bg-[#2a3a56] shrink-0" />
-          <span className="titulo-display text-[16px] font-semibold text-white tracking-wide truncate">Custo Dashboard</span>
+          <span className="titulo-display text-[16px] font-semibold text-white tracking-wide truncate">
+            {analise?.filename ?? 'Custo Dashboard'}
+          </span>
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".xlsx"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (file) void enviarArquivo(file)
-            }}
-          />
           {analise && (
             <>
               <button
-                onClick={() => void baixar('/api/uploads/report', 'Dashboard_Financeiro.pdf')}
+                onClick={() => void baixarPdf()}
                 className="h-9 rounded-lg px-3.5 text-[13px] font-medium bg-[#16243c] border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors inline-flex items-center gap-2"
               >
                 {ICONE_PDF}
                 Relatório PDF
               </button>
               <button
-                onClick={() => void baixar('/api/uploads/powerbi', 'Analise.pbix')}
+                onClick={() => void baixarPlanilha()}
                 className="h-9 rounded-lg px-3.5 text-[13px] font-medium bg-[#16243c] border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors inline-flex items-center gap-2"
               >
-                {ICONE_PBI}
-                Exportar Power BI
+                {ICONE_XLSX}
+                Exportar planilha
               </button>
+              <Link
+                to={`/projetos/${projetoId}/planilha`}
+                className="h-9 rounded-lg px-3.5 text-[13px] font-medium bg-[#16243c] border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors inline-flex items-center gap-2"
+              >
+                {ICONE_PLANILHA}
+                Editar dados
+              </Link>
               <span className="w-px h-6 bg-[#2a3a56] shrink-0" />
             </>
           )}
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={enviando}
-            className="h-9 rounded-lg px-4 text-[13px] font-semibold text-white inline-flex items-center gap-2 transition-opacity disabled:opacity-60 hover:opacity-90"
-            style={{ background: '#0c7d74' }}
-          >
-            {ICONE_UPLOAD}
-            {enviando ? 'Enviando…' : 'Enviar planilha'}
-          </button>
-          <span className="w-px h-6 bg-[#2a3a56] shrink-0" />
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold shrink-0"
             style={{ background: 'rgba(16, 160, 160, 0.15)', color: '#10a0a0' }}
@@ -231,26 +238,32 @@ export default function DashboardPage() {
         <main className="flex-1 min-w-0">
           {analise && analise.filename && (
             <div className="px-6 pt-4 text-[12.5px] text-mutado">
-              Exibindo: <span className="text-[#10a0a0] font-semibold">{analise.filename}</span>
+              Projeto: <span className="text-[#10a0a0] font-semibold">{analise.filename}</span>
             </div>
           )}
 
           <div className="p-6">
             {erro && <div className="text-sm text-alerta mb-4">{erro}</div>}
 
-            {!analise && (
+            {analise && analise.locais.length === 0 && (
               <div className="rounded-xl border border-borda bg-superficie p-7 text-center">
-                <div className="text-[15px] font-semibold text-tinta mb-1.5">Nenhuma análise carregada ainda</div>
-                <div className="text-[13px] text-mutado leading-relaxed">
-                  Envie uma planilha de custo no template padrão pelo botão no topo.
-                  <br />
-                  O arquivo precisa ter a aba <b>RELATORIO</b> (coluna LOCAL) e abas de equipamento
-                  (MATERIAL ALARME / MATERIAL CFTV).
+                <div className="text-[15px] font-semibold text-tinta mb-1.5">Nenhum local cadastrado</div>
+                <div className="text-[13px] text-mutado leading-relaxed mb-4">
+                  Preencha os dados na tela de planilha (ou importe uma planilha do template) para ver
+                  os gráficos e a análise do projeto.
                 </div>
+                <Link
+                  to={`/projetos/${projetoId}/planilha`}
+                  className="h-9 rounded-lg px-4 text-[13px] font-semibold text-white inline-flex items-center gap-2 hover:opacity-90 transition-opacity"
+                  style={{ background: '#0c7d74' }}
+                >
+                  {ICONE_PLANILHA}
+                  Abrir planilha de dados
+                </Link>
               </div>
             )}
 
-            {analise && (
+            {analise && analise.locais.length > 0 && (
               <>
                 {analise.avisos.map((aviso, indice) => (
                   <div key={indice} className="text-sm text-destaque bg-[rgba(224,123,26,0.10)] border border-[rgba(224,123,26,0.35)] rounded-lg px-3 py-2 mb-3">

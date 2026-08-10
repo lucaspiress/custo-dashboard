@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 import LoginPage from './pages/LoginPage'
+import ProjetosPage from './pages/ProjetosPage'
 import DashboardPage from './pages/DashboardPage'
+import PlanilhaPage from './pages/PlanilhaPage'
 
 function SucessoRedirect() {
   const { usuario } = useAuth()
@@ -37,7 +39,9 @@ function Rotas() {
   return (
     <Routes>
       <Route path="/login" element={usuario ? <SucessoRedirect /> : <LoginPage />} />
-      <Route path="/" element={usuario ? <DashboardPage /> : <Navigate to="/login" replace />} />
+      <Route path="/" element={usuario ? <ProjetosPage /> : <Navigate to="/login" replace />} />
+      <Route path="/projetos/:id" element={usuario ? <DashboardPage /> : <Navigate to="/login" replace />} />
+      <Route path="/projetos/:id/planilha" element={usuario ? <PlanilhaPage /> : <Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

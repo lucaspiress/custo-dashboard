@@ -29,6 +29,7 @@ export interface ResumoLocal {
 }
 
 export interface Item {
+  id?: number
   cod: string
   material: string
   qtd: number
@@ -43,6 +44,7 @@ export interface Insight {
 }
 
 export interface Local {
+  id?: number
   nome: string
   resumo: ResumoLocal
   itens: Item[]
@@ -71,6 +73,43 @@ export interface ProjetoSummary {
     num_itens: number
   }
   graficos: Record<string, string>
+}
+
+export interface ProjetoResumo {
+  id: number
+  nome: string
+  cliente: string | null
+  criado_em: string
+  num_locais: number
+  num_itens: number
+  totais: {
+    receita_mensal: number
+    saldo_mensal: number
+    investimento: number
+  }
+}
+
+export interface LocalLinha {
+  id: number
+  nome: string
+  valor_mensal: number
+  taxa_instalacao: number
+  custo_manutencao: number
+  mensal_terceirizada: number
+  chip_mensal: number
+  custos_softwares: number
+  mao_de_obra: number
+  data_inst: string | null
+}
+
+export interface ItemLinha {
+  id: number
+  categoria: string
+  cod: string
+  material: string
+  qtd: number
+  valor_unit: number
+  valor_total: number
 }
 
 export interface PontoFluxo {

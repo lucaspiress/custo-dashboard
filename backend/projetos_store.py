@@ -1,0 +1,388 @@
+"""Acesso a dados de projetos, locais e itens (Neon via psycopg ou SQLite local).
+
+Segue o mesmo padrão de db.py/history.py: a ramificação é feita por database_url().
+As tabelas são criadas no boot (schema.sql no Neon, history._inicializar no SQLite).
+"""
+
+from datetime import datetime
+
+import db
+import history
+
+COLS_LOCAL = (
+    "nome, valor_mensal, taxa_instalacao, custo_manutencao, mensal_terceirizada, "
+    "chip_mensal, custos_softwares, mao_de_obra, data_inst"
+)
+COLS_ITEM = "local_id, categoria, cod, material, qtd, valor_unit, valor_total"
+
+
+def _sqlite() -> bool:
+    return not db.enabled()
+
+
+def _conn():
+    if _sqlite():
+        return history._conexao()
+    return db.connect()
+
+
+def _isolar_valor(valor) -> float:
+    try:
+        return float(valor or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+# ---------------------------------------------------------------- projetos
+
+def listar_projetos() -> list[dict]:
+    conn = _conn()
+    try:
+        if _sqlite():
+            linhas = conn.execute(
+                """select id, nome, cliente, criado_em
+                   from projetos order by criado_em desc, id desc"""
+            ).fetchall()
+            return [dict(linha) for linha in linhas]
+        return list(
+            conn.execute(
+                """select id, nome, cliente, criado_em
+                   from public.projetos order by criado_em desc, id desc"""
+            ).fetchall()
+        )
+    finally:
+        conn.close()
+
+
+def criar_projeto(nome: str, cliente: str | None = None) -> dict:
+    conn = _conn()
+    try:
+        if _sqlite():
+            cursor = conn.execute(
+                "insert into projetos (nome, cliente, criado_em) values (?, ?, ?)",
+                (nome.strip(), (cliente or "").strip() or None, datetime.now().isoformat(timespec="seconds")),
+            )
+            conn.commit()
+            return {
+                "id": int(cursor.lastrowid),
+                "nome": nome.strip(),
+                "cliente": (cliente or "").strip() or None,
+            }
+        linha = conn.execute(
+            """insert into public.projetos (nome, cliente) values (%s, %s)
+               returning id, nome, cliente, criado_em""",
+            (nome.strip(), (cliente or "").strip() or None),
+        ).fetchone()
+        conn.commit()
+        return dict(linha)
+    finally:
+        conn.close()
+
+
+def get_projeto(projeto_id: int) -> dict | None:
+    conn = _conn()
+    try:
+        if _sqlite():
+            linha = conn.execute(
+                "select id, nome, cliente, criado_em from projetos where id = ?",
+                (projeto_id,),
+            ).fetchone()
+            return dict(linha) if linha else None
+        return conn.execute(
+            """select id, nome, cliente, criado_em
+               from public.projetos where id = %s""",
+            (projeto_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+
+def renomear_projeto(projeto_id: int, nome: str | None = None, cliente: str | None = None) -> dict | None:
+    conn = _conn()
+    try:
+        atual = get_projeto(projeto_id)
+        if atual is None:
+            return None
+        novo_nome = nome.strip() if nome is not None and nome.strip() else atual["nome"]
+        if cliente is not None:
+            novo_cliente = cliente.strip() or None
+        else:
+            novo_cliente = atual.get("cliente")
+        if _sqlite():
+            conn.execute(
+                "update projetos set nome = ?, cliente = ? where id = ?",
+                (novo_nome, novo_cliente, projeto_id),
+            )
+            conn.commit()
+        else:
+            conn.execute(
+                "update public.projetos set nome = %s, cliente = %s where id = %s",
+                (novo_nome, novo_cliente, projeto_id),
+            )
+            conn.commit()
+        return get_projeto(projeto_id)
+    finally:
+        conn.close()
+
+
+def excluir_projeto(projeto_id: int) -> bool:
+    conn = _conn()
+    try:
+        if _sqlite():
+            cursor = conn.execute("delete from projetos where id = ?", (projeto_id,))
+        else:
+            cursor = conn.execute("delete from public.projetos where id = %s", (projeto_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+# ------------------------------------------------------------------ locais
+
+def listar_locais(projeto_id: int) -> list[dict]:
+    conn = _conn()
+    try:
+        if _sqlite():
+            linhas = conn.execute(
+                "select id, projeto_id, " + COLS_LOCAL + " from locais where projeto_id = ? order by id",
+                (projeto_id,),
+            ).fetchall()
+            return [dict(linha) for linha in linhas]
+        return list(
+            conn.execute(
+                """select id, projeto_id, """ + COLS_LOCAL
+                + """ from public.locais where projeto_id = %s order by id""",
+                (projeto_id,),
+            ).fetchall()
+        )
+    finally:
+        conn.close()
+
+
+def criar_local(projeto_id: int, dados: dict) -> dict:
+    conn = _conn()
+    try:
+        if _sqlite():
+            cursor = conn.execute(
+                "insert into locais (projeto_id, " + COLS_LOCAL + ") values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    projeto_id,
+                    dados["nome"].strip(),
+                    _isolar_valor(dados.get("valor_mensal")),
+                    _isolar_valor(dados.get("taxa_instalacao")),
+                    _isolar_valor(dados.get("custo_manutencao")),
+                    _isolar_valor(dados.get("mensal_terceirizada")),
+                    _isolar_valor(dados.get("chip_mensal")),
+                    _isolar_valor(dados.get("custos_softwares")),
+                    _isolar_valor(dados.get("mao_de_obra")),
+                    dados.get("data_inst"),
+                ),
+            )
+            conn.commit()
+            return get_local(int(cursor.lastrowid))  # type: ignore[return-value]
+        linha = conn.execute(
+            """insert into public.locais (projeto_id, """ + COLS_LOCAL + """)
+               values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+               returning id, projeto_id, """ + COLS_LOCAL,
+            (
+                projeto_id,
+                dados["nome"].strip(),
+                _isolar_valor(dados.get("valor_mensal")),
+                _isolar_valor(dados.get("taxa_instalacao")),
+                _isolar_valor(dados.get("custo_manutencao")),
+                _isolar_valor(dados.get("mensal_terceirizada")),
+                _isolar_valor(dados.get("chip_mensal")),
+                _isolar_valor(dados.get("custos_softwares")),
+                _isolar_valor(dados.get("mao_de_obra")),
+                dados.get("data_inst"),
+            ),
+        ).fetchone()
+        conn.commit()
+        return dict(linha)
+    finally:
+        conn.close()
+
+
+def get_local(local_id: int) -> dict | None:
+    conn = _conn()
+    try:
+        if _sqlite():
+            linha = conn.execute(
+                "select id, projeto_id, " + COLS_LOCAL + " from locais where id = ?",
+                (local_id,),
+            ).fetchone()
+            return dict(linha) if linha else None
+        return conn.execute(
+            """select id, projeto_id, """ + COLS_LOCAL + """ from public.locais where id = %s""",
+            (local_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+
+def atualizar_local(local_id: int, dados: dict) -> dict | None:
+    conn = _conn()
+    try:
+        atual = get_local(local_id)
+        if atual is None:
+            return None
+        campos = ["nome", "valor_mensal", "taxa_instalacao", "custo_manutencao",
+                  "mensal_terceirizada", "chip_mensal", "custos_softwares", "mao_de_obra", "data_inst"]
+        for campo in campos:
+            if campo in dados:
+                valor = dados[campo]
+                if campo != "nome" and campo != "data_inst":
+                    valor = _isolar_valor(valor)
+                atual[campo] = valor
+        if _sqlite():
+            conn.execute(
+                """update locais set nome = ?, valor_mensal = ?, taxa_instalacao = ?,
+                   custo_manutencao = ?, mensal_terceirizada = ?, chip_mensal = ?,
+                   custos_softwares = ?, mao_de_obra = ?, data_inst = ? where id = ?""",
+                (atual["nome"].strip(), atual["valor_mensal"], atual["taxa_instalacao"],
+                 atual["custo_manutencao"], atual["mensal_terceirizada"], atual["chip_mensal"],
+                 atual["custos_softwares"], atual["mao_de_obra"], atual["data_inst"], local_id),
+            )
+            conn.commit()
+        else:
+            conn.execute(
+                """update public.locais set nome = %s, valor_mensal = %s, taxa_instalacao = %s,
+                   custo_manutencao = %s, mensal_terceirizada = %s, chip_mensal = %s,
+                   custos_softwares = %s, mao_de_obra = %s, data_inst = %s where id = %s""",
+                (atual["nome"].strip(), atual["valor_mensal"], atual["taxa_instalacao"],
+                 atual["custo_manutencao"], atual["mensal_terceirizada"], atual["chip_mensal"],
+                 atual["custos_softwares"], atual["mao_de_obra"], atual["data_inst"], local_id),
+            )
+            conn.commit()
+        return get_local(local_id)
+    finally:
+        conn.close()
+
+
+def excluir_local(local_id: int) -> bool:
+    conn = _conn()
+    try:
+        if _sqlite():
+            cursor = conn.execute("delete from locais where id = ?", (local_id,))
+        else:
+            cursor = conn.execute("delete from public.locais where id = %s", (local_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+# ------------------------------------------------------------------- itens
+
+def listar_itens(local_id: int) -> list[dict]:
+    conn = _conn()
+    try:
+        if _sqlite():
+            linhas = conn.execute(
+                "select id, local_id, " + COLS_ITEM + " from itens where local_id = ? order by id",
+                (local_id,),
+            ).fetchall()
+            return [dict(linha) for linha in linhas]
+        return list(
+            conn.execute(
+                """select id, local_id, """ + COLS_ITEM + """ from public.itens
+                   where local_id = %s order by id""",
+                (local_id,),
+            ).fetchall()
+        )
+    finally:
+        conn.close()
+
+
+def criar_item(local_id: int, dados: dict) -> dict:
+    conn = _conn()
+    try:
+        qtd = _isolar_valor(dados.get("qtd"))
+        valor_unit = _isolar_valor(dados.get("valor_unit"))
+        valor_total = dados.get("valor_total")
+        if valor_total is None:
+            valor_total = qtd * valor_unit
+        else:
+            valor_total = _isolar_valor(valor_total)
+        if _sqlite():
+            cursor = conn.execute(
+                "insert into itens (" + COLS_ITEM + ") values (?, ?, ?, ?, ?, ?, ?)",
+                (local_id, dados.get("categoria", "").strip(), (dados.get("cod") or "").strip(),
+                 dados.get("material", "").strip(), qtd, valor_unit, valor_total),
+            )
+            conn.commit()
+            return get_item(int(cursor.lastrowid))  # type: ignore[return-value]
+        linha = conn.execute(
+            """insert into public.itens (""" + COLS_ITEM + """)
+               values (%s, %s, %s, %s, %s, %s, %s)
+               returning id, local_id, """ + COLS_ITEM,
+            (local_id, dados.get("categoria", "").strip(), (dados.get("cod") or "").strip(),
+             dados.get("material", "").strip(), qtd, valor_unit, valor_total),
+        ).fetchone()
+        conn.commit()
+        return dict(linha)
+    finally:
+        conn.close()
+
+
+def get_item(item_id: int) -> dict | None:
+    conn = _conn()
+    try:
+        if _sqlite():
+            linha = conn.execute(
+                "select id, local_id, " + COLS_ITEM + " from itens where id = ?",
+                (item_id,),
+            ).fetchone()
+            return dict(linha) if linha else None
+        return conn.execute(
+            """select id, local_id, """ + COLS_ITEM + """ from public.itens where id = %s""",
+            (item_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+
+def atualizar_item(item_id: int, dados: dict) -> dict | None:
+    conn = _conn()
+    try:
+        atual = get_item(item_id)
+        if atual is None:
+            return None
+        campos = ["categoria", "cod", "material", "qtd", "valor_unit"]
+        for campo in campos:
+            if campo in dados:
+                atual[campo] = dados[campo]
+        atual["valor_total"] = _isolar_valor(atual.get("qtd")) * _isolar_valor(atual.get("valor_unit"))
+        if _sqlite():
+            conn.execute(
+                """update itens set categoria = ?, cod = ?, material = ?, qtd = ?,
+                   valor_unit = ?, valor_total = ? where id = ?""",
+                (atual["categoria"].strip(), (atual.get("cod") or "").strip(), atual["material"].strip(),
+                 _isolar_valor(atual["qtd"]), _isolar_valor(atual["valor_unit"]), atual["valor_total"], item_id),
+            )
+            conn.commit()
+        else:
+            conn.execute(
+                """update public.itens set categoria = %s, cod = %s, material = %s, qtd = %s,
+                   valor_unit = %s, valor_total = %s where id = %s""",
+                (atual["categoria"].strip(), (atual.get("cod") or "").strip(), atual["material"].strip(),
+                 _isolar_valor(atual["qtd"]), _isolar_valor(atual["valor_unit"]), atual["valor_total"], item_id),
+            )
+            conn.commit()
+        return get_item(item_id)
+    finally:
+        conn.close()
+
+
+def excluir_item(item_id: int) -> bool:
+    conn = _conn()
+    try:
+        if _sqlite():
+            cursor = conn.execute("delete from itens where id = ?", (item_id,))
+        else:
+            cursor = conn.execute("delete from public.itens where id = %s", (item_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()

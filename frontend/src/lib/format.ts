@@ -36,3 +36,29 @@ export function baixarBlob(blob: Blob, nome: string): void {
   link.remove()
   URL.revokeObjectURL(url)
 }
+
+/** Converte texto de número nos formatos BR (1.234,56) e EN (1234.56). */
+export function parseNumero(valor: string): number | null {
+  const texto = valor.trim().replace(/[R$\s]/g, '')
+  if (!texto) return 0
+  let normalizado = texto
+  if (texto.includes(',') && texto.includes('.')) {
+    normalizado = texto.replace(/\./g, '').replace(',', '.')
+  } else if (texto.includes(',')) {
+    normalizado = texto.replace(',', '.')
+  }
+  const numero = Number(normalizado)
+  return Number.isNaN(numero) ? null : numero
+}
+
+/** Data do payload (ISO ou dd/mm/yyyy) para value de input[type=date]. */
+export function paraInputDate(valor: string | null | undefined): string {
+  if (!valor) return ''
+  const iso = valor.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (iso) return valor.slice(0, 10)
+  const partes = valor.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (partes) return `${partes[3]}-${partes[2].padStart(2, '0')}-${partes[1].padStart(2, '0')}`
+  const data = new Date(valor)
+  if (!Number.isNaN(data.getTime())) return data.toISOString().slice(0, 10)
+  return ''
+}

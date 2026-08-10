@@ -1,94 +1,78 @@
 # Retomada de Desenvolvimento — Custo Dashboard
 
-Última atualização: 08/08/2026 (sexta)
-Objetivo: retomar o desenvolvimento na segunda-feira com contexto completo.
+Última atualização: 10/08/2026 (segunda)
+Contexto: v3 implementada (projetos persistidos + planilha editável), aguardando push.
 
-## 1. Estado atual da produção
+## 1. Estado atual
 
-- **URL correta do projeto:** https://custo-dashboard-rotacad.vercel.app
-  ⚠️ A URL `custo-dashboard-m13fiwhbx-rotacad.vercel.app` (anotada em docs antigos) é um
-  **deploy antigo congelado** — nunca atualiza. Não usar como referência.
-- `/api/health` responde `{"ok":true,"modo":"postgres","versao":3}` → API no ar.
-- Login em produção: usuários **`lucaspires`** e **`giusepe`** (Neon). O `admin`/`admin123456`
-  só existe no ambiente local (SQLite).
-- Último commit em `main`: `5ae1d2a` — `chore: fixa Python 3.12 na Vercel (.python-version)`.
+- **URL de produção:** https://custo-dashboard-rotacad.vercel.app
+  ⚠️ `custo-dashboard-m13fiwhbx-rotacad.vercel.app` é deploy antigo congelado — não usar.
+- Produção ainda roda a **v2** (upload em memória). A **v3 está implementada localmente,
+  ainda não commitada** (último commit em `main`: `167eb06`).
+- Usuários de produção: `lucaspires` e `giusepe` (Neon). `admin`/`admin123456` só no local (SQLite).
 
-## 2. Últimas entregas (já em produção, exceto onde indicado)
+## 2. O que a v3 entrega (pronto, validado localmente)
 
-- **Banco apenas para usuários**: upload não é mais salvo; `POST /api/uploads` analisa em
-  memória e devolve o payload completo (locais + insights + gráficos + projeto + fluxo
-  6/12/24/36). Tabelas `uploads`/`locais`/`itens` removidas do schema; script one-off
-  `backend/migrar_drop_snapshots.py` (Neon) — **ainda não executado em produção**.
-  Análise some ao atualizar a página (comportamento acordado).
-- **PDF** (`backend/report.py`): página 1 com card "Análise" verde sólido (veredito
-  PROJETO VIÁVEL / REVER VIABILIDADE) e cards de resultado 5/10 anos maiores e do mesmo
-  tamanho; página 4 com painel verde full-width de projeções e barras do gráfico espalhadas
-  até as margens. Usuário aprovou o conjunto, mas **vai apontar "alguns detalhes" na segunda**.
-- **Export Power BI** (substitui o Excel): `backend/powerbi_export.py` + rota
-  `POST /api/uploads/powerbi` + botão "Exportar Power BI" no topbar.
-  ❌ **NÃO FUNCIONA EM PRODUÇÃO** (ver pendência 1).
+- **Projetos persistidos** no banco: tabelas `projetos`, `locais`, `itens`
+  (`schema.sql`, criadas no boot com `CREATE TABLE IF NOT EXISTS` — Neon idempotente,
+  sem migração one-off; nada precisa ser migrado, nada era persistido antes).
+- **Tela Projetos** (`ProjetosPage`): lista com totais, novo projeto, importar `.xlsx`,
+  renomear, excluir (cascata).
+- **Tela Planilha** (`PlanilhaPage`): locais + itens em tabelas aninhadas, edição inline
+  com autosave (PATCH por célula), colar TSV do Excel (números BR/EN), colunas calculadas,
+  expansão por local, adicionar item/local.
+- **Dashboard** (`GET /api/projetos/{id}`): mesmo shape do payload antigo (locais +
+  insights + gráficos + projeto + fluxo 6/12/24/36); componentes reutilizados.
+- **Export .xlsx** (`GET /api/projetos/{id}/planilha.xlsx`, `planilha_export.py`) e
+  **PDF** (`POST /api/projetos/{id}/relatorio`, `report.py` atual).
+- **Removidos**: rotas `/api/uploads*`, `routers/uploads.py`, `routers/files.py`,
+  export Power BI (`powerbi_export.py`, `pbix-mcp` fora dos requirements,
+  `installCommand` do `vercel.json` revertido).
 
-## 3. Pendências conhecidas
+## 3. Validações feitas
 
-### 3.1 Export Power BI falha em produção (prioridade alta)
-- Sintoma: botão "Exportar Power BI" gera erro 500 no ambiente Vercel.
-- Fatos levantados:
-  - Funciona local (Windows, venv) e em container Linux `python:3.12-slim` com o
-    requirements.txt (PBIX gerado e validado).
-  - O import de `pbix_mcp.server` no topo do módulo derrubava o app inteiro na Vercel
-    (todos os endpoints 500) → corrigido com **import lazy** dentro de
-    `gerar_powerbi()` / `_adicionar_visuais()` (`backend/powerbi_export.py`).
-  - Com o import lazy, o app funciona, mas a rota `/powerbi` continua falhando.
-  - Foi criado `.python-version` = `3.12` para forçar o runtime (commit `5ae1d2a`),
-    mas o problema persistiu no teste do usuário.
-- Próximos passos (segunda):
-  1. Pegar o **traceback real**: Vercel → projeto → aba Functions (ou Deployments →
-     deployment → Logs) → filtrar `/api/uploads/powerbi`.
-  2. Confirmar a versão do Python no build (log do build mostra "Python 3.x.x").
-  3. Reproduzir: `python -c "import pbix_mcp.server"` no ambiente da Vercel (via
-     endpoint de debug temporário ou pelo log de erro da função).
-  4. Hipóteses a verificar: runtime ainda em 3.13/3.14 (`.python-version` não aplicado),
-     falha do `apsw` (SQLite nativa) no microVM da Vercel, ou conflito de versões do
-     `mcp`/`anyio`/`starlette` no ambiente de build.
-  5. Correções possíveis: pinar `mcp==1.29.0`/`anyio`/`starlette` compatíveis,
-     substituir `pbix_mcp.server` por `pbix_mcp.builder` (sem FastMCP/mcp) na geração,
-     ou tratar erro com mensagem clara ao usuário.
+- `pytest` 18/18 (CRUD projetos/locais/itens, dashboard payload, import xlsx,
+  export xlsx relido com openpyxl, PDF `%PDF`, auth 401).
+- `npm run build` OK.
+- Smoke UI (Playwright) foi **descartado** — instável nesta máquina (autofill do Chromium
+  injetando `<option>` nos inputs e seletores frágeis). Os inputs inline da planilha
+  ganharam `autoComplete="off"` como correção real.
+- Correção: `charts.py::_grafico_donut` com guarda de divisão por zero (local sem itens
+  causava 500 no `GET /api/projetos/{id}`).
 
-### 3.2 Detalhes do PDF (a definir com o usuário)
-- Usuário disse que "deu tudo certo com exceção de alguns detalhes no pdf".
-- Na segunda, pedir ao usuário para apontar os detalhes (ex.: posições, tamanhos, cores).
+## 4. Pendências
 
-### 3.3 Tabelas legadas no Neon (baixa prioridade)
-- Rodar uma vez após tudo estabilizado:
+### 4.1 Aprovação do usuário → commit/push (bloqueante para deploy)
+- Mostrar a v3 rodando local (backend + frontend) e obter OK antes do push.
+- Pós-deploy validar: `/api/health` (`versao: 3`), criar projeto via UI, importar xlsx,
+  exportar xlsx e PDF.
+
+### 4.2 Detalhes do PDF (a definir com o usuário)
+- Usuário aprovou o conjunto do PDF na v2 mas disse que apontaria "alguns detalhes".
+  Perguntar quais são.
+
+### 4.3 Tabelas legadas no Neon (baixa prioridade)
+- `uploads`/`locais`/`itens` antigas ainda existem no Neon. Quando estabilizar:
   `python backend/migrar_drop_snapshots.py` (com `DATABASE_URL` de produção).
-
-## 4. Validações já feitas (antes do push)
-
-- `pytest` 10/10 (inclui teste PDF + Power BI que gera e relê o .pbix).
-- `npm run build` OK; smoke UI 8 passos OK; previews em `backend/previews/`.
-- Geração .pbix validada em Windows e Linux 3.12 (zip com DataModel, 3 tabelas,
-  15 medidas, página "Visão Geral" com 8 visuais).
-- PDF validado por renderização + amostragem de pixels (p1 verde, p4 painel full-width).
+  Não conflita com as tabelas novas (nomes diferentes? verificar o script antes de rodar).
 
 ## 5. Comandos úteis
 
 - Backend local: `cd backend; $env:DATABASE_URL=""; ..\.venv\Scripts\python -m uvicorn main:app --port 8000`
 - Frontend local: `cd frontend; npm run dev` (login `admin` / `admin123456`)
 - Testes: `cd backend; $env:DATABASE_URL=""; ..\.venv\Scripts\python -m pytest -q`
-- Smoke: `cd backend; ..\.venv\Scripts\python -X utf8 smoke_ui.py` (servidores locais rodando)
-- Docker (reproduz ambiente Linux da Vercel): imagem `python:3.12-slim` com requirements.txt
 
-## 6. Arquivos-chave
+## 6. Arquivos-chave da v3
 
-- `backend/powerbi_export.py` — export Power BI (import lazy do pbix-mcp)
-- `backend/routers/files.py` — rotas POST /report e /powerbi
+- `backend/projetos_store.py` — CRUD dual SQLite/Neon (padrão de `db.py`)
+- `backend/routers/projetos.py` — todas as rotas de projetos/locais/itens/import/export/PDF
+- `backend/planilha_export.py` — geração do `.xlsx` (RELATORIO + aba por local)
 - `backend/report.py` — PDF (p1 verde, p4 painel de projeções)
-- `backend/routers/uploads.py` — POST /uploads com payload completo em memória
-- `backend/store.py` / `db.py` / `history.py` / `schema.sql` — só usuários
-- `backend/serialize.py` — workbook_from_payload (reconstrói dados p/ PDF)
-- `frontend/src/pages/DashboardPage.tsx` — botão "Exportar Power BI", abas sem
-  Comparar Versões/Histórico
-- `backend/planilha_teste.py` — planilha sintética p/ smoke/previews
+- `backend/schema.sql` / `store.py` — schema v3 (projetos/locais/itens + usuarios)
+- `frontend/src/pages/ProjetosPage.tsx` — lista/importação de projetos
+- `frontend/src/pages/PlanilhaPage.tsx` — edição inline/paste/autosave
+- `frontend/src/pages/DashboardPage.tsx` — dashboard por projeto (breadcrumb, exports)
+- `SPEC_V3.md` / `PRD_V3.md` — especificação completa
 - `.python-version` — fixa Python 3.12 na Vercel
 
 ## 7. Regras permanentes (lembrar)

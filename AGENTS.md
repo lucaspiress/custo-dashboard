@@ -10,15 +10,19 @@ automatizados com insights por regras, em português.
 
 - `CLAUDE.md` — convenções, arquitetura, comandos e regras do projeto
 - `PROJECT_CONTEXT.md` — contexto completo (inventário de arquivos, setup local, deploy)
+- `PRD_V3.md` / `SPEC_V3.md` — especificação da v3 (projetos persistidos + planilha editável)
 - `PLANO_MIGRACAO.md` — histórico da migração Streamlit → React + FastAPI (concluída)
 
 ## Resumo da arquitetura
 
 ```
 frontend/ (Vite + React + TS + Tailwind)  →  /api/* (rewrite no vercel.json)
+    ├─ /            ProjetosPage (lista, novo, importar .xlsx)
+    ├─ /projetos/:id            DashboardPage (abas, PDF, export .xlsx)
+    └─ /projetos/:id/planilha   PlanilhaPage (edição inline, paste, autosave)
     →  api/index.py  (função Python da Vercel, carrega backend/main.app)
     →  backend/      (FastAPI + análise em Python)
-    →  Neon Postgres (prod, RLS) | SQLite local (dev, user_id por usuário)
+    →  Neon Postgres (prod) | SQLite local (dev)
 ```
 
 ## Regras permanentes (não violar)
@@ -35,17 +39,17 @@ frontend/ (Vite + React + TS + Tailwind)  →  /api/* (rewrite no vercel.json)
 
 - Rodar backend local: `cd backend; $env:DATABASE_URL=""; ..\.venv\Scripts\python -m uvicorn main:app --port 8000`
 - Rodar frontend: `cd frontend; npm run dev` (proxy /api → localhost:8000)
-- Testes: `cd backend; $env:DATABASE_URL=""; ..\.venv\Scripts\python -m pytest -q` (11 testes)
-- Smoke test UI: `cd backend; ..\.venv\Scripts\python -X utf8 smoke_ui.py` (backend + frontend locais rodando)
+- Testes: `cd backend; $env:DATABASE_URL=""; ..\.venv\Scripts\python -m pytest -q` (18 testes)
 - Login local: `admin` / `admin123456`
 
-## Estado atual
+## Estado atual (v3)
 
-Migração completa e publicada. Usuários admin: `lucaspires` e `giusepe` (Neon).
-**Banco usado apenas para usuários** — uploads não são persistidos: `POST /api/uploads` analisa
-em memória e devolve o payload completo (locais + insights + gráficos + projeto + fluxo de caixa
-6/12/24/36); o frontend guarda no estado (some ao atualizar a página). PDF via
-`POST /api/uploads/report` e export **Power BI** (.pbix via `pbix-mcp`) via
-`POST /api/uploads/powerbi`, ambos com o payload. Abas: Visão Geral, Custos, Payback, Insights,
-Comparativo (ranking entre locais), Usuários (admin). Tabelas legadas uploads/locais/itens
-foram dropadas no Neon (`backend/migrar_drop_snapshots.py`).
+Dados persistidos no banco: tabelas `projetos`, `locais` e `itens` (criadas no boot via
+`CREATE TABLE IF NOT EXISTS`, sem migração one-off). Fluxo: tela de projetos → criar vazio
+ou importar `.xlsx` (`POST /api/projetos/importar`) → planilha editável com autosave
+(PATCH por célula) → dashboard via `GET /api/projetos/{id}` (mesmo shape do payload antigo:
+locais + insights + gráficos + projeto + fluxo 6/12/24/36). Export `.xlsx`
+(`GET /api/projetos/{id}/planilha.xlsx`) e PDF (`POST /api/projetos/{id}/relatorio`).
+Rotas antigas removidas: `/api/uploads*` e Power BI (`pbix-mcp` fora dos requirements).
+Usuários admin: `lucaspires` e `giusepe` (Neon); sem RLS — todos os usuários logados veem
+todos os projetos. Abas: Visão Geral, Custos, Payback, Insights, Comparativo, Usuários (admin).

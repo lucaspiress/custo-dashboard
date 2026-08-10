@@ -4,11 +4,10 @@ import tempfile
 import pytest
 
 os.environ.setdefault("DATABASE_URL", "")
-tmp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-os.environ["HISTORICO_DB"] = tmp_db.name
 
 from fastapi.testclient import TestClient
 
+import history
 import store
 from main import app
 
@@ -16,6 +15,8 @@ from main import app
 @pytest.fixture()
 def cliente():
     store.MODO = "sqlite"
+    tmp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    history.CAMINHO_DB = tmp_db.name
     store.ensure_schema()
     with TestClient(app) as client:
         yield client

@@ -19,10 +19,6 @@ def _conexao() -> sqlite3.Connection:
 def _inicializar(conn: sqlite3.Connection) -> None:
     conn.executescript(
         """
-        DROP TABLE IF EXISTS itens;
-        DROP TABLE IF EXISTS locais;
-        DROP TABLE IF EXISTS uploads;
-
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
@@ -33,9 +29,58 @@ def _inicializar(conn: sqlite3.Connection) -> None:
             ativo INTEGER NOT NULL DEFAULT 1,
             criado_em TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS projetos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            cliente TEXT,
+            criado_em TEXT NOT NULL
+        );
+        """
+    )
+    _migrar_tabelas_legadas(conn)
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS locais (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            projeto_id INTEGER NOT NULL REFERENCES projetos(id) ON DELETE CASCADE,
+            nome TEXT NOT NULL,
+            valor_mensal REAL NOT NULL DEFAULT 0,
+            taxa_instalacao REAL NOT NULL DEFAULT 0,
+            custo_manutencao REAL NOT NULL DEFAULT 0,
+            mensal_terceirizada REAL NOT NULL DEFAULT 0,
+            chip_mensal REAL NOT NULL DEFAULT 0,
+            custos_softwares REAL NOT NULL DEFAULT 0,
+            mao_de_obra REAL NOT NULL DEFAULT 0,
+            data_inst TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS itens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            local_id INTEGER NOT NULL REFERENCES locais(id) ON DELETE CASCADE,
+            categoria TEXT NOT NULL,
+            cod TEXT,
+            material TEXT NOT NULL,
+            qtd REAL NOT NULL DEFAULT 0,
+            valor_unit REAL NOT NULL DEFAULT 0,
+            valor_total REAL NOT NULL DEFAULT 0
+        );
         """
     )
     conn.commit()
+
+
+def _migrar_tabelas_legadas(conn: sqlite3.Connection) -> None:
+    """Remove tabelas do formato antigo (uploads/locais/itens com upload_id),
+    preservando tabelas no formato atual (projetos/locais/itens)."""
+    colunas_locais = {linha[1] for linha in conn.execute("PRAGMA table_info(locais)")}
+    if colunas_locais and "projeto_id" not in colunas_locais:
+        conn.execute("DROP TABLE itens")
+        conn.execute("DROP TABLE locais")
+    colunas_itens = {linha[1] for linha in conn.execute("PRAGMA table_info(itens)")}
+    if colunas_itens and "upload_id" in colunas_itens:
+        conn.execute("DROP TABLE itens")
+    conn.execute("DROP TABLE IF EXISTS uploads")
 
 
 def seed_admin_local() -> None:

@@ -215,7 +215,7 @@ def _grafico_donut(labels: list[str], valores: list[float], titulo: str, cores: 
             textfont=dict(color=theme.COR["tinta"], size=11.5),
             textposition="outside",
             marker=dict(line=dict(color=theme.COR["superficie"], width=2)),
-            customdata=[[f"{v / total * 100:.1f}%"] for v in valores],
+            customdata=[[f"{(v / total * 100):.1f}%" if total else "0.0%"] for v in valores],
             hovertemplate="<b>%{label}</b><br>%{customdata[0]} — <b>%{value:,.2f}</b><extra></extra>",
             sort=False,
         )
