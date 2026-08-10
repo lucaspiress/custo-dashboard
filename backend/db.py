@@ -16,12 +16,30 @@ def enabled() -> bool:
     return bool(database_url())
 
 
+def _migrar_legado(conn) -> None:
+    linha = conn.execute("select to_regclass('public.locais') as tabela").fetchone()
+    if not linha["tabela"]:
+        return
+    colunas = {
+        c["column_name"]
+        for c in conn.execute(
+            """select column_name from information_schema.columns
+               where table_schema = 'public' and table_name = 'locais'"""
+        ).fetchall()
+    }
+    if colunas and "projeto_id" not in colunas:
+        conn.execute("drop table if exists public.itens cascade")
+        conn.execute("drop table if exists public.locais cascade")
+        conn.execute("drop table if exists public.uploads cascade")
+
+
 def _garantir_schema(conn) -> None:
     global _schema_tentado, _schema_pronto, erro_schema
     if _schema_tentado:
         return
     _schema_tentado = True
     try:
+        _migrar_legado(conn)
         conn.execute(SCHEMA_PATH.read_text(encoding="utf-8"))
         conn.commit()
         _schema_pronto = True
