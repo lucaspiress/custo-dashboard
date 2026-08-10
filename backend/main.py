@@ -1,11 +1,20 @@
 import os
+import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-import store
-from routers import auth, projetos, users
+_ERRO_BOOT = None
+
+try:
+    import store
+    from routers import auth, projetos, users
+except Exception:
+    store = None
+    auth = users = None
+    projetos = None
+    _ERRO_BOOT = traceback.format_exc()
 
 
 def _origens_cors() -> list[str]:
@@ -15,12 +24,13 @@ def _origens_cors() -> list[str]:
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    store.ensure_schema()
+    if store is not None and _ERRO_BOOT is None:
+        store.ensure_schema()
     yield
 
 
 def criar_app() -> FastAPI:
-    app = FastAPI(title="Custo Dashboard API", version="2.0.0", lifespan=_lifespan)
+    app = FastAPI(title="Custo Dashboard API", version="3.0.0", lifespan=_lifespan)
 
     app.add_middleware(
         CORSMiddleware,
@@ -29,6 +39,13 @@ def criar_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    if _ERRO_BOOT is not None:
+        @app.api_route("/{caminho:path}", methods=["GET", "POST", "PATCH", "PUT", "DELETE"])
+        def _erro_boot(caminho: str = ""):  # noqa: ARG001
+            return {"erro_boot": _ERRO_BOOT}
+
+        return app
 
     @app.get("/api/health")
     def health() -> dict:
