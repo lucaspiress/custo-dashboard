@@ -1,37 +1,33 @@
 import os
+import sys
 import traceback
-from contextlib import asynccontextmanager
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 _ERRO_BOOT = None
+app = None
 
 try:
+    from contextlib import asynccontextmanager
+
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+
     import store
     from routers import auth, projetos, users
-except Exception:
-    store = None
-    auth = users = None
-    projetos = None
-    _ERRO_BOOT = traceback.format_exc()
 
+    def _origens_cors() -> list[str]:
+        raw = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:4173")
+        return [o.strip() for o in raw.split(",") if o.strip()]
 
-def _origens_cors() -> list[str]:
-    raw = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:4173")
-    return [o.strip() for o in raw.split(",") if o.strip()]
+    @asynccontextmanager
+    async def _lifespan(app_: FastAPI):
+        if _ERRO_BOOT is None:
+            try:
+                store.ensure_schema()
+            except Exception:
+                pass
+        yield
 
-
-@asynccontextmanager
-async def _lifespan(app: FastAPI):
-    if store is not None and _ERRO_BOOT is None:
-        store.ensure_schema()
-    yield
-
-
-def criar_app() -> FastAPI:
     app = FastAPI(title="Custo Dashboard API", version="3.0.0", lifespan=_lifespan)
-
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_origens_cors(),
@@ -40,13 +36,6 @@ def criar_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    if _ERRO_BOOT is not None:
-        @app.api_route("/{caminho:path}", methods=["GET", "POST", "PATCH", "PUT", "DELETE"])
-        def _erro_boot(caminho: str = ""):  # noqa: ARG001
-            return {"erro_boot": _ERRO_BOOT}
-
-        return app
-
     @app.get("/api/health")
     def health() -> dict:
         return {"ok": True, "modo": store.modo_atual(), "versao": 3}
@@ -54,7 +43,17 @@ def criar_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api")
     app.include_router(users.router, prefix="/api")
     app.include_router(projetos.router, prefix="/api")
-    return app
+except Exception:
+    _ERRO_BOOT = traceback.format_exc()
 
-
-app = criar_app()
+if app is None:
+    async def app(scope, receive, send):  # noqa: A001
+        corpo = ('{"erro_boot": ' + repr(_ERRO_BOOT).replace('"', "'") + '}').encode()
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 200,
+                "headers": [(b"content-type", b"application/json")],
+            }
+        )
+        await send({"type": "http.response.body", "body": corpo})
