@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
 import { fmtData, fmtMoeda } from '../lib/format'
+import { validarArquivoPlanilha } from '../lib/import-file'
 import type { ProjetoResumo } from '../lib/types'
 
 const ICONE_MAIS = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>)
@@ -180,6 +181,15 @@ export default function ProjetosPage() {
     }
   }
 
+  function selecionarArquivo(file: File | undefined) {
+    if (!file) return
+    if (!validarArquivoPlanilha(file)) {
+      setErro('Selecione uma planilha .xlsx no template padrão.')
+      return
+    }
+    void importarArquivo(file)
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <header
@@ -223,7 +233,7 @@ export default function ProjetosPage() {
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0]
-                if (file) void importarArquivo(file)
+                selecionarArquivo(file)
               }}
             />
             <button
@@ -243,6 +253,28 @@ export default function ProjetosPage() {
               Novo projeto
             </button>
           </div>
+        </div>
+
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Importar planilha por arrastar e soltar"
+          onClick={() => fileRef.current?.click()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              fileRef.current?.click()
+            }
+          }}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault()
+            selecionarArquivo(e.dataTransfer.files[0])
+          }}
+          className="mb-5 rounded-xl border border-dashed border-[#2a3a56] bg-[rgba(16,160,160,0.035)] px-5 py-4 text-center cursor-pointer hover:border-[#10a0a0] hover:bg-[rgba(16,160,160,0.07)] focus:outline-none focus:ring-2 focus:ring-[#10a0a0] transition-colors"
+        >
+          <div className="text-[13px] font-medium text-tinta">Arraste uma planilha aqui</div>
+          <div className="mt-0.5 text-[12px] text-mutado">ou clique para selecionar um arquivo .xlsx</div>
         </div>
 
         {erro && <div className="text-sm text-alerta mb-4">{erro}</div>}

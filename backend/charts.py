@@ -266,7 +266,7 @@ def grafico_categorias(local: loader.Local) -> go.Figure:
 def grafico_barras_comparativo(locais, metrica: str, titulo: str, e_meses: bool = False) -> go.Figure:
     fig = go.Figure()
     dados = [(analysis.resumo(local), local) for local in locais]
-    dados.sort(key=lambda par: par[0][metrica], reverse=True)
+    dados.sort(key=lambda par: par[0][metrica] if par[0][metrica] is not None else float("-inf"), reverse=True)
     nomes = [r["local"] for r, _ in dados]
     valores = [r[metrica] for r, _ in dados]
     cores = [theme.COR["primaria"]] * len(nomes)
@@ -281,7 +281,7 @@ def grafico_barras_comparativo(locais, metrica: str, titulo: str, e_meses: bool 
                 cores[i] = theme.COR["destaque"]
             else:
                 cores[i] = theme.COR["sucesso"]
-    custom = [[_fmt_br(v, 1) if not e_meses else f"{v:.1f} meses"] for v in valores]
+    custom = [["Sem retorno" if e_meses and v is None else _fmt_br(v, 1) if not e_meses else f"{v:.1f} meses"] for v in valores]
     fig.add_trace(
         go.Bar(
             x=valores,
@@ -413,4 +413,3 @@ def grafico_fluxo_caixa(local: loader.Local, meses: int = 12) -> go.Figure:
     )
     fig.update_yaxes(tickprefix="R$ ", separatethousands=True)
     return fig
-

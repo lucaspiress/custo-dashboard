@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
+import { criarAutosave, type Autosave, type EstadoAutosave } from '../lib/autosave'
 import { baixarBlob, fmtMoeda, fmtNumero, paraInputDate, parseNumero } from '../lib/format'
 import type { AnaliseUpload, ItemLinha } from '../lib/types'
 
@@ -214,9 +215,15 @@ export default function PlanilhaPage() {
   const [nomeProjeto, setNomeProjeto] = useState('')
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
+  const [estadoAutosave, setEstadoAutosave] = useState<EstadoAutosave>('salvo')
   const [confirmarExcluirLocal, setConfirmarExcluirLocal] = useState<number | null>(null)
   const locaisRef = useRef(locais)
+  const autosaveRef = useRef<Autosave<() => Promise<void>> | null>(null)
   locaisRef.current = locais
+
+  if (!autosaveRef.current) {
+    autosaveRef.current = criarAutosave(async (salvar) => salvar(), setEstadoAutosave)
+  }
 
   const totais = useMemo(() => {
     const receita = locais.reduce((s, l) => s + l.valor_mensal, 0)
@@ -261,38 +268,34 @@ export default function PlanilhaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projetoId])
 
+  useEffect(() => () => autosaveRef.current?.cancelar(), [])
+
   async function salvarLocal(linha: LinhaLocal, campo: string, valor: unknown) {
-    setErro('')
-    try {
-      const atualizado = await api.patch<Record<string, unknown>>(
-        `/api/projetos/${projetoId}/locais/${linha.id}`,
-        { [campo]: valor }
-      )
-      setLocais((atual) => atual.map((l) => (l.id === linha.id ? { ...l, ...atualizado } : l)))
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao salvar o local.')
-    }
+    const atualizado = await api.patch<Record<string, unknown>>(
+      `/api/projetos/${projetoId}/locais/${linha.id}`,
+      { [campo]: valor }
+    )
+    setLocais((atual) => atual.map((l) => (l.id === linha.id ? { ...l, ...atualizado } : l)))
   }
 
   async function salvarItem(linha: LinhaLocal, item: ItemLinha, campo: string, valor: unknown) {
-    setErro('')
-    try {
-      const atualizado = await api.patch<ItemLinha>(`/api/projetos/itens/${item.id}`, { [campo]: valor })
-      setLocais((atual) =>
-        atual.map((l) =>
-          l.id === linha.id
-            ? { ...l, itens: l.itens.map((i) => (i.id === item.id ? { ...i, ...atualizado } : i)) }
-            : l
-        )
+    const atualizado = await api.patch<ItemLinha>(`/api/projetos/itens/${item.id}`, { [campo]: valor })
+    setLocais((atual) =>
+      atual.map((l) =>
+        l.id === linha.id
+          ? { ...l, itens: l.itens.map((i) => (i.id === item.id ? { ...i, ...atualizado } : i)) }
+          : l
       )
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao salvar o item.')
-    }
+    )
+  }
+
+  function agendarSalvar(chave: string, salvar: () => Promise<void>) {
+    autosaveRef.current?.agendar(chave, salvar)
   }
 
   function alterarLocal(linha: LinhaLocal, campo: string, valor: unknown) {
     setLocais((atual) => atual.map((l) => (l.id === linha.id ? { ...l, [campo]: valor } : l)))
-    void salvarLocal(linha, campo, valor)
+    agendarSalvar(`local:${linha.id}:${campo}`, () => salvarLocal(linha, campo, valor))
   }
 
   async function adicionarLocal() {
@@ -524,6 +527,11 @@ export default function PlanilhaPage() {
             <p className="text-[12.5px] text-mutado mt-0.5">
               Clique numa célula para editar · cole linhas direto do Excel · tudo é salvo automaticamente
             </p>
+            <div className="mt-1 text-[12px]" aria-live="polite">
+              {estadoAutosave === 'pendente' && <span className="text-mutado">Alteração pendente…</span>}
+              {estadoAutosave === 'salvando' && <span className="text-[#10a0a0]">Salvando alteração…</span>}
+              {estadoAutosave === 'salvo' && <span className="text-[#10b981]">Alterações salvas</span>}
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right">
@@ -542,6 +550,17 @@ export default function PlanilhaPage() {
         </div>
 
         {erro && <div className="text-sm text-alerta mb-4">{erro}</div>}
+        {estadoAutosave === 'erro' && (
+          <div role="alert" className="text-sm text-alerta mb-4 flex items-center gap-3">
+            <span>{autosaveRef.current?.erroAtual() ?? 'Erro ao salvar a alteração.'}</span>
+            <button
+              onClick={() => void autosaveRef.current?.tentarNovamente()}
+              className="font-semibold text-[#10a0a0] hover:text-[#48c8c8] transition-colors"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
 
         <div className="rounded-xl border border-borda bg-superficie overflow-hidden">
           <div className="overflow-x-auto" onPaste={(e) => void colarLocais(e)}>
@@ -638,11 +657,11 @@ export default function PlanilhaPage() {
                                 <tbody>
                                   {linha.itens.map((item) => (
                                     <tr key={item.id} className="border-b border-[#141a2e] group/item">
-                                      <td className="px-2.5 py-1 min-w-[120px]"><TextCell valor={item.categoria} onCommit={(v) => void salvarItem(linha, item, 'categoria', v)} /></td>
-                                      <td className="px-1 py-1 min-w-[80px]"><TextCell valor={item.cod} onCommit={(v) => void salvarItem(linha, item, 'cod', v)} /></td>
-                                      <td className="px-1 py-1 min-w-[160px]"><TextCell valor={item.material} onCommit={(v) => void salvarItem(linha, item, 'material', v)} /></td>
-                                      <td className="px-1 py-1 text-right"><QtdCell valor={item.qtd} onCommit={(v) => void salvarItem(linha, item, 'qtd', v ?? 0)} /></td>
-                                      <td className="px-1 py-1 text-right"><MoneyCell valor={item.valor_unit} onCommit={(v) => void salvarItem(linha, item, 'valor_unit', v ?? 0)} /></td>
+                                      <td className="px-2.5 py-1 min-w-[120px]"><TextCell valor={item.categoria} onCommit={(v) => agendarSalvar(`item:${item.id}:categoria`, () => salvarItem(linha, item, 'categoria', v))} /></td>
+                                      <td className="px-1 py-1 min-w-[80px]"><TextCell valor={item.cod} onCommit={(v) => agendarSalvar(`item:${item.id}:cod`, () => salvarItem(linha, item, 'cod', v))} /></td>
+                                      <td className="px-1 py-1 min-w-[160px]"><TextCell valor={item.material} onCommit={(v) => agendarSalvar(`item:${item.id}:material`, () => salvarItem(linha, item, 'material', v))} /></td>
+                                      <td className="px-1 py-1 text-right"><QtdCell valor={item.qtd} onCommit={(v) => agendarSalvar(`item:${item.id}:qtd`, () => salvarItem(linha, item, 'qtd', v ?? 0))} /></td>
+                                      <td className="px-1 py-1 text-right"><MoneyCell valor={item.valor_unit} onCommit={(v) => agendarSalvar(`item:${item.id}:valor_unit`, () => salvarItem(linha, item, 'valor_unit', v ?? 0))} /></td>
                                       <td className="px-2.5 py-1 text-right text-[13px] text-tinta tabular-nums">{fmtMoeda(item.valor_total)}</td>
                                       <td className="px-2 py-1">
                                         <button

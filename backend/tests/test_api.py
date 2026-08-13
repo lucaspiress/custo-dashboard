@@ -126,6 +126,16 @@ def test_dashboard_do_projeto_calcula(cliente, admin):
     assert "investimento" in projeto_resumo["graficos"]
 
 
+def test_dashboard_do_projeto_sem_itens(cliente, admin):
+    projeto = _criar_projeto(cliente)
+    _criar_local(cliente, projeto["id"], valor_mensal=0, mao_de_obra=0)
+
+    resposta = cliente.get(f"/api/projetos/{projeto['id']}")
+
+    assert resposta.status_code == 200
+    assert resposta.json()["locais"][0]["itens"] == []
+
+
 def test_atualizar_local_recalcula(cliente, admin):
     projeto = _criar_projeto(cliente)
     local = _criar_local(cliente, projeto["id"])

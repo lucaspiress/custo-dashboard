@@ -64,21 +64,6 @@ def ensure_schema() -> None:
     connect().close()
 
 
-def diagnostico() -> dict:
-    resultado: dict = {"enabled": enabled(), "schema_pronto": _schema_pronto, "erro_schema": erro_schema}
-    if not enabled():
-        return resultado
-    try:
-        with connect() as conn:
-            resultado["schema_pronto"] = _schema_pronto
-            resultado["erro_schema"] = erro_schema
-            row = conn.execute("select to_regclass('public.projetos') as tabela").fetchone()
-            resultado["tabela_projetos"] = bool(row["tabela"])
-    except Exception as exc:
-        resultado["erro_conexao"] = f"{type(exc).__name__}: {exc}"
-    return resultado
-
-
 def get_user_by_username(username: str) -> dict | None:
     with connect() as conn:
         return conn.execute(

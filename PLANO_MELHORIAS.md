@@ -1,55 +1,62 @@
-# Plano de Melhorias — Custo Dashboard
+# Roadmap de Execução — Custo Dashboard
 
-Data: 08/08/2026
-Status: aprovado em discussão; aguardando execução
-Referência visual: https://360.rotagroup.com.br (Rota 360)
+Atualizado em 13/08/2026.
 
-## 1. Identidade visual Rota 360 (primeira)
+## Estado atual
 
-**Concluído em 08/08/2026 — v3 (dark-only + login Meridian).**
+A v3 está em produção: projetos persistidos, planilha editável, importação do
+template, dashboard, PDF, Excel e autenticação estão disponíveis. A base local
+inclui autosave com retry, teste de interface e correção para locais sem itens.
+As alterações locais ainda precisam ser revisadas, commitadas e publicadas antes
+de serem consideradas entregues em produção.
 
-- **Dark-only**: tema claro removido por completo (index.html, useTheme.ts deletado,
-  bloco `.light` excluído, toggles removidos).
-- **Login nível Meridian** (replicado do protótipo): header com marca mono + chip
-  "Sistema estável" (dot pulsante) + relógio UTC ao vivo; painel esquerdo com
-  **logo Rota no lugar do sonar** (tilt 3D com spring via rAF, starfield 46 estrelas,
-  corner brackets âmbar, telemetria LAT/LON/HDG/ALT, caption); card com campos
-  rotulados, checkbox âmbar, botão AUTENTICAR (gradiente azul→teal, sweep-scan,
-  loader de dots), tela "Acesso liberado" com ring-draw. Sem alt-auth/divider.
-- Fontes do Meridian no login (Space Grotesk + IBM Plex Mono); dashboard mantém Inter/Exo 2.
-- `DESIGN_SPEC.md` gerado por modelo de análise (referências em Desktop\ref-visual).
-- Execução por 4 agentes paralelos (limpeza dark, login, CSS, scripts de teste).
-- **Revisões por agente aplicadas**: motion BLOCK corrigido (tilt com lag →
-  spring via ref sem re-render; reduced-motion gating no tilt/scan; logo-breathe
-  redundante removido; estrelas estáticas com opacidade mínima; rise 0.7→0.5s;
-  redirect 1.3→0.8s); UI/UX corrigido (contraste header-mark/logo-tag/telemetria/
-  caption, bordas de inputs, placeholder, success-title, submit ≥44px, checkbox
-  com área de toque, h1 semântico, foco no 1º campo inválido + role=alert +
-  aria-describedby, tabular-nums na telemetria).
-- Validação: 11 testes pytest, build TS, smoke test 8 abas, screenshots em
-  `backend/previews/` (login.png, dashboard.png).
+## Fase 0 — Liberação segura
 
-## 2. Desempenho — cache de análise
-- ~~payload jsonb em uploads; GET vira leitura~~ **SUPERSEDIDO em 08/08/2026**: o banco passou a ser
-  usado **apenas para usuários**. O upload não é mais persistido: `POST /api/uploads` devolve o
-  payload completo (locais + insights + gráficos + projeto + fluxo de caixa 6/12/24/36) e o
-  frontend guarda em memória; PDF/Excel recebem o payload de volta (`POST`). Removidos:
-  "Comparar Versões", "Histórico", select "Ver análise de", tabelas uploads/locais/itens
-  (dropadas no Neon via `backend/migrar_drop_snapshots.py`). Análise some ao atualizar a página.
+- Consolidar as alterações locais em um commit aprovado.
+- Publicar e validar em produção: health, login, criação, importação, edição,
+  PDF e Excel.
+- Executar backup verificável do Neon antes de qualquer limpeza de tabelas
+  legadas.
 
-## 3. Plataforma — projetos e dados cadastrais (pela interface)
-- tabela projetos + uploads.projeto_id; renomear análises; cliente/projeto/licitação na UI
+## Fase 1 — Experiência de preenchimento
 
-## 4. UX — drag-and-drop, skeletons, responsividade mobile
+- Importação de `.xlsx` por arrastar e soltar na lista de projetos.
+- Skeletons nas páginas Projetos, Dashboard e Planilha.
+- Revisão responsiva para celular e tablet.
+- Expandir o teste Playwright para importação, colagem em massa, exportações e
+  gerenciamento de usuários.
 
-## 5. Relatórios — PDF consolidado do projeto + gráficos + Excel com insights
+## Fase 2 — Relatórios
 
-## 6. Operação — health rico, logs, backup Neon
+- Definir com o usuário os ajustes visuais e de conteúdo do PDF.
+- Criar PDF consolidado por projeto, preservando o relatório detalhado por local.
+- Incluir insights no Excel exportado.
+
+## Fase 3 — Operação
+
+- Health com versão, modo, conectividade e status do schema, sem expor segredos.
+- Logs estruturados para erros de API e exportações.
+- Rotina de backup e restauração do Neon documentada e testada.
+- Remover tabelas legadas do Neon somente após backup aprovado.
+
+## Fase 4 — Plataforma v4+
+
+- Permissões por cliente/projeto.
+- Histórico mensal e comparativo temporal.
+- Comparativo de portfólio entre projetos.
+- Alertas de payback.
+- Importação de planilhas livres com mapeamento.
+- Atualização recorrente por e-mail ou Dropbox.
+
+## Critério de conclusão
+
+Cada fase só é concluída com testes automatizados pertinentes, build de produção
+e validação manual proporcional ao risco. Commit, push, deploy e operações no
+Neon exigem solicitação explícita do usuário.
 
 ## Regras permanentes
-1. Nunca acessar pastas da rede (soluções/licitações — zero acesso)
-2. Não tocar em ROTACAD sem pedido explícito
-3. Trabalho restrito a Desktop\custo-dashboard, Downloads e tmp
-4. Commits/push/deploy só quando o usuário pedir
-5. Sem pandas no backend (limite 225MB do bundle)
-6. Nunca commitar DATABASE_URL, SESSION_SECRET ou senhas
+
+1. Nunca acessar pastas da rede, especialmente soluções e licitações.
+2. Não tocar no ROTACAD sem pedido explícito.
+3. Não adicionar pandas ao backend.
+4. Nunca versionar credenciais, `DATABASE_URL`, `SESSION_SECRET` ou senhas.
