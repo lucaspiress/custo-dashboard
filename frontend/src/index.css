@@ -68,6 +68,16 @@ html, body, #root {
   letter-spacing: 0.01em;
 }
 
+.skeleton {
+  background: linear-gradient(90deg, #171e34 20%, #273252 45%, #171e34 70%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  to { background-position: -200% 0; }
+}
+
 .botao-marca {
   background: linear-gradient(135deg, #0050a0 0%, #0080a0 100%);
   color: #ffffff;
@@ -743,5 +753,6 @@ select, input {
     animation: none !important;
     transition: none !important;
   }
+  .skeleton { animation: none !important; }
   .star { opacity: var(--min-o, 0.15); }
 }

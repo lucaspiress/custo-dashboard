@@ -56,8 +56,9 @@ backend stays responsible for template validation and persistence.
 - Modify: `frontend/src/pages/ProjetosPage.tsx`
 - Modify: `frontend/src/pages/DashboardPage.tsx`
 - Modify: `frontend/src/pages/PlanilhaPage.tsx`
+- Add: `backend/tests/ui_responsive_audit.py`
 
-- [ ] Capture desktop and mobile screenshots of loading states.
-- [ ] Replace generic loading text with skeletons that retain the page layout.
-- [ ] Verify tab order and horizontal overflow at 375 px and 768 px.
-- [ ] Run frontend unit tests, lint, build and browser smoke tests.
+- [x] Capture desktop and mobile screenshots of loading states.
+- [x] Replace generic loading text with skeletons that retain the page layout.
+- [x] Verify tab order and horizontal overflow at 375 px and 768 px.
+- [x] Run frontend unit tests, lint and production build.

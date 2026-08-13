@@ -5,6 +5,7 @@ import { api } from '../lib/api'
 import { criarAutosave, type Autosave, type EstadoAutosave } from '../lib/autosave'
 import { baixarBlob, fmtMoeda, fmtNumero, paraInputDate, parseNumero } from '../lib/format'
 import type { AnaliseUpload, ItemLinha } from '../lib/types'
+import { PlanilhaCarregando } from '../components/ProjetoLoading'
 
 interface LinhaLocal {
   id: number
@@ -463,17 +464,13 @@ export default function PlanilhaPage() {
   }
 
   if (carregando) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-mutado text-sm">
-        Carregando projeto…
-      </div>
-    )
+    return <PlanilhaCarregando />
   }
 
   return (
     <div className="min-h-screen flex flex-col">
       <header
-        className="h-[64px] shrink-0 border-b border-[#1a2138] flex items-center justify-between gap-4 px-5 z-10"
+        className="min-h-[64px] shrink-0 border-b border-[#1a2138] flex items-center justify-between gap-3 px-4 sm:px-5 py-3 z-10"
         style={{ background: '#111e34' }}
       >
         <div className="flex items-center gap-3.5 min-w-0">
@@ -493,19 +490,21 @@ export default function PlanilhaPage() {
         <div className="flex items-center gap-2.5 shrink-0">
           <button
             onClick={() => void exportarPdf()}
+            aria-label="Relatório PDF"
             className="h-9 rounded-lg px-3.5 text-[13px] font-medium bg-[#16243c] border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors inline-flex items-center gap-2"
           >
             {ICONE_PDF}
-            Relatório PDF
+            <span className="hidden sm:inline">Relatório PDF</span>
           </button>
           <button
             onClick={() => void exportarPlanilha()}
+            aria-label="Exportar planilha"
             className="h-9 rounded-lg px-3.5 text-[13px] font-medium bg-[#16243c] border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors inline-flex items-center gap-2"
           >
             {ICONE_XLSX}
-            Exportar planilha
+            <span className="hidden sm:inline">Exportar planilha</span>
           </button>
-          <span className="w-px h-6 bg-[#2a3a56] shrink-0" />
+          <span className="hidden sm:block w-px h-6 bg-[#2a3a56] shrink-0" />
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold shrink-0"
             style={{ background: 'rgba(16, 160, 160, 0.15)', color: '#10a0a0' }}
@@ -515,7 +514,7 @@ export default function PlanilhaPage() {
         </div>
       </header>
 
-      <main className="flex-1 w-full max-w-[1400px] mx-auto p-6">
+      <main className="flex-1 w-full max-w-[1400px] mx-auto p-4 sm:p-6">
         <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
           <div>
             <div className="text-[12.5px] text-mutado mb-1">

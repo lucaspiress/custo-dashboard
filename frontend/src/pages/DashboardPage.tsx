@@ -11,6 +11,7 @@ import PaybackTab from '../components/tabs/PaybackTab'
 import InsightsTab from '../components/tabs/InsightsTab'
 import ComparativoTab from '../components/tabs/ComparativoTab'
 import UsuariosTab from '../components/tabs/UsuariosTab'
+import { DashboardCarregando } from '../components/ProjetoLoading'
 
 const ABAS_PADRAO = ['Visão Geral', 'Custos', 'Payback', 'Insights', 'Comparativo']
 
@@ -89,17 +90,13 @@ export default function DashboardPage() {
   }
 
   if (carregando) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-mutado text-sm">
-        Carregando projeto…
-      </div>
-    )
+    return <DashboardCarregando />
   }
 
   return (
     <div className="min-h-screen flex flex-col">
       <header
-        className="h-[64px] shrink-0 border-b border-[#1a2138] flex items-center justify-between gap-4 px-5 z-10"
+        className="min-h-[64px] shrink-0 border-b border-[#1a2138] flex items-center justify-between gap-3 px-4 sm:px-5 py-3 z-10"
         style={{ background: '#111e34' }}
       >
         <div className="flex items-center gap-3.5 min-w-0">
@@ -121,24 +118,27 @@ export default function DashboardPage() {
             <>
               <button
                 onClick={() => void baixarPdf()}
+                aria-label="Relatório PDF"
                 className="h-9 rounded-lg px-3.5 text-[13px] font-medium bg-[#16243c] border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors inline-flex items-center gap-2"
               >
                 {ICONE_PDF}
-                Relatório PDF
+                <span className="hidden sm:inline">Relatório PDF</span>
               </button>
               <button
                 onClick={() => void baixarPlanilha()}
+                aria-label="Exportar planilha"
                 className="h-9 rounded-lg px-3.5 text-[13px] font-medium bg-[#16243c] border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors inline-flex items-center gap-2"
               >
                 {ICONE_XLSX}
-                Exportar planilha
+                <span className="hidden sm:inline">Exportar planilha</span>
               </button>
               <Link
                 to={`/projetos/${projetoId}/planilha`}
+                aria-label="Editar dados"
                 className="h-9 rounded-lg px-3.5 text-[13px] font-medium bg-[#16243c] border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors inline-flex items-center gap-2"
               >
                 {ICONE_PLANILHA}
-                Editar dados
+                <span className="hidden sm:inline">Editar dados</span>
               </Link>
               <span className="w-px h-6 bg-[#2a3a56] shrink-0" />
             </>
@@ -160,14 +160,14 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <div className="flex flex-1 min-h-0">
-        <aside className="w-72 shrink-0 border-r border-[#1a2138] flex flex-col overflow-y-auto" style={{ background: COR.sidebar }}>
-          <nav className="p-3 pt-4 flex flex-col gap-1">
+      <div className="flex flex-1 min-h-0 flex-col md:flex-row">
+        <aside className="w-full md:w-72 shrink-0 border-b md:border-b-0 md:border-r border-[#1a2138] flex flex-col overflow-y-auto" style={{ background: COR.sidebar }}>
+          <nav className="p-3 flex md:flex-col gap-1 overflow-x-auto">
             {abas.map((nome) => (
               <button
                 key={nome}
                 onClick={() => setAba(nome)}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium border-l-2 transition-colors ${
+                  className={`flex shrink-0 items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium border-l-2 transition-colors whitespace-nowrap ${
                   aba === nome
                     ? 'bg-[rgba(16,160,160,0.12)] text-white border-[#10a0a0]'
                     : 'border-transparent text-[#8fa3c7] hover:bg-superficie hover:text-white'
@@ -242,7 +242,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {erro && <div className="text-sm text-alerta mb-4">{erro}</div>}
 
             {analise && analise.locais.length === 0 && (
