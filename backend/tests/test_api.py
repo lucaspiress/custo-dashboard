@@ -204,6 +204,7 @@ def test_exportar_planilha(cliente, admin, tmp_path):
     wb = openpyxl.load_workbook(caminho)
     assert "RELATORIO" in wb.sheetnames
     assert "SESC TESTE" in wb.sheetnames
+    assert "INSIGHTS" in wb.sheetnames
     ws_rel = wb["RELATORIO"]
     assert ws_rel["A1"].value == "LOCAL"
     assert ws_rel["B2"].value == 10000
@@ -212,6 +213,13 @@ def test_exportar_planilha(cliente, admin, tmp_path):
     valores = [ws_local.cell(row=r, column=2).value for r in range(1, ws_local.max_row + 1)]
     assert "MATERIAL ALARME" in valores
     assert "MATERIAL CFTV" in valores
+    ws_insights = wb["INSIGHTS"]
+    assert [ws_insights.cell(row=1, column=coluna).value for coluna in range(1, 4)] == [
+        "LOCAL", "SEVERIDADE", "INSIGHT"
+    ]
+    assert ws_insights["A2"].value == "SESC TESTE"
+    assert ws_insights["B2"].value in {"ok", "dica", "atencao", "alerta"}
+    assert "SESC TESTE" in ws_insights["C2"].value
 
 
 def test_relatorio_pdf_do_projeto(cliente, admin):

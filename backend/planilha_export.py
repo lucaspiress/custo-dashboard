@@ -4,12 +4,15 @@ from datetime import datetime
 from io import BytesIO
 
 import openpyxl
+from openpyxl.styles import Alignment, Font, PatternFill
 
 import config
+import insights
 import loader
 
 SHEET_RELATORIO = config.SHEET_RELATORIO
 SHEET_GRAFICOS = config.SHEET_GRAFICOS
+SHEET_INSIGHTS = "INSIGHTS"
 
 
 def _data_br(valor: datetime | None) -> str | None:
@@ -44,6 +47,26 @@ def _montar_aba_local(ws, local: loader.Local) -> None:
             linha += 1
         ws.cell(row=linha, column=1, value=config.HEADER_TOTAL)
         linha += 1
+
+
+def _montar_aba_insights(wb: openpyxl.Workbook, workbook: loader.WorkbookData) -> None:
+    ws = wb.create_sheet(SHEET_INSIGHTS)
+    ws.append(["LOCAL", "SEVERIDADE", "INSIGHT"])
+    for local in workbook.locais:
+        for insight in insights.gerar_insights(local):
+            ws.append([local.nome, insight["severidade"], insight["texto"]])
+
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="172033")
+        cell.alignment = Alignment(horizontal="center")
+    for linha in ws.iter_rows(min_row=2):
+        linha[2].alignment = Alignment(wrap_text=True, vertical="top")
+    ws.column_dimensions["A"].width = 28
+    ws.column_dimensions["B"].width = 14
+    ws.column_dimensions["C"].width = 110
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
 
 
 def montar_planilha(workbook: loader.WorkbookData) -> BytesIO:
@@ -83,6 +106,7 @@ def montar_planilha(workbook: loader.WorkbookData) -> BytesIO:
             ]
         )
 
+    _montar_aba_insights(wb, workbook)
     wb.create_sheet(SHEET_GRAFICOS)
     buffer = BytesIO()
     wb.save(buffer)
