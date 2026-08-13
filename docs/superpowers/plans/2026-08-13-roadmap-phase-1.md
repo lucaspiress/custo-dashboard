@@ -45,10 +45,10 @@ backend stays responsible for template validation and persistence.
 - Consumes: local SQLite, Vite and FastAPI servers.
 - Produces: an executable smoke flow for import and export paths.
 
-- [ ] Create a synthetic template in the test environment.
-- [ ] Import it through the visible UI.
-- [ ] Assert the dashboard opens and downloads return non-empty XLSX and PDF blobs.
-- [ ] Run the smoke flow against local servers.
+- [x] Create a synthetic template in the test environment.
+- [x] Import it through the visible UI.
+- [x] Assert the dashboard opens and downloads return non-empty XLSX and PDF blobs.
+- [x] Run the smoke flow against local servers.
 
 ### Task 3: Loading and responsive audit
 

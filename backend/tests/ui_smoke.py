@@ -1,3 +1,7 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from fixtures import planilha_base
 from playwright.sync_api import expect, sync_playwright
 
 
@@ -32,6 +36,34 @@ def main() -> None:
 
             page.reload(wait_until="domcontentloaded")
             expect(page.get_by_text("Filial teste", exact=True)).to_be_visible(timeout=15_000)
+
+            page.get_by_role("link", name="Voltar aos projetos").click()
+            page.wait_for_url(f"{BASE_URL}/", wait_until="networkidle")
+            with page.expect_file_chooser() as chooser_info:
+                page.get_by_role("button", name="Importar planilha", exact=True).click()
+            chooser_info.value.set_files(
+                {
+                    "name": "importacao-ui.xlsx",
+                    "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "buffer": planilha_base().getvalue(),
+                }
+            )
+            page.wait_for_url(f"{BASE_URL}/projetos/*", wait_until="networkidle")
+            expect(page.get_by_role("button", name="Relatório PDF")).to_be_visible()
+
+            with TemporaryDirectory() as diretorio:
+                destino = Path(diretorio)
+                with page.expect_download() as pdf_info:
+                    page.get_by_role("button", name="Relatório PDF").click()
+                pdf = pdf_info.value
+                pdf.save_as(destino / "relatorio.pdf")
+                assert (destino / "relatorio.pdf").stat().st_size > 0
+
+                with page.expect_download() as planilha_info:
+                    page.get_by_role("button", name="Exportar planilha").click()
+                planilha = planilha_info.value
+                planilha.save_as(destino / "planilha.xlsx")
+                assert (destino / "planilha.xlsx").stat().st_size > 0
         finally:
             browser.close()
 
