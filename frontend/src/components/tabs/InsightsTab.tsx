@@ -10,7 +10,7 @@ export default function InsightsTab({ local }: Props) {
     return <div className="text-sm text-mutado">Nenhum insight gerado para este local.</div>
   }
   return (
-    <div className="max-w-3xl">
+    <div>
       {local.insights.map((insight, indice) => (
         <InsightCard key={indice} severidade={insight.severidade} texto={insight.texto} atraso={indice * 60} />
       ))}

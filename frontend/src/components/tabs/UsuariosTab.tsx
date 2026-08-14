@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react'
 import type { Usuario } from '../../lib/types'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
+import Botao from '../ui/Botao'
+import Badge from '../ui/Badge'
 
 const MAX_ADMINS = 3
 
@@ -62,8 +64,8 @@ export default function UsuariosTab() {
 
   return (
     <div className="max-w-4xl">
-      <div className="text-[15px] font-semibold text-tinta my-1.5 mb-2.5">Administração de usuários</div>
-      <div className="text-sm text-mutado mb-3">
+      <div className="text-[15px] font-semibold my-1.5 mb-2.5" style={{ color: 'var(--cor-tinta)' }}>Administração de usuários</div>
+      <div className="text-sm mb-3" style={{ color: 'var(--cor-mutado)' }}>
         Administradores cadastrados: {admins}/{MAX_ADMINS}
       </div>
 
@@ -73,50 +75,54 @@ export default function UsuariosTab() {
         </div>
       )}
 
-      <form onSubmit={criar} className="rounded-xl border border-borda bg-superficie p-4 mb-4 grid grid-cols-2 gap-3">
+      <form onSubmit={criar} className="rounded-2xl border p-4 mb-4 grid grid-cols-2 gap-3"
+        style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
         <input
           type="text"
           value={nome}
           onChange={(e) => setNome(e.target.value)}
           placeholder="Nome"
-          className="rounded-lg px-3 py-2 text-sm border border-borda outline-none focus:border-primaria"
+          className="rounded-lg px-3 py-2 text-sm border outline-none"
+          style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)', color: 'var(--cor-tinta)' }}
         />
         <input
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           placeholder="Usuário"
-          className="rounded-lg px-3 py-2 text-sm border border-borda outline-none focus:border-primaria"
+          className="rounded-lg px-3 py-2 text-sm border outline-none"
+          style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)', color: 'var(--cor-tinta)' }}
         />
         <input
           type="password"
           value={senha}
           onChange={(e) => setSenha(e.target.value)}
           placeholder="Senha (mín. 8 caracteres)"
-          className="rounded-lg px-3 py-2 text-sm border border-borda outline-none focus:border-primaria"
+          className="rounded-lg px-3 py-2 text-sm border outline-none"
+          style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)', color: 'var(--cor-tinta)' }}
         />
         <div className="flex gap-3">
           <select
             value={papel}
             onChange={(e) => setPapel(e.target.value)}
-            className="rounded-lg px-2 py-2 text-sm border border-borda outline-none"
+            className="rounded-lg px-2 py-2 text-sm border outline-none"
+            style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)', color: 'var(--cor-tinta)' }}
           >
             <option value="usuario">Usuário</option>
             <option value="admin">Admin</option>
           </select>
-          <button type="submit" className="botao-marca rounded-lg px-4 py-2 text-sm font-medium">
-            Criar usuário
-          </button>
+          <Botao type="submit">Criar usuário</Botao>
         </div>
       </form>
 
-      <div className="rounded-xl border border-borda bg-superficie overflow-hidden">
+      <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
         {usuarios.map((u) => (
-          <div key={u.id} className="flex items-center gap-3 px-4 py-3 border-b border-borda last:border-0">
+          <div key={u.id} className="flex items-center gap-3 px-4 py-3 border-b last:border-0"
+            style={{ borderColor: 'var(--cor-borda)' }}>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-tinta truncate">{u.nome}</div>
-              <div className="text-xs text-mutado">
-                {u.username} · {u.papel.toUpperCase()} · {u.ativo ? 'Ativo' : 'Desativado'}
+              <div className="text-sm font-semibold truncate" style={{ color: 'var(--cor-tinta)' }}>{u.nome}</div>
+              <div className="text-xs mt-0.5" style={{ color: 'var(--cor-mutado)' }}>
+                {u.username} · <Badge cor={u.papel === 'admin' ? '#2e59f6' : '#18d6ec'} rotulo={u.papel === 'admin' ? 'Admin' : 'Usuário'} /> · {u.ativo ? 'Ativo' : 'Desativado'}
               </div>
             </div>
             <form
@@ -132,9 +138,10 @@ export default function UsuariosTab() {
                 type="password"
                 name="novaSenha"
                 placeholder="Nova senha"
-                className="rounded-lg px-2 py-1.5 text-xs border border-borda outline-none focus:border-primaria w-36"
+                className="rounded-lg px-2 py-1.5 text-xs border outline-none w-36"
+                style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)', color: 'var(--cor-tinta)' }}
               />
-              <button type="submit" className="text-xs text-mutado hover:text-primaria">
+              <button type="submit" className="text-xs transition-colors" style={{ color: 'var(--cor-mutado)' }}>
                 Redefinir
               </button>
             </form>
@@ -143,9 +150,10 @@ export default function UsuariosTab() {
                 onClick={() => void alternarAtivo(u)}
                 className={`text-xs px-3 py-1.5 rounded-lg border ${
                   u.ativo
-                    ? 'border-borda text-mutado hover:text-alerta hover:border-alerta'
-                    : 'bg-sucesso border-sucesso text-white hover:bg-[#15803D]'
+                    ? ''
+                    : 'bg-sucesso border-sucesso text-white'
                 }`}
+                style={u.ativo ? { borderColor: 'var(--cor-borda)', color: 'var(--cor-mutado)' } : undefined}
               >
                 {u.ativo ? 'Desativar' : 'Ativar'}
               </button>
@@ -153,7 +161,7 @@ export default function UsuariosTab() {
           </div>
         ))}
         {usuarios.length === 0 && (
-          <div className="px-4 py-6 text-sm text-mutado">Nenhum usuário cadastrado.</div>
+          <div className="px-4 py-6 text-sm" style={{ color: 'var(--cor-mutado)' }}>Nenhum usuário cadastrado.</div>
         )}
       </div>
     </div>

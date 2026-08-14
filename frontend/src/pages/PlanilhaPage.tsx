@@ -1,11 +1,11 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
 import { criarAutosave, type Autosave, type EstadoAutosave } from '../lib/autosave'
 import { baixarBlob, fmtMoeda, fmtNumero, paraInputDate, parseNumero } from '../lib/format'
 import type { AnaliseUpload, ItemLinha } from '../lib/types'
 import { PlanilhaCarregando } from '../components/ProjetoLoading'
+import AppShell from '../components/AppShell'
 
 interface LinhaLocal {
   id: number
@@ -50,7 +50,6 @@ const CABECALHO_LOCAL = [
 
 const CABECALHO_ITEM = ['Categoria', 'Código', 'Material', 'Qtd', 'Valor unit.', 'Valor total', '']
 
-const ICONE_VOLTAR = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>)
 const ICONE_LIXO = (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>)
 const ICONE_PDF = (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>)
 const ICONE_XLSX = (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /></svg>)
@@ -87,7 +86,7 @@ function MoneyCell({ valor, onCommit }: { valor: number; onCommit: (n: number | 
         onChange={(e) => setTexto(e.target.value)}
         onBlur={confirmar}
         onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-        className="w-full min-w-[92px] rounded px-1.5 py-1 text-[13px] bg-elevado text-tinta outline-none ring-1 ring-[#10a0a0] text-right"
+        className="w-full min-w-[92px] rounded px-1.5 py-1 text-[13px] bg-elevado text-tinta outline-none ring-1 ring-[#2e59f6] text-right"
       />
     )
   }
@@ -127,7 +126,7 @@ function QtdCell({ valor, onCommit }: { valor: number; onCommit: (n: number | nu
         onChange={(e) => setTexto(e.target.value)}
         onBlur={confirmar}
         onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-        className="w-full min-w-[60px] rounded px-1.5 py-1 text-[13px] bg-elevado text-tinta outline-none ring-1 ring-[#10a0a0] text-right"
+        className="w-full min-w-[60px] rounded px-1.5 py-1 text-[13px] bg-elevado text-tinta outline-none ring-1 ring-[#2e59f6] text-right"
       />
     )
   }
@@ -166,7 +165,7 @@ function TextCell({ valor, onCommit, placeholder = '' }: { valor: string; onComm
         onChange={(e) => setTexto(e.target.value)}
         onBlur={confirmar}
         onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-        className="w-full rounded px-1.5 py-1 text-[13px] bg-elevado text-tinta outline-none ring-1 ring-[#10a0a0]"
+        className="w-full rounded px-1.5 py-1 text-[13px] bg-elevado text-tinta outline-none ring-1 ring-[#2e59f6]"
       />
     )
   }
@@ -194,7 +193,7 @@ function DateCell({ valor, onCommit }: { valor: string | null; onCommit: (v: str
           const v = e.target.value || null
           if (v !== paraInputDate(valor)) onCommit(v)
         }}
-        className="w-full rounded px-1.5 py-1 text-[13px] bg-elevado text-tinta outline-none ring-1 ring-[#10a0a0]"
+        className="w-full rounded px-1.5 py-1 text-[13px] bg-elevado text-tinta outline-none ring-1 ring-[#2e59f6]"
       />
     )
   }
@@ -211,7 +210,6 @@ function DateCell({ valor, onCommit }: { valor: string | null; onCommit: (v: str
 export default function PlanilhaPage() {
   const { id } = useParams<{ id: string }>()
   const projetoId = Number(id)
-  const { usuario } = useAuth()
   const [locais, setLocais] = useState<LinhaLocal[]>([])
   const [nomeProjeto, setNomeProjeto] = useState('')
   const [carregando, setCarregando] = useState(true)
@@ -468,30 +466,16 @@ export default function PlanilhaPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header
-        className="min-h-[64px] shrink-0 border-b border-[#1a2138] flex items-center justify-between gap-3 px-4 sm:px-5 py-3 z-10"
-        style={{ background: '#111e34' }}
-      >
-        <div className="flex items-center gap-3.5 min-w-0">
-          <Link
-            to="/"
-            className="rounded-lg p-2 text-[#93a5c8] hover:text-white hover:bg-[#16243c] transition-colors"
-            title="Voltar aos projetos"
-          >
-            {ICONE_VOLTAR}
-          </Link>
-          <img src="/logo-sistema.png" alt="Rota Group" className="h-[32px] w-auto object-contain shrink-0" />
-          <span className="w-px h-6 bg-[#2a3a56] shrink-0" />
-          <span className="titulo-display text-[16px] font-semibold text-white tracking-wide truncate">
-            {nomeProjeto || 'Projeto'}
-          </span>
-        </div>
-        <div className="flex items-center gap-2.5 shrink-0">
+    <>
+    <AppShell
+      titulo="Planilha de dados"
+      acoes={
+        <>
           <button
             onClick={() => void exportarPdf()}
             aria-label="Relatório PDF"
-            className="h-9 rounded-lg px-3.5 text-[13px] font-medium bg-[#16243c] border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors inline-flex items-center gap-2"
+            className="h-9 rounded-lg px-3.5 text-[13px] font-medium transition-colors inline-flex items-center gap-2"
+            style={{ background: 'var(--cor-elevado)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}
           >
             {ICONE_PDF}
             <span className="hidden sm:inline">Relatório PDF</span>
@@ -499,40 +483,32 @@ export default function PlanilhaPage() {
           <button
             onClick={() => void exportarPlanilha()}
             aria-label="Exportar planilha"
-            className="h-9 rounded-lg px-3.5 text-[13px] font-medium bg-[#16243c] border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors inline-flex items-center gap-2"
+            className="h-9 rounded-lg px-3.5 text-[13px] font-medium transition-colors inline-flex items-center gap-2"
+            style={{ background: 'var(--cor-elevado)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}
           >
             {ICONE_XLSX}
             <span className="hidden sm:inline">Exportar planilha</span>
           </button>
-          <span className="hidden sm:block w-px h-6 bg-[#2a3a56] shrink-0" />
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold shrink-0"
-            style={{ background: 'rgba(16, 160, 160, 0.15)', color: '#10a0a0' }}
-          >
-            {usuario?.nome?.[0]?.toUpperCase() ?? 'U'}
+        </>
+      }
+    >
+      <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
+        <div>
+          <div className="text-[12.5px] mb-1" style={{ color: 'var(--cor-mutado)' }}>
+            <Link to="/" className="transition-colors" style={{ color: 'var(--cor-mutado)' }}>Projetos</Link>
+            <span className="mx-1.5">/</span>
+            <span className="font-medium" style={{ color: 'var(--cor-primaria)' }}>{nomeProjeto || 'Projeto'}</span>
+          </div>
+          <p className="text-[12.5px] mt-0.5" style={{ color: 'var(--cor-mutado)' }}>
+            Clique numa célula para editar · cole linhas direto do Excel · tudo é salvo automaticamente
+          </p>
+          <div className="mt-1 text-[12px]" aria-live="polite">
+            {estadoAutosave === 'pendente' && <span className="text-mutado">Alteração pendente…</span>}
+            {estadoAutosave === 'salvando' && <span style={{ color: 'var(--cor-primaria)' }}>Salvando alteração…</span>}
+            {estadoAutosave === 'salvo' && <span style={{ color: 'var(--cor-sucesso)' }}>Alterações salvas</span>}
           </div>
         </div>
-      </header>
-
-      <main className="flex-1 w-full max-w-[1400px] mx-auto p-4 sm:p-6">
-        <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
-          <div>
-            <div className="text-[12.5px] text-mutado mb-1">
-              <Link to="/" className="hover:text-[#10a0a0] transition-colors">Projetos</Link>
-              <span className="mx-1.5">/</span>
-              <span className="text-[#10a0a0] font-medium">{nomeProjeto || 'Projeto'}</span>
-            </div>
-            <h1 className="text-xl font-bold text-tinta">Planilha de dados</h1>
-            <p className="text-[12.5px] text-mutado mt-0.5">
-              Clique numa célula para editar · cole linhas direto do Excel · tudo é salvo automaticamente
-            </p>
-            <div className="mt-1 text-[12px]" aria-live="polite">
-              {estadoAutosave === 'pendente' && <span className="text-mutado">Alteração pendente…</span>}
-              {estadoAutosave === 'salvando' && <span className="text-[#10a0a0]">Salvando alteração…</span>}
-              {estadoAutosave === 'salvo' && <span className="text-[#10b981]">Alterações salvas</span>}
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
             <div className="text-right">
               <div className="text-[11px] uppercase tracking-wide text-mutado">Receita mensal</div>
               <div className="text-[15px] font-semibold text-tinta tabular-nums">{fmtMoeda(totais.receita)}</div>
@@ -554,22 +530,23 @@ export default function PlanilhaPage() {
             <span>{autosaveRef.current?.erroAtual() ?? 'Erro ao salvar a alteração.'}</span>
             <button
               onClick={() => void autosaveRef.current?.tentarNovamente()}
-              className="font-semibold text-[#10a0a0] hover:text-[#48c8c8] transition-colors"
+              className="font-semibold text-[#2e59f6] hover:text-[#5b8cff] transition-colors"
             >
               Tentar novamente
             </button>
           </div>
         )}
 
-        <div className="rounded-xl border border-borda bg-superficie overflow-hidden">
+        <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
           <div className="overflow-x-auto" onPaste={(e) => void colarLocais(e)}>
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-[#1a2138]">
+                <tr className="border-b" style={{ borderColor: 'var(--cor-borda)' }}>
                   {CABECALHO_LOCAL.map((c, i) => (
                     <th
                       key={i}
-                      className={`px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[#8fa3c7] whitespace-nowrap ${i > 0 && i < CABECALHO_LOCAL.length - 1 ? 'text-right' : ''}`}
+                      className={`px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap ${i > 0 && i < CABECALHO_LOCAL.length - 1 ? 'text-right' : ''}`}
+                      style={{ color: 'var(--cor-mutado)' }}
                     >
                       {c}
                     </th>
@@ -581,7 +558,7 @@ export default function PlanilhaPage() {
                   const comp = computarLocal(linha)
                   return (
                     <Fragment key={linha.id}>
-                      <tr className="border-b border-[#141a2e] group">
+                      <tr className="border-b group" style={{ borderColor: 'var(--cor-borda)' }}>
                         <td className="px-2.5 py-1.5">
                           <div className="flex items-center gap-1.5 min-w-[150px]">
                             <button
@@ -624,29 +601,32 @@ export default function PlanilhaPage() {
                       </tr>
                       {linha.expanso && (
                         <tr>
-                          <td colSpan={CABECALHO_LOCAL.length} className="px-4 pb-4 bg-[rgba(16,160,160,0.03)]">
+                          <td colSpan={CABECALHO_LOCAL.length} className="px-4 pb-4" style={{ background: 'rgba(46, 89, 246, 0.04)' }}>
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-[12px] font-semibold uppercase tracking-wider text-[#8fa3c7]">
+                              <span className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: 'var(--cor-mutado)' }}>
                                 Itens de equipamento · {comp.numItens} item(ns) · {fmtMoeda(comp.equipamento)}
                               </span>
                               <button
                                 onClick={() => void adicionarItem(linha)}
-                                className="h-7 px-2.5 rounded-md text-[12px] font-medium border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors"
+                                className="h-7 px-2.5 rounded-md text-[12px] font-medium border transition-colors"
+                                style={{ borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)', background: 'var(--cor-elevado)' }}
                               >
                                 + Item
                               </button>
                             </div>
                             <div
-                              className="rounded-lg border border-[#1a2138] overflow-hidden"
+                              className="rounded-lg border overflow-hidden"
+                              style={{ borderColor: 'var(--cor-borda)' }}
                               onPaste={(e) => void colarItens(linha, e)}
                             >
                               <table className="w-full text-left">
                                 <thead>
-                                  <tr className="bg-[#0f1526] border-b border-[#1a2138]">
+                                  <tr className="border-b" style={{ background: 'var(--cor-sidebar)', borderColor: 'var(--cor-borda)' }}>
                                     {CABECALHO_ITEM.map((c, i) => (
                                       <th
                                         key={i}
-                                        className={`px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wider text-[#8fa3c7] whitespace-nowrap ${i > 0 && i < CABECALHO_ITEM.length - 1 ? 'text-right' : ''}`}
+                                        className={`px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap ${i > 0 && i < CABECALHO_ITEM.length - 1 ? 'text-right' : ''}`}
+                                        style={{ color: 'var(--cor-mutado)' }}
                                       >
                                         {c}
                                       </th>
@@ -655,7 +635,7 @@ export default function PlanilhaPage() {
                                 </thead>
                                 <tbody>
                                   {linha.itens.map((item) => (
-                                    <tr key={item.id} className="border-b border-[#141a2e] group/item">
+                                    <tr key={item.id} className="border-b group/item" style={{ borderColor: 'var(--cor-borda)' }}>
                                       <td className="px-2.5 py-1 min-w-[120px]"><TextCell valor={item.categoria} onCommit={(v) => agendarSalvar(`item:${item.id}:categoria`, () => salvarItem(linha, item, 'categoria', v))} /></td>
                                       <td className="px-1 py-1 min-w-[80px]"><TextCell valor={item.cod} onCommit={(v) => agendarSalvar(`item:${item.id}:cod`, () => salvarItem(linha, item, 'cod', v))} /></td>
                                       <td className="px-1 py-1 min-w-[160px]"><TextCell valor={item.material} onCommit={(v) => agendarSalvar(`item:${item.id}:material`, () => salvarItem(linha, item, 'material', v))} /></td>
@@ -701,47 +681,49 @@ export default function PlanilhaPage() {
               </tbody>
             </table>
           </div>
-          <div className="flex items-center justify-between px-4 py-3 border-t border-[#1a2138]">
+          <div className="flex items-center justify-between px-4 py-3 border-t" style={{ borderColor: 'var(--cor-borda)' }}>
             <button
               onClick={() => void adicionarLocal()}
-              className="h-9 rounded-lg px-4 text-[13px] font-semibold text-white inline-flex items-center gap-2 hover:opacity-90 transition-opacity"
-              style={{ background: '#0c7d74' }}
+              className="h-9 rounded-lg px-4 text-[13px] font-semibold text-white inline-flex items-center gap-2 transition-opacity hover:opacity-90"
+              style={{ background: 'linear-gradient(135deg, #2e59f6 0%, #3061d9 100%)' }}
             >
               + Local
             </button>
             <Link
               to={`/projetos/${projetoId}`}
-              className="h-9 rounded-lg px-4 text-[13px] font-semibold inline-flex items-center gap-2 border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors"
+              className="h-9 rounded-lg px-4 text-[13px] font-semibold inline-flex items-center gap-2 border transition-colors"
+              style={{ borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)', background: 'var(--cor-elevado)' }}
             >
               Ver dashboard
             </Link>
           </div>
         </div>
-      </main>
+      </AppShell>
 
       {confirmarExcluirLocal !== null &&
         (() => {
           const linha = locaisRef.current.find((l) => l.id === confirmarExcluirLocal)
           if (!linha) return null
           return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-              <div className="w-full max-w-sm rounded-xl border border-borda bg-superficie p-5 shadow-2xl">
-                <div className="text-[15px] font-semibold text-tinta mb-2">Excluir local?</div>
-                <p className="text-[13px] text-mutado leading-relaxed">
-                  O local <b className="text-tinta">{linha.nome}</b> e seus {linha.itens.length} item(ns) serão
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(5, 8, 16, 0.7)' }}>
+              <div className="w-full max-w-sm rounded-2xl border p-5" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)', boxShadow: '0 24px 60px rgba(0,0,0,0.5)' }}>
+                <div className="text-[15px] font-semibold mb-2" style={{ color: 'var(--cor-tinta)' }}>Excluir local?</div>
+                <p className="text-[13px] leading-relaxed" style={{ color: 'var(--cor-mutado)' }}>
+                  O local <b style={{ color: 'var(--cor-tinta)' }}>{linha.nome}</b> e seus {linha.itens.length} item(ns) serão
                   removidos.
                 </p>
                 <div className="flex justify-end gap-2 mt-5">
                   <button
                     onClick={() => setConfirmarExcluirLocal(null)}
-                    className="h-9 px-3.5 rounded-lg text-[13px] font-medium text-mutado hover:text-white hover:bg-elevado transition-colors"
+                    className="h-9 px-3.5 rounded-lg text-[13px] font-medium transition-colors"
+                    style={{ color: 'var(--cor-mutado)' }}
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={() => void excluirLocal(linha)}
                     className="h-9 px-4 rounded-lg text-[13px] font-semibold text-white"
-                    style={{ background: '#b42323' }}
+                    style={{ background: 'linear-gradient(135deg, #dc2626 0%, #b42323 100%)' }}
                   >
                     Excluir
                   </button>
@@ -750,6 +732,6 @@ export default function PlanilhaPage() {
             </div>
           )
         })()}
-    </div>
+    </>
   )
 }

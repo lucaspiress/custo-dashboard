@@ -3,26 +3,26 @@
 
 :root {
   color-scheme: dark;
-  --cor-primaria: #10a0a0;
-  --cor-primaria-hover: #0c8c8c;
-  --cor-secundaria: #0050a0;
+  --cor-primaria: #2e59f6;
+  --cor-primaria-hover: #4669f7;
+  --cor-secundaria: #3061d9;
   --cor-destaque: #e07b1a;
-  --cor-fundo: #0b0f1e;
-  --cor-superficie: #12172b;
-  --cor-elevado: #1a2138;
-  --cor-sidebar: #070b18;
-  --cor-borda: #232a44;
-  --cor-mutado: #8b93a7;
-  --cor-tinta: #edf1f7;
+  --cor-fundo: #121622;
+  --cor-superficie: #181f32;
+  --cor-elevado: #222b45;
+  --cor-sidebar: #0c111c;
+  --cor-borda: #1f2740;
+  --cor-mutado: #8fa3c7;
+  --cor-tinta: #f5f7fc;
   --cor-sucesso: #10b981;
   --cor-alerta: #ef4444;
   --cor-dica: #3b82f6;
-  --cor-grid: #232a44;
-  --cor-ciano: #2090b0;
-  --cor-violeta: #6366f1;
+  --cor-grid: #1f2740;
+  --cor-ciano: #18d6ec;
+  --cor-violeta: #6649df;
   --cor-cinza: #94a3b8;
   --cor-rosa: #f43f5e;
-  --cor-hover: #1a2138;
+  --cor-hover: #222b45;
   --fonte-ui: 'IBM Plex Sans', 'Segoe UI', sans-serif;
   --fonte-display: 'Space Grotesk', 'Inter', sans-serif;
   --fonte-numero: 'IBM Plex Mono', Consolas, monospace;
@@ -69,7 +69,7 @@ html, body, #root {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, #171e34 20%, #273252 45%, #171e34 70%);
+  background: linear-gradient(90deg, #181f32 20%, #222b45 45%, #181f32 70%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
 }
@@ -79,11 +79,16 @@ html, body, #root {
 }
 
 .botao-marca {
-  background: linear-gradient(135deg, #0050a0 0%, #0080a0 100%);
+  background: linear-gradient(135deg, #2e59f6 0%, #3061d9 100%);
   color: #ffffff;
 }
 
 :focus-visible {
+  outline: 2px solid #2e59f6;
+  outline-offset: 2px;
+}
+
+.login-app :focus-visible {
   outline: 2px solid #10a0a0;
   outline-offset: 2px;
 }
@@ -93,10 +98,10 @@ html, body, #root {
   background: var(--cor-superficie);
   border: 1px solid var(--cor-borda);
   border-bottom: 3px solid var(--kpi-cor, var(--cor-primaria));
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 18px 20px;
   animation: fadeInUp 0.4s ease-out both;
-  transition: transform 200ms ease, border-color 200ms ease;
+  transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--kpi-cor, var(--cor-primaria)) 14%, transparent),
     0 0 14px -4px color-mix(in srgb, var(--kpi-cor, var(--cor-primaria)) 45%, transparent),
@@ -106,6 +111,10 @@ html, body, #root {
 .kpi-card:hover {
   transform: translateY(-2px);
   border-color: var(--kpi-cor, var(--cor-primaria));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--kpi-cor, var(--cor-primaria)) 22%, transparent),
+    0 6px 20px -4px color-mix(in srgb, var(--kpi-cor, var(--cor-primaria)) 55%, transparent),
+    0 8px 22px rgba(0, 0, 0, 0.3);
 }
 
 .kpi-value {
@@ -120,7 +129,7 @@ html, body, #root {
 .insight-card {
   border: 1px solid var(--insight-borda);
   background: var(--insight-fundo);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 10px 14px;
   margin-bottom: 8px;
   animation: fadeInUp .4s ease-out both;
@@ -145,11 +154,12 @@ html, body, #root {
 }
 
 .grafico-caixa {
-  background: #12172b;
-  border: 1px solid #232a44;
-  border-radius: 12px;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: 14px;
   overflow: hidden;
   padding: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
 }
 
 table th {

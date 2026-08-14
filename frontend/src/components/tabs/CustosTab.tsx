@@ -44,41 +44,43 @@ export default function CustosTab({ local, categorias }: Props) {
   }, [local, busca, categorias, ordenacao])
 
   return (
-    <div>
-      <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {local.graficos.composicao && <PlotlyChart figJson={local.graficos.composicao} />}
         {local.graficos.categorias && <PlotlyChart figJson={local.graficos.categorias} />}
       </div>
       {local.graficos.pareto && <PlotlyChart figJson={local.graficos.pareto} />}
 
       <div className="mt-2">
-        <div className="text-[15px] font-semibold text-tinta my-1.5 mb-2.5">Itens de equipamento</div>
+        <div className="text-[15px] font-semibold my-1.5 mb-2.5" style={{ color: 'var(--cor-tinta)' }}>Itens de equipamento</div>
         <div className="flex flex-wrap gap-3 mb-3">
           <input
             type="text"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar material ou código…"
-            className="rounded-lg px-3 py-1.5 text-sm border border-borda outline-none focus:border-primaria w-64"
+            className="rounded-lg px-3 py-1.5 text-sm border outline-none w-64"
+            style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-superficie)', color: 'var(--cor-tinta)' }}
           />
           <select
             value={ordenacao}
             onChange={(e) => setOrdenacao(e.target.value)}
-            className="rounded-lg px-2 py-1.5 text-sm border border-borda outline-none"
+            className="rounded-lg px-2 py-1.5 text-sm border outline-none"
+            style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-superficie)', color: 'var(--cor-tinta)' }}
           >
             {ORDENACOES.map((o) => (
               <option key={o.valor} value={o.valor}>{o.rotulo}</option>
             ))}
           </select>
-          <span className="text-xs text-mutado self-center">
+          <span className="text-xs self-center" style={{ color: 'var(--cor-mutado)' }}>
             {itens.length} de {local.itens.length} itens
             {categorias.length > 0 && ` · filtrado por ${categorias.length} categoria(s)`}
           </span>
         </div>
-        <div className="overflow-x-auto rounded-xl border border-borda bg-superficie">
+        <div className="overflow-x-auto rounded-2xl border" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
           <table className="w-full text-[13px]">
             <thead>
-              <tr className="text-left text-tinta font-semibold border-b border-borda">
+              <tr className="text-left font-semibold border-b" style={{ color: 'var(--cor-tinta)', borderColor: 'var(--cor-borda)' }}>
                 <th className="px-3 py-2.5">Categoria</th>
                 <th className="px-3 py-2.5">Código</th>
                 <th className="px-3 py-2.5">Material</th>
@@ -89,18 +91,18 @@ export default function CustosTab({ local, categorias }: Props) {
             </thead>
             <tbody>
               {itens.map((item, indice) => (
-                <tr key={`${item.cod}-${item.material}-${indice}`} className="border-b border-borda last:border-0 font-mono hover:bg-hover transition-colors">
+                <tr key={`${item.cod}-${item.material}-${indice}`} className="border-b last:border-0 font-mono hover:bg-[var(--cor-hover)] transition-colors" style={{ borderColor: 'var(--cor-borda)' }}>
                   <td className="px-3 py-2 font-sans">{item.categoria}</td>
                   <td className="px-3 py-2">{item.cod}</td>
                   <td className="px-3 py-2 font-sans">{item.material}</td>
                   <td className="px-3 py-2">{item.qtd}</td>
                   <td className="px-3 py-2">{fmtMoeda(item.valor_unit)}</td>
-                  <td className="px-3 py-2 font-semibold text-tinta">{fmtMoeda(item.valor_total)}</td>
+                  <td className="px-3 py-2 font-semibold" style={{ color: 'var(--cor-tinta)' }}>{fmtMoeda(item.valor_total)}</td>
                 </tr>
               ))}
               {itens.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-mutado">
+                  <td colSpan={6} className="px-3 py-6 text-center" style={{ color: 'var(--cor-mutado)' }}>
                     Nenhum item encontrado com os filtros atuais.
                   </td>
                 </tr>

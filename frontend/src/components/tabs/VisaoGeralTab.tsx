@@ -16,34 +16,26 @@ export default function VisaoGeralTab({ analise, local }: Props) {
 
   return (
     <div>
-      <div className="grid grid-cols-4 gap-x-6 gap-y-8 items-start">
-        <div className="flex flex-col gap-8">
-          <KpiCard rotulo="Receita mensal" valor={fmtMoeda(r.valor_mensal)} sub="Mensalidade do contrato" cor={KPI_CORES['Receita mensal']} />
-          <KpiCard rotulo="Receita anual" valor={fmtMoeda(r.receita_anual)} sub="12 meses + taxa de instalação" cor={KPI_CORES['Receita anual']} atraso={80} />
-        </div>
-        <div className="flex flex-col gap-8">
-          <KpiCard rotulo="Saldo mensal" valor={fmtMoeda(r.saldo_mensal)} sub={margem} cor={KPI_CORES['Saldo mensal']} atraso={160} />
-          <KpiCard rotulo="Impostos (15%)" valor={fmtMoeda(r.impostos)} sub="Sobre a receita mensal" cor={KPI_CORES['Impostos (15%)']} atraso={240} />
-        </div>
-        <div className="flex flex-col gap-8">
-          <KpiCard rotulo="Investimento" valor={fmtMoeda(r.investimento)} sub="Mão de obra + equipamento" cor={KPI_CORES.Investimento} atraso={320} />
-          <KpiCard rotulo="Equipamento" valor={fmtMoeda(r.equipamento)} sub="Itens da proposta" cor={KPI_CORES.Equipamento} atraso={400} />
-        </div>
-        <div className="flex flex-col gap-8">
-          <KpiCard rotulo="Tempo de retorno" valor={fmtNumero(r.tempo_retorno)} sub="Payback do investimento" cor={KPI_CORES['Tempo de retorno']} atraso={480} />
-          <KpiCard rotulo="Instalação" valor={fmtData(r.data_inst)} sub="Data prevista / realizada" cor={KPI_CORES['Instalação']} atraso={560} />
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard rotulo="Receita mensal" valor={fmtMoeda(r.valor_mensal)} sub="Mensalidade do contrato" cor={KPI_CORES['Receita mensal']} />
+        <KpiCard rotulo="Saldo mensal" valor={fmtMoeda(r.saldo_mensal)} sub={margem} cor={KPI_CORES['Saldo mensal']} atraso={60} />
+        <KpiCard rotulo="Investimento" valor={fmtMoeda(r.investimento)} sub="Mão de obra + equipamento" cor={KPI_CORES.Investimento} atraso={120} />
+        <KpiCard rotulo="Tempo de retorno" valor={fmtNumero(r.tempo_retorno)} sub="Payback do investimento" cor={KPI_CORES['Tempo de retorno']} atraso={180} />
+        <KpiCard rotulo="Receita anual" valor={fmtMoeda(r.receita_anual)} sub="12 meses + taxa de instalação" cor={KPI_CORES['Receita anual']} atraso={240} />
+        <KpiCard rotulo="Impostos (15%)" valor={fmtMoeda(r.impostos)} sub="Sobre a receita mensal" cor={KPI_CORES['Impostos (15%)']} atraso={300} />
+        <KpiCard rotulo="Equipamento" valor={fmtMoeda(r.equipamento)} sub="Itens da proposta" cor={KPI_CORES.Equipamento} atraso={360} />
+        <KpiCard rotulo="Instalação" valor={fmtData(r.data_inst)} sub="Data prevista / realizada" cor={KPI_CORES['Instalação']} atraso={420} />
       </div>
 
       <div className="mt-10">
-        <div className="text-[15px] font-semibold text-tinta my-1.5 mb-2.5">Resumo do local</div>
+        <div className="text-[15px] font-semibold my-1.5 mb-2.5" style={{ color: 'var(--cor-tinta)' }}>Resumo do local</div>
         <div
-          className="overflow-x-auto rounded-xl border border-borda bg-superficie"
-          style={{ animation: 'fadeInUp 0.5s ease-out 600ms both' }}
+          className="overflow-x-auto rounded-2xl border"
+          style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)', animation: 'fadeInUp 0.5s ease-out 600ms both' }}
         >
           <table className="w-full text-[13px]">
             <thead>
-              <tr className="text-left text-tinta font-semibold border-b border-borda">
+              <tr className="text-left font-semibold border-b" style={{ color: 'var(--cor-tinta)', borderColor: 'var(--cor-borda)' }}>
                 <th className="px-3 py-2.5">Local</th>
                 <th className="px-3 py-2.5">Receita mensal</th>
                 <th className="px-3 py-2.5">Saldo mensal</th>
@@ -56,8 +48,8 @@ export default function VisaoGeralTab({ analise, local }: Props) {
             </thead>
             <tbody>
               {analise.locais.map((l) => (
-                <tr key={l.nome} className="border-b border-borda last:border-0 font-mono hover:bg-hover transition-colors">
-                  <td className="px-3 py-2 font-sans">{l.nome}</td>
+                <tr key={l.nome} className="border-b last:border-0 font-mono hover:bg-[var(--cor-hover)] transition-colors" style={{ borderColor: 'var(--cor-borda)' }}>
+                  <td className="px-3 py-2 font-sans" style={{ color: 'var(--cor-tinta)' }}>{l.nome}</td>
                   <td className="px-3 py-2">{fmtMoeda(l.resumo.valor_mensal)}</td>
                   <td className="px-3 py-2">{fmtMoeda(l.resumo.saldo_mensal)}</td>
                   <td className="px-3 py-2">{fmtMoeda(l.resumo.mao_de_obra)}</td>

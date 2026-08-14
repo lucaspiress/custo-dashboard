@@ -3,7 +3,6 @@ import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
 import { baixarBlob } from '../lib/format'
-import { COR } from '../lib/theme'
 import type { AnaliseUpload } from '../lib/types'
 import VisaoGeralTab from '../components/tabs/VisaoGeralTab'
 import CustosTab from '../components/tabs/CustosTab'
@@ -12,14 +11,14 @@ import InsightsTab from '../components/tabs/InsightsTab'
 import ComparativoTab from '../components/tabs/ComparativoTab'
 import UsuariosTab from '../components/tabs/UsuariosTab'
 import { DashboardCarregando } from '../components/ProjetoLoading'
+import AppShell from '../components/AppShell'
+import Botao from '../components/ui/Botao'
 
 const ABAS_PADRAO = ['Visão Geral', 'Custos', 'Payback', 'Insights', 'Comparativo']
 
 const ICONE_PDF = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" /></svg>)
 const ICONE_XLSX = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /></svg>)
 const ICONE_PLANILHA = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /></svg>)
-const ICONE_VOLTAR = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>)
-const ICONE_SAIR = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>)
 
 const ICONES_ABAS: Record<string, ReactNode> = {
   'Visão Geral': (<><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>),
@@ -33,7 +32,7 @@ const ICONES_ABAS: Record<string, ReactNode> = {
 export default function DashboardPage() {
   const { id } = useParams<{ id: string }>()
   const projetoId = Number(id)
-  const { usuario, logout } = useAuth()
+  const { usuario } = useAuth()
   const [analise, setAnalise] = useState<AnaliseUpload | null>(null)
   const [localNome, setLocalNome] = useState<string | null>(null)
   const [aba, setAba] = useState('Visão Geral')
@@ -94,84 +93,55 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header
-        className="min-h-[64px] shrink-0 border-b border-[#1a2138] flex items-center justify-between gap-3 px-4 sm:px-5 py-3 z-10"
-        style={{ background: '#111e34' }}
-      >
-        <div className="flex items-center gap-3.5 min-w-0">
-          <Link
-            to="/"
-            className="rounded-lg p-2 text-[#93a5c8] hover:text-white hover:bg-[#16243c] transition-colors"
-            title="Voltar aos projetos"
-          >
-            {ICONE_VOLTAR}
-          </Link>
-          <img src="/logo-sistema.png" alt="Rota Group" className="h-[32px] w-auto object-contain shrink-0" />
-          <span className="w-px h-6 bg-[#2a3a56] shrink-0" />
-          <span className="titulo-display text-[16px] font-semibold text-white tracking-wide truncate">
-            {analise?.filename ?? 'Custo Dashboard'}
-          </span>
-        </div>
-        <div className="flex items-center gap-2.5 shrink-0">
-          {analise && (
-            <>
-              <button
-                onClick={() => void baixarPdf()}
-                aria-label="Relatório PDF"
-                className="h-9 rounded-lg px-3.5 text-[13px] font-medium bg-[#16243c] border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors inline-flex items-center gap-2"
-              >
-                {ICONE_PDF}
-                <span className="hidden sm:inline">Relatório PDF</span>
-              </button>
-              <button
-                onClick={() => void baixarPlanilha()}
-                aria-label="Exportar planilha"
-                className="h-9 rounded-lg px-3.5 text-[13px] font-medium bg-[#16243c] border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors inline-flex items-center gap-2"
-              >
-                {ICONE_XLSX}
-                <span className="hidden sm:inline">Exportar planilha</span>
-              </button>
-              <Link
-                to={`/projetos/${projetoId}/planilha`}
-                aria-label="Editar dados"
-                className="h-9 rounded-lg px-3.5 text-[13px] font-medium bg-[#16243c] border border-[#2a3a56] text-[#b9c7e4] hover:text-white hover:border-[#10a0a0] transition-colors inline-flex items-center gap-2"
-              >
-                {ICONE_PLANILHA}
-                <span className="hidden sm:inline">Editar dados</span>
-              </Link>
-              <span className="w-px h-6 bg-[#2a3a56] shrink-0" />
-            </>
-          )}
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold shrink-0"
-            style={{ background: 'rgba(16, 160, 160, 0.15)', color: '#10a0a0' }}
-          >
-            {usuario?.nome?.[0]?.toUpperCase() ?? 'U'}
-          </div>
-          <span className="hidden lg:block text-[12.5px] text-[#b9c7e4]">{usuario?.nome}</span>
-          <button
-            onClick={() => void logout()}
-            title="Sair"
-            className="rounded-lg p-2 text-[#93a5c8] hover:text-white hover:bg-[#16243c] transition-colors"
-          >
-            {ICONE_SAIR}
-          </button>
-        </div>
-      </header>
-
-      <div className="flex flex-1 min-h-0 flex-col md:flex-row">
-        <aside className="w-full md:w-72 shrink-0 border-b md:border-b-0 md:border-r border-[#1a2138] flex flex-col overflow-y-auto" style={{ background: COR.sidebar }}>
-          <nav className="p-3 flex md:flex-col gap-1 overflow-x-auto">
+    <AppShell
+      titulo={analise?.filename ?? 'Projeto'}
+      acoes={
+        analise && (
+          <>
+            <Botao variante="secundario" onClick={() => void baixarPdf()} aria-label="Relatório PDF">
+              {ICONE_PDF}
+              <span className="hidden sm:inline">Relatório PDF</span>
+            </Botao>
+            <Botao variante="secundario" onClick={() => void baixarPlanilha()} aria-label="Exportar planilha">
+              {ICONE_XLSX}
+              <span className="hidden sm:inline">Exportar planilha</span>
+            </Botao>
+            <Link to={`/projetos/${projetoId}/planilha`} aria-label="Editar dados" className="h-9 rounded-lg px-3.5 text-[13px] font-medium inline-flex items-center gap-2 transition-colors" style={{ background: 'var(--cor-elevado)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}>
+              {ICONE_PLANILHA}
+              <span className="hidden sm:inline">Editar dados</span>
+            </Link>
+          </>
+        )
+      }
+    >
+      <div className="flex flex-col lg:flex-row gap-5">
+        <aside
+          className="w-full lg:w-64 shrink-0 rounded-2xl border p-4 lg:self-start"
+          style={{
+            background: 'var(--cor-sidebar)',
+            borderColor: 'var(--cor-borda)',
+          }}
+        >
+          <nav className="flex lg:flex-col gap-1 overflow-x-auto">
             {abas.map((nome) => (
               <button
                 key={nome}
                 onClick={() => setAba(nome)}
-                  className={`flex shrink-0 items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium border-l-2 transition-colors whitespace-nowrap ${
-                  aba === nome
-                    ? 'bg-[rgba(16,160,160,0.12)] text-white border-[#10a0a0]'
-                    : 'border-transparent text-[#8fa3c7] hover:bg-superficie hover:text-white'
+                className={`flex shrink-0 items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium border-l-2 transition-colors whitespace-nowrap ${
+                  aba === nome ? '' : ''
                 }`}
+                style={
+                  aba === nome
+                    ? {
+                        background: 'rgba(46, 89, 246, 0.14)',
+                        color: 'var(--cor-tinta)',
+                        borderColor: 'var(--cor-primaria)',
+                      }
+                    : {
+                        borderColor: 'transparent',
+                        color: 'var(--cor-mutado)',
+                      }
+                }
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                   strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
@@ -183,15 +153,16 @@ export default function DashboardPage() {
           </nav>
 
           {analise && analise.locais.length > 0 && (
-            <div className="p-4 flex flex-col gap-4 border-t border-[#1a2138]">
+            <div className="mt-4 flex flex-col gap-4 border-t pt-4" style={{ borderColor: 'var(--cor-borda)' }}>
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8fa3c7] mb-2">
+                <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--cor-mutado)' }}>
                   Local
                 </div>
                 <select
                   value={localNome ?? ''}
                   onChange={(e) => setLocalNome(e.target.value)}
-                  className="w-full rounded-lg px-2 py-1.5 text-sm border border-borda outline-none bg-superficie text-tinta"
+                  className="w-full rounded-lg px-2 py-1.5 text-sm border outline-none"
+                  style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-superficie)', color: 'var(--cor-tinta)' }}
                 >
                   {analise.locais.map((l) => (
                     <option key={l.nome} value={l.nome}>{l.nome}</option>
@@ -201,17 +172,20 @@ export default function DashboardPage() {
 
               {categorias.length > 0 && (
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8fa3c7] mb-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--cor-mutado)' }}>
                     Categorias
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex lg:flex-col flex-wrap gap-1">
                     <button
                       onClick={() => setCategoriasFiltro([])}
                       className={`text-left text-[12.5px] px-2.5 py-1.5 rounded-md border transition-colors ${
-                        categoriasFiltro.length === 0
-                          ? 'border-[#10a0a0] text-white bg-[rgba(16,160,160,0.12)]'
-                          : 'border-transparent text-[#8fa3c7] hover:bg-superficie hover:text-white'
+                        categoriasFiltro.length === 0 ? '' : ''
                       }`}
+                      style={
+                        categoriasFiltro.length === 0
+                          ? { borderColor: 'var(--cor-primaria)', color: 'var(--cor-tinta)', background: 'rgba(46, 89, 246, 0.14)' }
+                          : { borderColor: 'transparent', color: 'var(--cor-mutado)' }
+                      }
                     >
                       Todas
                     </button>
@@ -220,10 +194,13 @@ export default function DashboardPage() {
                         key={c}
                         onClick={() => alternarCategoria(c)}
                         className={`text-left text-[12.5px] px-2.5 py-1.5 rounded-md border transition-colors ${
-                          categoriasFiltro.includes(c)
-                            ? 'border-[#10a0a0] text-white bg-[rgba(16,160,160,0.12)]'
-                            : 'border-transparent text-[#8fa3c7] hover:bg-superficie hover:text-white'
+                          categoriasFiltro.includes(c) ? '' : ''
                         }`}
+                        style={
+                          categoriasFiltro.includes(c)
+                            ? { borderColor: 'var(--cor-primaria)', color: 'var(--cor-tinta)', background: 'rgba(46, 89, 246, 0.14)' }
+                            : { borderColor: 'transparent', color: 'var(--cor-mutado)' }
+                        }
                       >
                         {c}
                       </button>
@@ -236,53 +213,46 @@ export default function DashboardPage() {
         </aside>
 
         <main className="flex-1 min-w-0">
-          {analise && analise.filename && (
-            <div className="px-6 pt-4 text-[12.5px] text-mutado">
-              Projeto: <span className="text-[#10a0a0] font-semibold">{analise.filename}</span>
+          {erro && <div className="text-sm mb-4" style={{ color: 'var(--cor-alerta)' }}>{erro}</div>}
+
+          {analise && analise.locais.length === 0 && (
+            <div className="rounded-2xl border p-7 text-center" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
+              <div className="text-[15px] font-semibold mb-1.5" style={{ color: 'var(--cor-tinta)' }}>Nenhum local cadastrado</div>
+              <div className="text-[13px] leading-relaxed mb-4" style={{ color: 'var(--cor-mutado)' }}>
+                Preencha os dados na tela de planilha (ou importe uma planilha do template) para ver
+                os gráficos e a análise do projeto.
+              </div>
+              <Link
+                to={`/projetos/${projetoId}/planilha`}
+                className="h-9 rounded-lg px-4 text-[13px] font-semibold text-white inline-flex items-center gap-2"
+                style={{ background: 'linear-gradient(135deg, #2e59f6 0%, #3061d9 100%)' }}
+              >
+                {ICONE_PLANILHA}
+                Abrir planilha de dados
+              </Link>
             </div>
           )}
 
-          <div className="p-4 sm:p-6">
-            {erro && <div className="text-sm text-alerta mb-4">{erro}</div>}
-
-            {analise && analise.locais.length === 0 && (
-              <div className="rounded-xl border border-borda bg-superficie p-7 text-center">
-                <div className="text-[15px] font-semibold text-tinta mb-1.5">Nenhum local cadastrado</div>
-                <div className="text-[13px] text-mutado leading-relaxed mb-4">
-                  Preencha os dados na tela de planilha (ou importe uma planilha do template) para ver
-                  os gráficos e a análise do projeto.
+          {analise && analise.locais.length > 0 && (
+            <>
+              {analise.avisos.map((aviso, indice) => (
+                <div key={indice} className="text-sm rounded-lg px-3 py-2 mb-3"
+                  style={{ color: 'var(--cor-destaque)', background: 'rgba(224, 123, 26, 0.10)', border: '1px solid rgba(224, 123, 26, 0.30)' }}>
+                  {aviso}
                 </div>
-                <Link
-                  to={`/projetos/${projetoId}/planilha`}
-                  className="h-9 rounded-lg px-4 text-[13px] font-semibold text-white inline-flex items-center gap-2 hover:opacity-90 transition-opacity"
-                  style={{ background: '#0c7d74' }}
-                >
-                  {ICONE_PLANILHA}
-                  Abrir planilha de dados
-                </Link>
-              </div>
-            )}
-
-            {analise && analise.locais.length > 0 && (
-              <>
-                {analise.avisos.map((aviso, indice) => (
-                  <div key={indice} className="text-sm text-destaque bg-[rgba(224,123,26,0.10)] border border-[rgba(224,123,26,0.35)] rounded-lg px-3 py-2 mb-3">
-                    {aviso}
-                  </div>
-                ))}
-                {aba === 'Visão Geral' && local && <VisaoGeralTab analise={analise} local={local} />}
-                {aba === 'Custos' && local && (
-                  <CustosTab local={local} categorias={categoriasFiltro} onCategorias={setCategoriasFiltro} />
-                )}
-                {aba === 'Payback' && local && <PaybackTab local={local} />}
-                {aba === 'Insights' && local && <InsightsTab local={local} />}
-                {aba === 'Comparativo' && <ComparativoTab projeto={analise.projeto} />}
-                {aba === 'Usuários' && usuario?.papel === 'admin' && <UsuariosTab />}
-              </>
-            )}
-          </div>
+              ))}
+              {aba === 'Visão Geral' && local && <VisaoGeralTab analise={analise} local={local} />}
+              {aba === 'Custos' && local && (
+                <CustosTab local={local} categorias={categoriasFiltro} onCategorias={setCategoriasFiltro} />
+              )}
+              {aba === 'Payback' && local && <PaybackTab local={local} />}
+              {aba === 'Insights' && local && <InsightsTab local={local} />}
+              {aba === 'Comparativo' && <ComparativoTab projeto={analise.projeto} />}
+              {aba === 'Usuários' && usuario?.papel === 'admin' && <UsuariosTab />}
+            </>
+          )}
         </main>
       </div>
-    </div>
+    </AppShell>
   )
 }

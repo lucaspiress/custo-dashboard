@@ -13,16 +13,16 @@ def _fmt_br(valor: float, casas: int = 2) -> str:
 def _layout(titulo: str, altura: int, x_titulo: str | None = None, y_titulo: str | None = None) -> dict:
     return dict(
         template="plotly_white",
-        title=dict(text=titulo, font=dict(size=15, color=theme.COR["tinta"], family=theme.FONTE_UI)),
+        title=dict(text=titulo, font=dict(size=14, color=theme.COR["tinta"], family=theme.FONTE_UI)),
         paper_bgcolor=theme.COR["superficie"],
         plot_bgcolor=theme.COR["superficie"],
-        font=dict(family=theme.FONTE_UI, color=theme.COR["mutado"], size=12),
-        xaxis=dict(title=x_titulo, gridcolor=theme.COR["grid"], zeroline=False, tickfont=dict(size=11)),
-        yaxis=dict(title=y_titulo, gridcolor=theme.COR["grid"], zeroline=False, tickfont=dict(size=11)),
+        font=dict(family=theme.FONTE_UI, color=theme.COR["mutado"], size=11),
+        xaxis=dict(title=x_titulo, gridcolor=theme.COR["grid"], zeroline=False, tickfont=dict(size=10)),
+        yaxis=dict(title=y_titulo, gridcolor=theme.COR["grid"], zeroline=False, tickfont=dict(size=10)),
         height=altura,
-        margin=dict(l=10, r=10, t=44, b=10),
+        margin=dict(l=10, r=10, t=56, b=46),
         hoverlabel=dict(bgcolor=theme.COR["fundo"], font=dict(color="#ffffff", family=theme.FONTE_UI, size=12)),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0, font=dict(size=11)),
+        legend=dict(orientation="h", yanchor="top", y=-0.12, x=0, xanchor="left", font=dict(size=11), bgcolor="rgba(0,0,0,0)"),
     )
 
 
@@ -86,10 +86,10 @@ def grafico_payback(local: loader.Local) -> go.Figure:
         )
     )
     fig.update_layout(
-        **_layout(f"Curva de payback - {local.nome}", 440, x_titulo="Meses", y_titulo="Saldo acumulado (R$)")
+        **_layout(f"Curva de payback - {local.nome}", 420, x_titulo="Meses", y_titulo="Saldo acumulado (R$)")
     )
     fig.update_layout(showlegend=False)
-    fig.update_yaxes(tickprefix="R$ ", separatethousands=True)
+    fig.update_yaxes(tickprefix="R$ ", separatethousands=True, title_font=dict(size=10))
     return fig
 
 
@@ -167,7 +167,7 @@ def grafico_pareto(local: loader.Local, n: int = 15) -> go.Figure:
         xanchor="left",
     )
     fig.update_layout(
-        **_layout(f"Top {len(dados)} itens por valor - {local.nome}", 500, x_titulo="Valor do item (R$)")
+        **_layout(f"Top {len(dados)} itens por valor - {local.nome}", 440, x_titulo="Valor do item (R$)")
     )
     fig.update_layout(
         xaxis=dict(
@@ -195,10 +195,21 @@ def grafico_pareto(local: loader.Local, n: int = 15) -> go.Figure:
             zeroline=False,
             tickfont=dict(size=10),
         ),
-        margin=dict(l=10, r=10, t=76, b=22),
+        margin=dict(l=10, r=10, t=90, b=24),
         showlegend=False,
     )
     return fig
+
+
+def _legenda_donut(labels: list[str], valores: list[float], cores: list[str]) -> str:
+    partes = []
+    for label, valor, cor in zip(labels, valores, cores):
+        partes.append(
+            f'<span style="color:{cor}">&#9632;</span> '
+            f'<b style="color:{theme.COR["tinta"]}">{label}</b> '
+            f'<span style="color:{theme.COR["mutado"]}">{_fmt_br(valor)}</span>'
+        )
+    return " &nbsp;&nbsp; ".join(partes)
 
 
 def _grafico_donut(labels: list[str], valores: list[float], titulo: str, cores: list[str]) -> go.Figure:
@@ -207,36 +218,47 @@ def _grafico_donut(labels: list[str], valores: list[float], titulo: str, cores: 
         go.Pie(
             labels=labels,
             values=valores,
-            hole=0.55,
+            hole=0.58,
             marker_colors=cores,
-            text=[_fmt_br(value) for value in valores],
             textinfo="none",
-            texttemplate="%{label}<br>%{text}",
-            textfont=dict(color=theme.COR["tinta"], size=11.5),
-            textposition="outside",
             marker=dict(line=dict(color=theme.COR["superficie"], width=2)),
-            customdata=[[f"{(v / total * 100):.1f}%" if total else "0.0%"] for v in valores],
-            hovertemplate="<b>%{label}</b><br>%{customdata[0]} — <b>%{value:,.2f}</b><extra></extra>",
+            customdata=[
+                [f"{(v / total * 100):.1f}%" if total else "0.0%", _fmt_br(v)]
+                for v in valores
+            ],
+            hovertemplate="<b>%{label}</b><br>%{customdata[1]} (%{customdata[0]})<extra></extra>",
             sort=False,
         )
     )
+    base = _layout(titulo, 400)
+    base["margin"] = dict(l=16, r=16, t=56, b=58)
+    fig.update_layout(**base)
     fig.update_layout(
-        **_layout(titulo, 400),
         showlegend=False,
         annotations=[
             dict(
                 text=f"<b>{_fmt_br(total)}</b>",
                 x=0.5,
-                y=0.5,
+                y=0.52,
                 showarrow=False,
                 font=dict(family=theme.FONTE_NUMERO, size=16, color=theme.COR["tinta"]),
             ),
             dict(
                 text="TOTAL",
                 x=0.5,
-                y=0.43,
+                y=0.45,
                 showarrow=False,
                 font=dict(family=theme.FONTE_UI, size=10, color=theme.COR["mutado"]),
+            ),
+            dict(
+                text=_legenda_donut(labels, valores, cores),
+                x=0.5,
+                y=-0.12,
+                showarrow=False,
+                xref="paper",
+                yref="paper",
+                font=dict(family=theme.FONTE_UI, size=11),
+                xanchor="center",
             ),
         ],
     )
@@ -294,10 +316,11 @@ def grafico_barras_comparativo(locais, metrica: str, titulo: str, e_meses: bool 
         )
     )
     fig.update_layout(
-        **_layout(titulo, 500, x_titulo="Meses" if e_meses else "R$"),
+        **_layout(titulo, 380, x_titulo="Meses" if e_meses else None),
         showlegend=False,
+        bargap=0.45,
     )
-    fig.update_layout(margin=dict(l=10, r=10, t=56, b=22))
+    fig.update_layout(margin=dict(l=10, r=10, t=56, b=24))
     fig.update_yaxes(
         categoryorder="array",
         categoryarray=nomes[::-1],
@@ -305,8 +328,10 @@ def grafico_barras_comparativo(locais, metrica: str, titulo: str, e_meses: bool 
         zeroline=False,
         tickfont=dict(size=10),
     )
+    if len(nomes) == 1:
+        fig.update_yaxes(range=[-0.6, 0.6])
     if not e_meses:
-        fig.update_xaxes(tickprefix="R$ ", separatethousands=True)
+        fig.update_xaxes(tickprefix="R$ ", separatethousands=True, title=None)
     return fig
 
 
@@ -347,12 +372,12 @@ def grafico_dispersao(locais) -> go.Figure:
             )
         )
     fig.update_layout(
-        **_layout("Investimento × saldo mensal por local", 480, x_titulo="Investimento (R$)", y_titulo="Saldo mensal (R$)"),
+        **_layout("Investimento × saldo mensal por local", 420, x_titulo="Investimento", y_titulo="Saldo mensal"),
         showlegend=False,
     )
-    fig.update_layout(margin=dict(l=10, r=10, t=56, b=22))
-    fig.update_xaxes(tickprefix="R$ ", separatethousands=True)
-    fig.update_yaxes(tickprefix="R$ ", separatethousands=True)
+    fig.update_layout(margin=dict(l=10, r=10, t=56, b=46))
+    fig.update_xaxes(tickprefix="R$ ", separatethousands=True, title_font=dict(size=10))
+    fig.update_yaxes(tickprefix="R$ ", separatethousands=True, title_font=dict(size=10))
     return fig
 
 
@@ -362,17 +387,19 @@ def grafico_fluxo_caixa(local: loader.Local, meses: int = 12) -> go.Figure:
     pontos = fluxo["pontos"]
     saldos = [p["saldo"] for p in pontos]
     acumulados = [p["acumulado"] for p in pontos]
-    fig.add_trace(
-        go.Bar(
-            x=[p["mes"] for p in pontos],
-            y=saldos,
-            name="Saldo mensal",
-            marker_color=theme.COR["secundaria"],
-            marker_line=dict(color="#ffffff", width=0.6),
-            customdata=[[_fmt_br(v)] for v in saldos],
-            hovertemplate="Mês %{x}<br>Saldo: <b>%{customdata[0]}</b><extra></extra>",
+    saldos_variancia = (max(saldos) - min(saldos)) if saldos else 0
+    if saldos_variancia > 0:
+        fig.add_trace(
+            go.Bar(
+                x=[p["mes"] for p in pontos],
+                y=saldos,
+                name="Saldo mensal",
+                marker_color=theme.COR["secundaria"],
+                marker_line=dict(color="#ffffff", width=0.6),
+                customdata=[[_fmt_br(v)] for v in saldos],
+                hovertemplate="Mês %{x}<br>Saldo: <b>%{customdata[0]}</b><extra></extra>",
+            )
         )
-    )
     fig.add_trace(
         go.Scatter(
             x=[p["mes"] for p in pontos],
@@ -407,7 +434,7 @@ def grafico_fluxo_caixa(local: loader.Local, meses: int = 12) -> go.Figure:
             annotation_font=dict(color=theme.COR["alerta"], size=11.5),
         )
     fig.update_layout(
-        **_layout(f"Fluxo de caixa projetado — {local.nome}", 440, x_titulo="Meses", y_titulo="R$"),
+        **_layout("", 420, x_titulo="Meses", y_titulo=None),
         barmode="group",
         showlegend=True,
     )
