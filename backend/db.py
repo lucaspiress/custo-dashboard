@@ -33,6 +33,37 @@ def _migrar_legado(conn) -> None:
         conn.execute("drop table if exists public.uploads cascade")
 
 
+def _coluna_existe(conn, tabela: str, coluna: str) -> bool:
+    linha = conn.execute(
+        """select 1 as ok from information_schema.columns
+           where table_schema = 'public' and table_name = %s and column_name = %s""",
+        (tabela, coluna),
+    ).fetchone()
+    return bool(linha)
+
+
+def _aplicar_migracoes(conn) -> None:
+    linha = conn.execute("select to_regclass('public.projetos') as tabela").fetchone()
+    if not linha["tabela"]:
+        return
+    if not _coluna_existe(conn, "projetos", "cliente_usuario_id"):
+        conn.execute(
+            "alter table public.projetos "
+            "add column cliente_usuario_id bigint references public.usuarios(id) on delete set null"
+        )
+    linha_check = conn.execute(
+        """select conname from pg_constraint
+           where conrelid = 'public.usuarios'::regclass
+             and contype = 'c' and pg_get_constraintdef(oid) like '%papel%'"""
+    ).fetchone()
+    if linha_check:
+        conn.execute(f"alter table public.usuarios drop constraint {linha_check['conname']}")
+        conn.execute(
+            "alter table public.usuarios "
+            "add constraint usuarios_papel_check check (papel in ('admin', 'usuario', 'cliente'))"
+        )
+
+
 def _garantir_schema(conn) -> None:
     global _schema_tentado, _schema_pronto, erro_schema
     if _schema_tentado:
@@ -40,6 +71,7 @@ def _garantir_schema(conn) -> None:
     _schema_tentado = True
     try:
         _migrar_legado(conn)
+        _aplicar_migracoes(conn)
         conn.execute(SCHEMA_PATH.read_text(encoding="utf-8"))
         conn.commit()
         _schema_pronto = True

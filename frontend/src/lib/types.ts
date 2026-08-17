@@ -2,7 +2,7 @@ export interface Usuario {
   id: number
   username: string
   nome: string
-  papel: 'admin' | 'usuario'
+  papel: 'admin' | 'usuario' | 'cliente'
   ativo: boolean
 }
 

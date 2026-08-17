@@ -31,7 +31,7 @@ def criar(dados: dict, _: dict = Depends(admin_obrigatorio)) -> dict:
     papel = str(dados.get("papel", "usuario"))
     if not nome or not username or len(senha) < 8:
         raise HTTPException(status_code=400, detail="Informe nome, usuário e uma senha com pelo menos 8 caracteres.")
-    if papel not in ("admin", "usuario"):
+    if papel not in ("admin", "usuario", "cliente"):
         raise HTTPException(status_code=400, detail="Perfil inválido.")
     if papel == "admin" and store.count_admins() >= config.MAX_ADMINS:
         raise HTTPException(status_code=400, detail=f"O limite de {config.MAX_ADMINS} administradores já foi atingido.")

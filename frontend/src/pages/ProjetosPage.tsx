@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
+import { useAuth } from '../lib/auth'
 import { fmtData, fmtMoeda } from '../lib/format'
 import { validarArquivoPlanilha } from '../lib/import-file'
 import type { ProjetoResumo } from '../lib/types'
@@ -103,6 +104,9 @@ function ModalProjeto({
 
 export default function ProjetosPage() {
   const navigate = useNavigate()
+  const { usuario } = useAuth()
+  const papel = usuario?.papel ?? 'usuario'
+  const somenteLeitura = papel === 'cliente'
   const [projetos, setProjetos] = useState<ProjetoResumo[]>([])
   const [erro, setErro] = useState('')
   const [carregando, setCarregando] = useState(true)
@@ -235,26 +239,28 @@ export default function ProjetosPage() {
   return (
     <AppShell saudacao busca buscaValor={busca} onBusca={setBusca} buscaPlaceholder="Buscar projetos ou clientes…"
       acoes={
-        <>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".xlsx"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              selecionarArquivo(file)
-            }}
-          />
-          <Botao variante="secundario" onClick={() => fileRef.current?.click()} disabled={importando}>
-            {ICONE_UPLOAD}
-            {importando ? 'Importando…' : 'Importar planilha'}
-          </Botao>
-          <Botao onClick={abrirNovo}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-            Novo projeto
-          </Botao>
-        </>
+        !somenteLeitura ? (
+          <>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                selecionarArquivo(file)
+              }}
+            />
+            <Botao variante="secundario" onClick={() => fileRef.current?.click()} disabled={importando}>
+              {ICONE_UPLOAD}
+              {importando ? 'Importando…' : 'Importar planilha'}
+            </Botao>
+            <Botao onClick={abrirNovo}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+              Novo projeto
+            </Botao>
+          </>
+        ) : undefined
       }
     >
       {!carregando && projetos.length > 0 && (
@@ -270,19 +276,21 @@ export default function ProjetosPage() {
         role="button"
         tabIndex={0}
         aria-label="Importar planilha por arrastar e soltar"
-        onClick={() => fileRef.current?.click()}
+        onClick={() => !somenteLeitura && fileRef.current?.click()}
         onKeyDown={(e) => {
+          if (somenteLeitura) return
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
             fileRef.current?.click()
           }
         }}
-        onDragOver={(e) => e.preventDefault()}
+        onDragOver={(e) => !somenteLeitura && e.preventDefault()}
         onDrop={(e) => {
+          if (somenteLeitura) return
           e.preventDefault()
           selecionarArquivo(e.dataTransfer.files[0])
         }}
-        className="mb-5 rounded-xl border border-dashed px-5 py-4 text-center cursor-pointer transition-colors focus:outline-none"
+        className={`mb-5 rounded-xl border border-dashed px-5 py-4 text-center transition-colors focus:outline-none ${somenteLeitura ? 'cursor-default' : 'cursor-pointer'}`}
         style={{
           borderColor: 'var(--cor-borda)',
           background: 'rgba(46, 89, 246, 0.04)',
@@ -376,22 +384,26 @@ export default function ProjetosPage() {
                 {ICONE_PLANILHA}
                 Planilha
               </button>
-              <button
-                onClick={() => abrirEditar(projeto)}
-                title="Renomear"
-                className="h-8 w-8 rounded-lg inline-flex items-center justify-center transition-colors"
-                style={{ color: 'var(--cor-mutado)' }}
-              >
-                {ICONE_EDITAR}
-              </button>
-              <button
-                onClick={() => setModalExcluir(projeto)}
-                title="Excluir"
-                className="h-8 w-8 rounded-lg inline-flex items-center justify-center transition-colors"
-                style={{ color: 'var(--cor-mutado)' }}
-              >
-                {ICONE_LIXO}
-              </button>
+              {!somenteLeitura && (
+                <>
+                  <button
+                    onClick={() => abrirEditar(projeto)}
+                    title="Renomear"
+                    className="h-8 w-8 rounded-lg inline-flex items-center justify-center transition-colors"
+                    style={{ color: 'var(--cor-mutado)' }}
+                  >
+                    {ICONE_EDITAR}
+                  </button>
+                  <button
+                    onClick={() => setModalExcluir(projeto)}
+                    title="Excluir"
+                    className="h-8 w-8 rounded-lg inline-flex items-center justify-center transition-colors"
+                    style={{ color: 'var(--cor-mutado)' }}
+                  >
+                    {ICONE_LIXO}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         ))}

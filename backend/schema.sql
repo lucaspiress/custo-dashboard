@@ -4,7 +4,7 @@ create table if not exists public.usuarios (
     nome text not null,
     senha_hash text not null,
     salt text not null,
-    papel text not null default 'usuario' check (papel in ('admin', 'usuario')),
+    papel text not null default 'usuario' check (papel in ('admin', 'usuario', 'cliente')),
     ativo boolean not null default true,
     criado_em timestamptz not null default now()
 );
@@ -16,6 +16,7 @@ create table if not exists public.projetos (
     id bigint generated always as identity primary key,
     nome text not null,
     cliente text,
+    cliente_usuario_id bigint references public.usuarios(id) on delete set null,
     criado_em timestamptz not null default now()
 );
 

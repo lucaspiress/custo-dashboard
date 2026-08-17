@@ -106,10 +106,12 @@ export default function DashboardPage() {
               {ICONE_XLSX}
               <span className="hidden sm:inline">Exportar planilha</span>
             </Botao>
-            <Link to={`/projetos/${projetoId}/planilha`} aria-label="Editar dados" className="h-9 rounded-lg px-3.5 text-[13px] font-medium inline-flex items-center gap-2 transition-colors" style={{ background: 'var(--cor-elevado)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}>
-              {ICONE_PLANILHA}
-              <span className="hidden sm:inline">Editar dados</span>
-            </Link>
+            {usuario?.papel !== 'cliente' && (
+              <Link to={`/projetos/${projetoId}/planilha`} aria-label="Editar dados" className="h-9 rounded-lg px-3.5 text-[13px] font-medium inline-flex items-center gap-2 transition-colors" style={{ background: 'var(--cor-elevado)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}>
+                {ICONE_PLANILHA}
+                <span className="hidden sm:inline">Editar dados</span>
+              </Link>
+            )}
           </>
         )
       }

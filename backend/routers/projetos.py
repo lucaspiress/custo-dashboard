@@ -12,7 +12,7 @@ import planilha_export
 import projetos_store
 import report
 import serialize
-from deps import usuario_atual
+from deps import admin_obrigatorio, exigir_projeto, usuario_atual
 
 router = APIRouter(prefix="/projetos", tags=["projetos"])
 
@@ -138,8 +138,9 @@ def _item_ou_404(item_id: int) -> dict:
 
 @router.get("")
 def listar(usuario: dict = Depends(usuario_atual)) -> list[dict]:
+    escopo_cliente = usuario["id"] if usuario["papel"] == "cliente" else None
     projetos = []
-    for projeto in projetos_store.listar_projetos():
+    for projeto in projetos_store.listar_projetos(cliente_usuario_id=escopo_cliente):
         workbook = _workbook(projeto["id"])
         totais = analysis.resumo_projeto(workbook.locais)["totais"]
         projetos.append(
@@ -161,39 +162,46 @@ def listar(usuario: dict = Depends(usuario_atual)) -> list[dict]:
 
 
 @router.post("")
-def criar(dados: dict, usuario: dict = Depends(usuario_atual)) -> dict:
+def criar(dados: dict, usuario: dict = Depends(admin_obrigatorio)) -> dict:
     nome = str(dados.get("nome") or "").strip()
     if not nome:
         raise HTTPException(status_code=400, detail="Informe o nome do projeto.")
     cliente = str(dados.get("cliente") or "").strip() or None
-    return projetos_store.criar_projeto(nome, cliente)
+    cliente_uid = dados.get("cliente_usuario_id")
+    if cliente_uid is not None:
+        try:
+            cliente_uid = int(cliente_uid)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="cliente_usuario_id inválido.")
+    return projetos_store.criar_projeto(nome, cliente, cliente_usuario_id=cliente_uid)
 
 
 @router.patch("/{projeto_id}")
-def renomear(projeto_id: int, dados: dict, usuario: dict = Depends(usuario_atual)) -> dict:
+def renomear(projeto_id: int, dados: dict, usuario: dict = Depends(admin_obrigatorio)) -> dict:
     _projeto_ou_404(projeto_id)
     projeto = projetos_store.renomear_projeto(
         projeto_id,
         nome=dados.get("nome"),
         cliente=dados.get("cliente"),
+        cliente_usuario_id=dados.get("cliente_usuario_id", projetos_store._SEM_ALTERAR),
     )
     return projeto or {}
 
 
 @router.delete("/{projeto_id}", status_code=204)
-def excluir(projeto_id: int, usuario: dict = Depends(usuario_atual)) -> None:
+def excluir(projeto_id: int, usuario: dict = Depends(admin_obrigatorio)) -> None:
     if not projetos_store.excluir_projeto(projeto_id):
         raise HTTPException(status_code=404, detail="Projeto não encontrado.")
 
 
 @router.get("/{projeto_id}")
 def dashboard(projeto_id: int, usuario: dict = Depends(usuario_atual)) -> dict:
-    projeto = _projeto_ou_404(projeto_id)
+    projeto = exigir_projeto(usuario, projeto_id)
     return _payload_projeto(_workbook(projeto_id), projeto["nome"])
 
 
 @router.post("/{projeto_id}/locais")
-def criar_local(projeto_id: int, dados: dict, usuario: dict = Depends(usuario_atual)) -> dict:
+def criar_local(projeto_id: int, dados: dict, usuario: dict = Depends(admin_obrigatorio)) -> dict:
     _projeto_ou_404(projeto_id)
     nome = str(dados.get("nome") or "").strip()
     if not nome:
@@ -202,7 +210,7 @@ def criar_local(projeto_id: int, dados: dict, usuario: dict = Depends(usuario_at
 
 
 @router.patch("/{projeto_id}/locais/{local_id}")
-def atualizar_local(projeto_id: int, local_id: int, dados: dict, usuario: dict = Depends(usuario_atual)) -> dict:
+def atualizar_local(projeto_id: int, local_id: int, dados: dict, usuario: dict = Depends(admin_obrigatorio)) -> dict:
     _projeto_ou_404(projeto_id)
     local = _local_ou_404(local_id)
     if int(local["projeto_id"]) != projeto_id:
@@ -212,7 +220,7 @@ def atualizar_local(projeto_id: int, local_id: int, dados: dict, usuario: dict =
 
 
 @router.delete("/{projeto_id}/locais/{local_id}", status_code=204)
-def excluir_local(projeto_id: int, local_id: int, usuario: dict = Depends(usuario_atual)) -> None:
+def excluir_local(projeto_id: int, local_id: int, usuario: dict = Depends(admin_obrigatorio)) -> None:
     _projeto_ou_404(projeto_id)
     local = _local_ou_404(local_id)
     if int(local["projeto_id"]) != projeto_id:
@@ -221,7 +229,7 @@ def excluir_local(projeto_id: int, local_id: int, usuario: dict = Depends(usuari
 
 
 @router.post("/locais/{local_id}/itens")
-def criar_item(local_id: int, dados: dict, usuario: dict = Depends(usuario_atual)) -> dict:
+def criar_item(local_id: int, dados: dict, usuario: dict = Depends(admin_obrigatorio)) -> dict:
     _local_ou_404(local_id)
     if not str(dados.get("material") or "").strip():
         raise HTTPException(status_code=400, detail="Informe o material do item.")
@@ -229,21 +237,21 @@ def criar_item(local_id: int, dados: dict, usuario: dict = Depends(usuario_atual
 
 
 @router.patch("/itens/{item_id}")
-def atualizar_item(item_id: int, dados: dict, usuario: dict = Depends(usuario_atual)) -> dict:
+def atualizar_item(item_id: int, dados: dict, usuario: dict = Depends(admin_obrigatorio)) -> dict:
     _item_ou_404(item_id)
     atualizado = projetos_store.atualizar_item(item_id, {k: v for k, v in dados.items() if k in CAMPOS_ITEM})
     return atualizado or {}
 
 
 @router.delete("/itens/{item_id}", status_code=204)
-def excluir_item(item_id: int, usuario: dict = Depends(usuario_atual)) -> None:
+def excluir_item(item_id: int, usuario: dict = Depends(admin_obrigatorio)) -> None:
     if not projetos_store.excluir_item(item_id):
         raise HTTPException(status_code=404, detail="Item não encontrado.")
 
 
 @router.get("/{projeto_id}/planilha.xlsx")
 def exportar_planilha(projeto_id: int, usuario: dict = Depends(usuario_atual)) -> Response:
-    projeto = _projeto_ou_404(projeto_id)
+    projeto = exigir_projeto(usuario, projeto_id)
     buffer = planilha_export.montar_planilha(_workbook(projeto_id))
     return Response(
         content=buffer.getvalue(),
@@ -258,7 +266,7 @@ def exportar_planilha(projeto_id: int, usuario: dict = Depends(usuario_atual)) -
 
 @router.post("/{projeto_id}/relatorio")
 def relatorio(projeto_id: int, usuario: dict = Depends(usuario_atual)) -> Response:
-    projeto = _projeto_ou_404(projeto_id)
+    projeto = exigir_projeto(usuario, projeto_id)
     workbook = _workbook(projeto_id)
     if not workbook.locais:
         raise HTTPException(status_code=400, detail="Projeto sem locais para gerar o relatório.")
@@ -278,7 +286,7 @@ def relatorio(projeto_id: int, usuario: dict = Depends(usuario_atual)) -> Respon
 def importar(
     arquivo: UploadFile = File(...),
     nome: str | None = None,
-    usuario: dict = Depends(usuario_atual),
+    usuario: dict = Depends(admin_obrigatorio),
 ) -> dict:
     if not arquivo.filename or not arquivo.filename.lower().endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="O arquivo precisa ser .xlsx no template padrão.")

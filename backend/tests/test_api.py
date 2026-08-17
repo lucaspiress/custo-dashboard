@@ -253,3 +253,142 @@ def test_usuario_comum_sem_acesso_admin(cliente, admin):
     _login(cliente, username="comum", senha="senha12345")
     assert cliente.get("/api/users").status_code == 403
     assert cliente.get("/api/projetos").status_code == 200
+
+
+def _criar_cliente(contexto_cliente, username="cliente1", nome="Cliente 1") -> int:
+    resposta = contexto_cliente.post(
+        "/api/users",
+        json={"nome": nome, "username": username, "senha": "cliente1234", "papel": "cliente"},
+    )
+    assert resposta.status_code == 200, resposta.text
+    return int(resposta.json()["id"])
+
+
+def _login_como(cliente, username, senha):
+    cliente.post("/api/auth/logout")
+    resposta = cliente.post("/api/auth/login", json={"username": username, "senha": senha})
+    assert resposta.status_code == 200, resposta.text
+    return resposta.json()
+
+
+def test_admin_cria_cliente(cliente, admin):
+    resposta = cliente.post(
+        "/api/users",
+        json={"nome": "Cliente X", "username": "cliente_x", "senha": "cliente1234", "papel": "cliente"},
+    )
+    assert resposta.status_code == 200, resposta.text
+    corpo = resposta.json()
+    assert corpo["papel"] == "cliente"
+    assert corpo["username"] == "cliente_x"
+
+
+def test_papel_invalido_rejeitado(cliente, admin):
+    resposta = cliente.post(
+        "/api/users",
+        json={"nome": "Z", "username": "z", "senha": "senha12345", "papel": "visitante"},
+    )
+    assert resposta.status_code == 400
+
+
+def test_cliente_ve_apenas_seu_projeto(cliente, admin):
+    id_cliente_a = _criar_cliente(cliente, username="cliente_a", nome="Cliente A")
+    id_cliente_b = _criar_cliente(cliente, username="cliente_b", nome="Cliente B")
+    projeto_a = _criar_projeto(cliente, nome="Proj A")
+    projeto_b = _criar_projeto(cliente, nome="Proj B")
+    cliente.patch(f"/api/projetos/{projeto_a['id']}", json={"cliente_usuario_id": id_cliente_a})
+    cliente.patch(f"/api/projetos/{projeto_b['id']}", json={"cliente_usuario_id": id_cliente_b})
+
+    _login_como(cliente, "cliente_a", "cliente1234")
+    lista = cliente.get("/api/projetos").json()
+    assert len(lista) == 1
+    assert lista[0]["id"] == projeto_a["id"]
+
+
+def test_cliente_nao_acessa_projeto_de_outro(cliente, admin):
+    _criar_cliente(cliente, username="cliente_a", nome="Cliente A")
+    _criar_cliente(cliente, username="cliente_b", nome="Cliente B")
+    projeto_a = _criar_projeto(cliente, nome="Proj A")
+    _criar_projeto(cliente, nome="Proj B")
+    cliente.patch(f"/api/projetos/{projeto_a['id']}", json={"cliente_usuario_id": 2})
+
+    _login_como(cliente, "cliente_b", "cliente1234")
+    assert cliente.get(f"/api/projetos/{projeto_a['id']}").status_code == 404
+
+
+def test_cliente_pode_baixar_pdf_e_planilha(cliente, admin):
+    id_cliente = _criar_cliente(cliente, username="cliente_x", nome="Cliente X")
+    projeto = _criar_projeto(cliente, nome="Proj X")
+    cliente.patch(f"/api/projetos/{projeto['id']}", json={"cliente_usuario_id": id_cliente})
+    _criar_local(cliente, projeto["id"])
+
+    _login_como(cliente, "cliente_x", "cliente1234")
+    assert cliente.get(f"/api/projetos/{projeto['id']}/planilha.xlsx").status_code == 200
+    assert cliente.post(f"/api/projetos/{projeto['id']}/relatorio").status_code == 200
+
+
+def test_cliente_nao_pode_criar_projeto(cliente, admin):
+    _criar_cliente(cliente, username="cliente_x", nome="Cliente X")
+    _login_como(cliente, "cliente_x", "cliente1234")
+    resposta = cliente.post("/api/projetos", json={"nome": "Inv"})
+    assert resposta.status_code == 403
+
+
+def test_cliente_nao_pode_editar_local(cliente, admin):
+    id_cliente = _criar_cliente(cliente, username="cliente_x", nome="Cliente X")
+    projeto = _criar_projeto(cliente, nome="Proj X")
+    cliente.patch(f"/api/projetos/{projeto['id']}", json={"cliente_usuario_id": id_cliente})
+    local = _criar_local(cliente, projeto["id"])
+
+    _login_como(cliente, "cliente_x", "cliente1234")
+    resposta = cliente.patch(
+        f"/api/projetos/{projeto['id']}/locais/{local['id']}",
+        json={"valor_mensal": 999},
+    )
+    assert resposta.status_code == 403
+
+
+def test_cliente_nao_pode_excluir_projeto(cliente, admin):
+    id_cliente = _criar_cliente(cliente, username="cliente_x", nome="Cliente X")
+    projeto = _criar_projeto(cliente, nome="Proj X")
+    cliente.patch(f"/api/projetos/{projeto['id']}", json={"cliente_usuario_id": id_cliente})
+
+    _login_como(cliente, "cliente_x", "cliente1234")
+    assert cliente.delete(f"/api/projetos/{projeto['id']}").status_code == 403
+
+
+def test_cliente_nao_pode_importar_planilha(cliente, admin):
+    from fixtures import planilha_base
+
+    _criar_cliente(cliente, username="cliente_x", nome="Cliente X")
+    _login_como(cliente, "cliente_x", "cliente1234")
+    resposta = cliente.post(
+        "/api/projetos/importar",
+        files={"arquivo": ("planilha.xlsx", planilha_base().getvalue(),
+                           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    assert resposta.status_code == 403
+
+
+def test_cliente_nao_pode_listar_usuarios(cliente, admin):
+    _criar_cliente(cliente, username="cliente_x", nome="Cliente X")
+    _login_como(cliente, "cliente_x", "cliente1234")
+    assert cliente.get("/api/users").status_code == 403
+
+
+def test_patch_nao_altera_cliente_quando_ausente(cliente, admin):
+    id_cliente = _criar_cliente(cliente, username="cliente_x", nome="Cliente X")
+    projeto = _criar_projeto(cliente, nome="Proj X")
+    cliente.patch(f"/api/projetos/{projeto['id']}", json={"cliente_usuario_id": id_cliente})
+    resposta = cliente.patch(f"/api/projetos/{projeto['id']}", json={"nome": "Renomeado"})
+    assert resposta.status_code == 200
+    assert resposta.json()["cliente_usuario_id"] == id_cliente
+    assert resposta.json()["nome"] == "Renomeado"
+
+
+def test_patch_atribui_cliente_nulo(cliente, admin):
+    id_cliente = _criar_cliente(cliente, username="cliente_x", nome="Cliente X")
+    projeto = _criar_projeto(cliente, nome="Proj X")
+    cliente.patch(f"/api/projetos/{projeto['id']}", json={"cliente_usuario_id": id_cliente})
+    resposta = cliente.patch(f"/api/projetos/{projeto['id']}", json={"cliente_usuario_id": None})
+    assert resposta.status_code == 200
+    assert resposta.json()["cliente_usuario_id"] is None

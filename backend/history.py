@@ -34,6 +34,7 @@ def _inicializar(conn: sqlite3.Connection) -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT NOT NULL,
             cliente TEXT,
+            cliente_usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
             criado_em TEXT NOT NULL
         );
         """
@@ -81,6 +82,9 @@ def _migrar_tabelas_legadas(conn: sqlite3.Connection) -> None:
     if colunas_itens and "upload_id" in colunas_itens:
         conn.execute("DROP TABLE itens")
     conn.execute("DROP TABLE IF EXISTS uploads")
+    colunas_projetos = {linha[1] for linha in conn.execute("PRAGMA table_info(projetos)")}
+    if colunas_projetos and "cliente_usuario_id" not in colunas_projetos:
+        conn.execute("ALTER TABLE projetos ADD COLUMN cliente_usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL")
 
 
 def seed_admin_local() -> None:

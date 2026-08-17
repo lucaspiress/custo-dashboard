@@ -35,43 +35,64 @@ def _isolar_valor(valor) -> float:
 
 # ---------------------------------------------------------------- projetos
 
-def listar_projetos() -> list[dict]:
+def listar_projetos(cliente_usuario_id: int | None = None) -> list[dict]:
     conn = _conn()
     try:
         if _sqlite():
-            linhas = conn.execute(
-                """select id, nome, cliente, criado_em
-                   from projetos order by criado_em desc, id desc"""
-            ).fetchall()
+            if cliente_usuario_id is None:
+                linhas = conn.execute(
+                    """select id, nome, cliente, cliente_usuario_id, criado_em
+                       from projetos order by criado_em desc, id desc"""
+                ).fetchall()
+            else:
+                linhas = conn.execute(
+                    """select id, nome, cliente, cliente_usuario_id, criado_em
+                       from projetos where cliente_usuario_id = ?
+                       order by criado_em desc, id desc""",
+                    (cliente_usuario_id,),
+                ).fetchall()
             return [dict(linha) for linha in linhas]
+        if cliente_usuario_id is None:
+            return list(
+                conn.execute(
+                    """select id, nome, cliente, cliente_usuario_id, criado_em
+                       from public.projetos order by criado_em desc, id desc"""
+                ).fetchall()
+            )
         return list(
             conn.execute(
-                """select id, nome, cliente, criado_em
-                   from public.projetos order by criado_em desc, id desc"""
+                """select id, nome, cliente, cliente_usuario_id, criado_em
+                   from public.projetos where cliente_usuario_id = %s
+                   order by criado_em desc, id desc""",
+                (cliente_usuario_id,),
             ).fetchall()
         )
     finally:
         conn.close()
 
 
-def criar_projeto(nome: str, cliente: str | None = None) -> dict:
+def criar_projeto(nome: str, cliente: str | None = None, cliente_usuario_id: int | None = None) -> dict:
     conn = _conn()
     try:
+        nome = nome.strip()
+        cliente_norm = (cliente or "").strip() or None
         if _sqlite():
             cursor = conn.execute(
-                "insert into projetos (nome, cliente, criado_em) values (?, ?, ?)",
-                (nome.strip(), (cliente or "").strip() or None, datetime.now().isoformat(timespec="seconds")),
+                "insert into projetos (nome, cliente, cliente_usuario_id, criado_em) values (?, ?, ?, ?)",
+                (nome, cliente_norm, cliente_usuario_id, datetime.now().isoformat(timespec="seconds")),
             )
             conn.commit()
             return {
                 "id": int(cursor.lastrowid),
-                "nome": nome.strip(),
-                "cliente": (cliente or "").strip() or None,
+                "nome": nome,
+                "cliente": cliente_norm,
+                "cliente_usuario_id": cliente_usuario_id,
             }
         linha = conn.execute(
-            """insert into public.projetos (nome, cliente) values (%s, %s)
-               returning id, nome, cliente, criado_em""",
-            (nome.strip(), (cliente or "").strip() or None),
+            """insert into public.projetos (nome, cliente, cliente_usuario_id)
+               values (%s, %s, %s)
+               returning id, nome, cliente, cliente_usuario_id, criado_em""",
+            (nome, cliente_norm, cliente_usuario_id),
         ).fetchone()
         conn.commit()
         return dict(linha)
@@ -84,12 +105,12 @@ def get_projeto(projeto_id: int) -> dict | None:
     try:
         if _sqlite():
             linha = conn.execute(
-                "select id, nome, cliente, criado_em from projetos where id = ?",
+                "select id, nome, cliente, cliente_usuario_id, criado_em from projetos where id = ?",
                 (projeto_id,),
             ).fetchone()
             return dict(linha) if linha else None
         return conn.execute(
-            """select id, nome, cliente, criado_em
+            """select id, nome, cliente, cliente_usuario_id, criado_em
                from public.projetos where id = %s""",
             (projeto_id,),
         ).fetchone()
@@ -97,7 +118,15 @@ def get_projeto(projeto_id: int) -> dict | None:
         conn.close()
 
 
-def renomear_projeto(projeto_id: int, nome: str | None = None, cliente: str | None = None) -> dict | None:
+_SEM_ALTERAR = object()
+
+
+def renomear_projeto(
+    projeto_id: int,
+    nome: str | None = None,
+    cliente: str | None = None,
+    cliente_usuario_id: int | None | object = _SEM_ALTERAR,
+) -> dict | None:
     conn = _conn()
     try:
         atual = get_projeto(projeto_id)
@@ -108,16 +137,20 @@ def renomear_projeto(projeto_id: int, nome: str | None = None, cliente: str | No
             novo_cliente = cliente.strip() or None
         else:
             novo_cliente = atual.get("cliente")
+        if cliente_usuario_id is _SEM_ALTERAR:
+            novo_cliente_uid = atual.get("cliente_usuario_id")
+        else:
+            novo_cliente_uid = int(cliente_usuario_id) if cliente_usuario_id is not None else None
         if _sqlite():
             conn.execute(
-                "update projetos set nome = ?, cliente = ? where id = ?",
-                (novo_nome, novo_cliente, projeto_id),
+                "update projetos set nome = ?, cliente = ?, cliente_usuario_id = ? where id = ?",
+                (novo_nome, novo_cliente, novo_cliente_uid, projeto_id),
             )
             conn.commit()
         else:
             conn.execute(
-                "update public.projetos set nome = %s, cliente = %s where id = %s",
-                (novo_nome, novo_cliente, projeto_id),
+                "update public.projetos set nome = %s, cliente = %s, cliente_usuario_id = %s where id = %s",
+                (novo_nome, novo_cliente, novo_cliente_uid, projeto_id),
             )
             conn.commit()
         return get_projeto(projeto_id)
