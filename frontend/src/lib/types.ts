@@ -79,6 +79,7 @@ export interface ProjetoResumo {
   id: number
   nome: string
   cliente: string | null
+  cliente_usuario_id: number | null
   criado_em: string
   num_locais: number
   num_itens: number

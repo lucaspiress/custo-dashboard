@@ -148,6 +148,7 @@ def listar(usuario: dict = Depends(usuario_atual)) -> list[dict]:
                 "id": projeto["id"],
                 "nome": projeto["nome"],
                 "cliente": projeto.get("cliente"),
+                "cliente_usuario_id": projeto.get("cliente_usuario_id"),
                 "criado_em": projeto.get("criado_em"),
                 "num_locais": totais["num_locais"],
                 "num_itens": totais["num_itens"],

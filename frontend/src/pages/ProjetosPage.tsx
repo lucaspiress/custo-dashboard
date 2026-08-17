@@ -46,12 +46,21 @@ const ICONE_LIXO = (
   </svg>
 )
 
+interface UsuarioOption {
+  id: number
+  nome: string
+  username: string
+}
+
 function ModalProjeto({
   titulo,
   valorNome,
   valorCliente,
+  valorClienteUsuario,
   onNome,
   onCliente,
+  onClienteUsuario,
+  clientes,
   aoSalvar,
   aoCancelar,
   salvando,
@@ -59,8 +68,11 @@ function ModalProjeto({
   titulo: string
   valorNome: string
   valorCliente: string
+  valorClienteUsuario: number | null
   onNome: (v: string) => void
   onCliente: (v: string) => void
+  onClienteUsuario: (id: number | null) => void
+  clientes: UsuarioOption[]
   aoSalvar: () => void
   aoCancelar: () => void
   salvando: boolean
@@ -87,13 +99,31 @@ function ModalProjeto({
         onChange={(e) => onCliente(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && void aoSalvar()}
         placeholder="Nome do cliente"
-        className="w-full rounded-lg px-3 py-2 text-sm border outline-none"
+        className="w-full rounded-lg px-3 py-2 text-sm border outline-none mb-3"
         style={{
           borderColor: 'var(--cor-borda)',
           background: 'var(--cor-elevado)',
           color: 'var(--cor-tinta)',
         }}
       />
+      <label className="block text-[12px] mb-1.5" style={{ color: 'var(--cor-mutado)' }}>
+        Acesso do cliente (opcional)
+      </label>
+      <select
+        value={valorClienteUsuario == null ? '' : String(valorClienteUsuario)}
+        onChange={(e) => onClienteUsuario(e.target.value ? Number(e.target.value) : null)}
+        className="w-full rounded-lg px-3 py-2 text-sm border outline-none"
+        style={{
+          borderColor: 'var(--cor-borda)',
+          background: 'var(--cor-elevado)',
+          color: 'var(--cor-tinta)',
+        }}
+      >
+        <option value="">Sem acesso de cliente</option>
+        {clientes.map((c) => (
+          <option key={c.id} value={c.id}>{c.nome} ({c.username})</option>
+        ))}
+      </select>
       <div className="flex justify-end gap-2 mt-5">
         <Botao variante="fantasma" onClick={aoCancelar}>Cancelar</Botao>
         <Botao onClick={() => void aoSalvar()} disabled={salvando}>Salvar</Botao>
@@ -108,6 +138,7 @@ export default function ProjetosPage() {
   const papel = usuario?.papel ?? 'usuario'
   const somenteLeitura = papel === 'cliente'
   const [projetos, setProjetos] = useState<ProjetoResumo[]>([])
+  const [clientes, setClientes] = useState<UsuarioOption[]>([])
   const [erro, setErro] = useState('')
   const [carregando, setCarregando] = useState(true)
   const [modalNovo, setModalNovo] = useState(false)
@@ -115,6 +146,7 @@ export default function ProjetosPage() {
   const [modalExcluir, setModalExcluir] = useState<ProjetoResumo | null>(null)
   const [nomeCampo, setNomeCampo] = useState('')
   const [clienteCampo, setClienteCampo] = useState('')
+  const [clienteUsuarioCampo, setClienteUsuarioCampo] = useState<number | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [importando, setImportando] = useState(false)
   const [busca, setBusca] = useState('')
@@ -132,13 +164,26 @@ export default function ProjetosPage() {
     }
   }
 
+  async function carregarClientes() {
+    if (somenteLeitura) return
+    try {
+      const usuarios = await api.get<Array<{ id: number; nome: string; username: string; papel: string }>>('/api/users')
+      setClientes(usuarios.filter((u) => u.papel === 'cliente').map((u) => ({ id: u.id, nome: u.nome, username: u.username })))
+    } catch {
+      setClientes([])
+    }
+  }
+
   useEffect(() => {
     void carregar()
+    void carregarClientes()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function abrirNovo() {
     setNomeCampo('')
     setClienteCampo('')
+    setClienteUsuarioCampo(null)
     setModalNovo(true)
   }
 
@@ -146,6 +191,7 @@ export default function ProjetosPage() {
     setModalEditar(projeto)
     setNomeCampo(projeto.nome)
     setClienteCampo(projeto.cliente ?? '')
+    setClienteUsuarioCampo(projeto.cliente_usuario_id ?? null)
   }
 
   async function salvarNovo() {
@@ -155,6 +201,7 @@ export default function ProjetosPage() {
       const criado = await api.post<{ id: number }>('/api/projetos', {
         nome: nomeCampo.trim(),
         cliente: clienteCampo.trim() || undefined,
+        cliente_usuario_id: clienteUsuarioCampo,
       })
       setModalNovo(false)
       navigate(`/projetos/${criado.id}`)
@@ -171,6 +218,7 @@ export default function ProjetosPage() {
       await api.patch(`/api/projetos/${modalEditar.id}`, {
         nome: nomeCampo.trim(),
         cliente: clienteCampo.trim() || null,
+        cliente_usuario_id: clienteUsuarioCampo,
       })
       setModalEditar(null)
       await carregar()
@@ -414,8 +462,11 @@ export default function ProjetosPage() {
           titulo="Novo projeto"
           valorNome={nomeCampo}
           valorCliente={clienteCampo}
+          valorClienteUsuario={clienteUsuarioCampo}
           onNome={setNomeCampo}
           onCliente={setClienteCampo}
+          onClienteUsuario={setClienteUsuarioCampo}
+          clientes={clientes}
           aoSalvar={salvarNovo}
           aoCancelar={() => setModalNovo(false)}
           salvando={salvando}
@@ -427,8 +478,11 @@ export default function ProjetosPage() {
           titulo="Editar projeto"
           valorNome={nomeCampo}
           valorCliente={clienteCampo}
+          valorClienteUsuario={clienteUsuarioCampo}
           onNome={setNomeCampo}
           onCliente={setClienteCampo}
+          onClienteUsuario={setClienteUsuarioCampo}
+          clientes={clientes}
           aoSalvar={salvarEditar}
           aoCancelar={() => setModalEditar(null)}
           salvando={salvando}

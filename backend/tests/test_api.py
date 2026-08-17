@@ -392,3 +392,11 @@ def test_patch_atribui_cliente_nulo(cliente, admin):
     resposta = cliente.patch(f"/api/projetos/{projeto['id']}", json={"cliente_usuario_id": None})
     assert resposta.status_code == 200
     assert resposta.json()["cliente_usuario_id"] is None
+
+
+def test_listar_retorna_cliente_usuario_id(cliente, admin):
+    id_cliente = _criar_cliente(cliente, username="cliente_x", nome="Cliente X")
+    projeto = _criar_projeto(cliente, nome="Proj X")
+    cliente.patch(f"/api/projetos/{projeto['id']}", json={"cliente_usuario_id": id_cliente})
+    lista = cliente.get("/api/projetos").json()
+    assert lista[0]["cliente_usuario_id"] == id_cliente
