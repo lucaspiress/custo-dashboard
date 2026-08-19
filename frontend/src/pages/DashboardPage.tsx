@@ -19,6 +19,7 @@ const ABAS_PADRAO = ['Visão Geral', 'Custos', 'Payback', 'Insights', 'Comparati
 const ICONE_PDF = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" /></svg>)
 const ICONE_XLSX = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /></svg>)
 const ICONE_PLANILHA = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /></svg>)
+const ICONE_DASHBOARD = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>)
 
 const ICONES_ABAS: Record<string, ReactNode> = {
   'Visão Geral': (<><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>),
@@ -112,6 +113,14 @@ export default function DashboardPage() {
                 <span className="hidden sm:inline">Editar dados</span>
               </Link>
             )}
+            <Link to={`/projetos/${projetoId}/datasets`} aria-label="Datasets" className="h-9 rounded-lg px-3.5 text-[13px] font-medium inline-flex items-center gap-2 transition-colors" style={{ background: 'var(--cor-elevado)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}>
+              {ICONE_PLANILHA}
+              <span className="hidden sm:inline">Datasets</span>
+            </Link>
+            <Link to={`/projetos/${projetoId}/dashboards`} aria-label="Dashboards" className="h-9 rounded-lg px-3.5 text-[13px] font-medium inline-flex items-center gap-2 transition-colors" style={{ background: 'var(--cor-elevado)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}>
+              {ICONE_DASHBOARD}
+              <span className="hidden sm:inline">Dashboards</span>
+            </Link>
           </>
         )
       }

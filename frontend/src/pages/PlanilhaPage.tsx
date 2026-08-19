@@ -54,6 +54,17 @@ const ICONE_LIXO = (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" 
 const ICONE_PDF = (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>)
 const ICONE_XLSX = (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /></svg>)
 const ICONE_CHEVRON = (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>)
+const ICONE_PLANILHA = (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /></svg>)
+
+function letraColuna(idx: number): string {
+  let letra = ''
+  let n = idx
+  while (n >= 0) {
+    letra = String.fromCharCode(65 + (n % 26)) + letra
+    n = Math.floor(n / 26) - 1
+  }
+  return letra
+}
 
 function fmtDataLocal(iso: string): string {
   const [ano, mes, dia] = iso.split('-')
@@ -467,10 +478,91 @@ export default function PlanilhaPage() {
 
   return (
     <>
+    <style>{`
+      .excel-grid { border-collapse: separate; border-spacing: 0; }
+      .excel-th {
+        background: var(--cor-sidebar);
+        color: var(--cor-mutado);
+        border-right: 1px solid var(--cor-borda);
+        border-bottom: 1px solid var(--cor-borda);
+        padding: 6px 8px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+      }
+      .excel-th-letter { text-align: center; font-weight: 500; text-transform: none; letter-spacing: 0; }
+      .excel-rn {
+        background: var(--cor-sidebar);
+        color: var(--cor-mutado);
+        border-right: 1px solid var(--cor-borda);
+        border-bottom: 1px solid var(--cor-borda);
+        text-align: center;
+        font-size: 11px;
+        font-weight: 500;
+        padding: 6px 8px;
+        min-width: 44px;
+        font-variant-numeric: tabular-nums;
+      }
+      .excel-cell {
+        border-right: 1px solid var(--cor-borda);
+        border-bottom: 1px solid var(--cor-borda);
+        vertical-align: top;
+        background: var(--cor-superficie);
+      }
+      .excel-cell-local { padding: 4px 8px; }
+      .excel-cell-data { padding: 4px 8px; }
+      .excel-cell-actions { padding: 4px; text-align: center; }
+    `}</style>
     <AppShell
       titulo="Planilha de dados"
       acoes={
         <>
+          <div
+            className="inline-flex rounded-lg p-0.5 border"
+            style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)' }}
+            role="tablist"
+            aria-label="Visualização do projeto"
+          >
+            <Link
+              to={`/projetos/${projetoId}/planilha`}
+              role="tab"
+              aria-selected="true"
+              className="h-8 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors"
+              style={{ background: 'var(--cor-superficie)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}
+            >
+              {ICONE_PLANILHA}
+              Planilha
+            </Link>
+            <Link
+              to={`/projetos/${projetoId}/dashboard`}
+              role="tab"
+              aria-selected="false"
+              className="h-8 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors hover:text-tinta"
+              style={{ color: 'var(--cor-mutado)' }}
+            >
+              Dashboard
+            </Link>
+            <Link
+              to={`/projetos/${projetoId}/datasets`}
+              role="tab"
+              aria-selected="false"
+              className="h-8 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors hover:text-tinta"
+              style={{ color: 'var(--cor-mutado)' }}
+            >
+              Datasets
+            </Link>
+            <Link
+              to={`/projetos/${projetoId}/dashboards`}
+              role="tab"
+              aria-selected="false"
+              className="h-8 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors hover:text-tinta"
+              style={{ color: 'var(--cor-mutado)' }}
+            >
+              Dashboards
+            </Link>
+          </div>
           <button
             onClick={() => void exportarPdf()}
             aria-label="Relatório PDF"
@@ -539,14 +631,42 @@ export default function PlanilhaPage() {
 
         <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
           <div className="overflow-x-auto" onPaste={(e) => void colarLocais(e)}>
-            <table className="w-full text-left">
+            <table className="w-full text-left excel-grid">
+              <colgroup>
+                <col style={{ width: '44px' }} />
+                {CABECALHO_LOCAL.map((c, i) => (
+                  <col
+                    key={i}
+                    style={{
+                      minWidth:
+                        c === 'Local'
+                          ? '160px'
+                          : c === ''
+                          ? '44px'
+                          : c === 'Data instalação'
+                          ? '120px'
+                          : c === 'Retorno'
+                          ? '88px'
+                          : '96px',
+                    }}
+                  />
+                ))}
+              </colgroup>
               <thead>
-                <tr className="border-b" style={{ borderColor: 'var(--cor-borda)' }}>
+                <tr>
+                  <th className="excel-th" aria-hidden="true" />
+                  {CABECALHO_LOCAL.map((c, i) => (
+                    <th key={i} className="excel-th excel-th-letter" title={c || 'Ações'}>
+                      {letraColuna(i)}
+                    </th>
+                  ))}
+                </tr>
+                <tr>
+                  <th className="excel-th" aria-hidden="true" />
                   {CABECALHO_LOCAL.map((c, i) => (
                     <th
                       key={i}
-                      className={`px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap ${i > 0 && i < CABECALHO_LOCAL.length - 1 ? 'text-right' : ''}`}
-                      style={{ color: 'var(--cor-mutado)' }}
+                      className={`excel-th ${i > 0 && i < CABECALHO_LOCAL.length - 1 ? 'text-right' : ''}`}
                     >
                       {c}
                     </th>
@@ -554,13 +674,14 @@ export default function PlanilhaPage() {
                 </tr>
               </thead>
               <tbody>
-                {locais.map((linha) => {
+                {locais.map((linha, idx) => {
                   const comp = computarLocal(linha)
                   return (
                     <Fragment key={linha.id}>
-                      <tr className="border-b group" style={{ borderColor: 'var(--cor-borda)' }}>
-                        <td className="px-2.5 py-1.5">
-                          <div className="flex items-center gap-1.5 min-w-[150px]">
+                      <tr className="group">
+                        <th className="excel-rn" scope="row">{idx + 1}</th>
+                        <td className="excel-cell">
+                          <div className="flex items-center gap-1.5 min-w-[150px] excel-cell-local">
                             <button
                               onClick={() =>
                                 setLocais((atual) =>
@@ -576,31 +697,32 @@ export default function PlanilhaPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-1 py-1.5 text-right"><MoneyCell valor={linha.valor_mensal} onCommit={(v) => alterarLocal(linha, 'valor_mensal', v ?? 0)} /></td>
-                        <td className="px-1 py-1.5 text-right"><MoneyCell valor={linha.taxa_instalacao} onCommit={(v) => alterarLocal(linha, 'taxa_instalacao', v ?? 0)} /></td>
-                        <td className="px-1 py-1.5 text-right"><MoneyCell valor={linha.custo_manutencao} onCommit={(v) => alterarLocal(linha, 'custo_manutencao', v ?? 0)} /></td>
-                        <td className="px-1 py-1.5 text-right"><MoneyCell valor={linha.mensal_terceirizada} onCommit={(v) => alterarLocal(linha, 'mensal_terceirizada', v ?? 0)} /></td>
-                        <td className="px-1 py-1.5 text-right"><MoneyCell valor={linha.chip_mensal} onCommit={(v) => alterarLocal(linha, 'chip_mensal', v ?? 0)} /></td>
-                        <td className="px-1 py-1.5 text-right"><MoneyCell valor={linha.custos_softwares} onCommit={(v) => alterarLocal(linha, 'custos_softwares', v ?? 0)} /></td>
-                        <td className="px-1 py-1.5 text-right"><MoneyCell valor={linha.mao_de_obra} onCommit={(v) => alterarLocal(linha, 'mao_de_obra', v ?? 0)} /></td>
-                        <td className="px-1 py-1.5"><DateCell valor={linha.data_inst} onCommit={(v) => alterarLocal(linha, 'data_inst', v)} /></td>
-                        <td className="px-2.5 py-1.5 text-right text-[13px] text-[#10b981] tabular-nums font-medium">{fmtMoeda(comp.saldoMensal)}</td>
-                        <td className="px-2.5 py-1.5 text-right text-[13px] text-[#e07b1a] tabular-nums font-medium">{fmtMoeda(comp.investimento)}</td>
-                        <td className="px-2.5 py-1.5 text-right text-[13px] text-mutado tabular-nums">
-                          {comp.retorno === null ? '—' : `${Math.ceil(comp.retorno)} meses`}
-                        </td>
-                        <td className="px-2 py-1.5">
-                          <button
-                            onClick={() => setConfirmarExcluirLocal(linha.id)}
-                            title="Excluir local"
-                            className="p-1.5 rounded text-mutado hover:text-alerta hover:bg-[rgba(239,68,68,0.1)] transition-colors opacity-0 group-hover:opacity-100"
-                          >
-                            {ICONE_LIXO}
-                          </button>
+                        <td className="excel-cell"><div className="excel-cell-data text-right"><MoneyCell valor={linha.valor_mensal} onCommit={(v) => alterarLocal(linha, 'valor_mensal', v ?? 0)} /></div></td>
+                        <td className="excel-cell"><div className="excel-cell-data text-right"><MoneyCell valor={linha.taxa_instalacao} onCommit={(v) => alterarLocal(linha, 'taxa_instalacao', v ?? 0)} /></div></td>
+                        <td className="excel-cell"><div className="excel-cell-data text-right"><MoneyCell valor={linha.custo_manutencao} onCommit={(v) => alterarLocal(linha, 'custo_manutencao', v ?? 0)} /></div></td>
+                        <td className="excel-cell"><div className="excel-cell-data text-right"><MoneyCell valor={linha.mensal_terceirizada} onCommit={(v) => alterarLocal(linha, 'mensal_terceirizada', v ?? 0)} /></div></td>
+                        <td className="excel-cell"><div className="excel-cell-data text-right"><MoneyCell valor={linha.chip_mensal} onCommit={(v) => alterarLocal(linha, 'chip_mensal', v ?? 0)} /></div></td>
+                        <td className="excel-cell"><div className="excel-cell-data text-right"><MoneyCell valor={linha.custos_softwares} onCommit={(v) => alterarLocal(linha, 'custos_softwares', v ?? 0)} /></div></td>
+                        <td className="excel-cell"><div className="excel-cell-data text-right"><MoneyCell valor={linha.mao_de_obra} onCommit={(v) => alterarLocal(linha, 'mao_de_obra', v ?? 0)} /></div></td>
+                        <td className="excel-cell"><div className="excel-cell-data"><DateCell valor={linha.data_inst} onCommit={(v) => alterarLocal(linha, 'data_inst', v)} /></div></td>
+                        <td className="excel-cell"><div className="excel-cell-data text-right text-[13px] text-[#10b981] tabular-nums font-medium">{fmtMoeda(comp.saldoMensal)}</div></td>
+                        <td className="excel-cell"><div className="excel-cell-data text-right text-[13px] text-[#e07b1a] tabular-nums font-medium">{fmtMoeda(comp.investimento)}</div></td>
+                        <td className="excel-cell"><div className="excel-cell-data text-right text-[13px] text-mutado tabular-nums">{comp.retorno === null ? '—' : `${Math.ceil(comp.retorno)} meses`}</div></td>
+                        <td className="excel-cell">
+                          <div className="excel-cell-actions">
+                            <button
+                              onClick={() => setConfirmarExcluirLocal(linha.id)}
+                              title="Excluir local"
+                              className="p-1.5 rounded text-mutado hover:text-alerta hover:bg-[rgba(239,68,68,0.1)] transition-colors opacity-0 group-hover:opacity-100"
+                            >
+                              {ICONE_LIXO}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                       {linha.expanso && (
                         <tr>
+                          <th className="excel-rn" aria-hidden="true" />
                           <td colSpan={CABECALHO_LOCAL.length} className="px-4 pb-4" style={{ background: 'rgba(46, 89, 246, 0.04)' }}>
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: 'var(--cor-mutado)' }}>
@@ -672,6 +794,7 @@ export default function PlanilhaPage() {
                 })}
                 {locais.length === 0 && (
                   <tr>
+                    <th className="excel-rn" aria-hidden="true" />
                     <td colSpan={CABECALHO_LOCAL.length} className="px-4 py-8 text-center text-[13px] text-mutado">
                       Nenhum local cadastrado — cole linhas do Excel aqui (colunas na ordem do template) ou clique em
                       “+ Local”.
@@ -690,7 +813,7 @@ export default function PlanilhaPage() {
               + Local
             </button>
             <Link
-              to={`/projetos/${projetoId}`}
+              to={`/projetos/${projetoId}/dashboard`}
               className="h-9 rounded-lg px-4 text-[13px] font-semibold inline-flex items-center gap-2 border transition-colors"
               style={{ borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)', background: 'var(--cor-elevado)' }}
             >

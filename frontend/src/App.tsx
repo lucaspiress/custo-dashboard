@@ -1,10 +1,18 @@
-import { useEffect, useState } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 import LoginPage from './pages/LoginPage'
 import ProjetosPage from './pages/ProjetosPage'
 import DashboardPage from './pages/DashboardPage'
 import PlanilhaPage from './pages/PlanilhaPage'
+
+const DatasetsPage = lazy(() => import('./pages/DatasetsPage'))
+const DashboardBuilderPage = lazy(() => import('./pages/DashboardBuilderPage'))
+
+function RedirecionarParaDashboard() {
+  const { id } = useParams<{ id: string }>()
+  return <Navigate to={`/projetos/${id}/dashboard`} replace />
+}
 
 function SucessoRedirect() {
   const { usuario } = useAuth()
@@ -37,13 +45,24 @@ function Rotas() {
     )
   }
   return (
-    <Routes>
-      <Route path="/login" element={usuario ? <SucessoRedirect /> : <LoginPage />} />
-      <Route path="/" element={usuario ? <ProjetosPage /> : <Navigate to="/login" replace />} />
-      <Route path="/projetos/:id" element={usuario ? <DashboardPage /> : <Navigate to="/login" replace />} />
-      <Route path="/projetos/:id/planilha" element={usuario ? <PlanilhaPage /> : <Navigate to="/login" replace />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-mutado text-sm">Carregando…</div>
+      }
+    >
+      <Routes>
+        <Route path="/login" element={usuario ? <SucessoRedirect /> : <LoginPage />} />
+        <Route path="/" element={usuario ? <ProjetosPage /> : <Navigate to="/login" replace />} />
+        <Route path="/projetos/:id" element={usuario ? <RedirecionarParaDashboard /> : <Navigate to="/login" replace />} />
+        <Route path="/projetos/:id/dashboard" element={usuario ? <DashboardPage /> : <Navigate to="/login" replace />} />
+        <Route path="/projetos/:id/planilha" element={usuario ? <PlanilhaPage /> : <Navigate to="/login" replace />} />
+        <Route path="/projetos/:id/datasets" element={usuario ? <DatasetsPage /> : <Navigate to="/login" replace />} />
+        <Route path="/projetos/:id/datasets/:did" element={usuario ? <DatasetsPage /> : <Navigate to="/login" replace />} />
+        <Route path="/projetos/:id/dashboards" element={usuario ? <DashboardBuilderPage /> : <Navigate to="/login" replace />} />
+        <Route path="/projetos/:id/dashboards/:dbid" element={usuario ? <DashboardBuilderPage /> : <Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   )
 }
 

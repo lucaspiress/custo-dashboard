@@ -66,6 +66,63 @@ def _inicializar(conn: sqlite3.Connection) -> None:
             valor_unit REAL NOT NULL DEFAULT 0,
             valor_total REAL NOT NULL DEFAULT 0
         );
+
+        CREATE TABLE IF NOT EXISTS datasets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            projeto_id INTEGER NOT NULL REFERENCES projetos(id) ON DELETE CASCADE,
+            nome TEXT NOT NULL,
+            schema_json TEXT NOT NULL DEFAULT '{}',
+            fonte TEXT NOT NULL DEFAULT 'livre',
+            criado_em TEXT NOT NULL,
+            atualizado_em TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS dataset_rows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            dataset_id INTEGER NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
+            row_index INTEGER NOT NULL,
+            data_json TEXT NOT NULL DEFAULT '{}',
+            criado_em TEXT NOT NULL,
+            UNIQUE(dataset_id, row_index)
+        );
+
+        CREATE TABLE IF NOT EXISTS dashboards (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            projeto_id INTEGER NOT NULL REFERENCES projetos(id) ON DELETE CASCADE,
+            nome TEXT NOT NULL,
+            layout_json TEXT NOT NULL DEFAULT '{}',
+            eh_interno INTEGER NOT NULL DEFAULT 0,
+            criado_em TEXT NOT NULL,
+            atualizado_em TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS widgets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            dashboard_id INTEGER NOT NULL REFERENCES dashboards(id) ON DELETE CASCADE,
+            type TEXT NOT NULL,
+            dataset_id TEXT NOT NULL,
+            config_json TEXT NOT NULL DEFAULT '{}',
+            position_json TEXT NOT NULL DEFAULT '{"x":0,"y":0,"w":4,"h":3}',
+            ordem INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS slicers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            dashboard_id INTEGER NOT NULL REFERENCES dashboards(id) ON DELETE CASCADE,
+            dataset_id TEXT NOT NULL,
+            field TEXT NOT NULL,
+            values_json TEXT NOT NULL DEFAULT '[]',
+            tipo TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS campos_calculados (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            dataset_id INTEGER NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
+            nome TEXT NOT NULL,
+            formula TEXT NOT NULL,
+            dependencias_json TEXT NOT NULL DEFAULT '[]',
+            ordem INTEGER NOT NULL DEFAULT 0
+        );
         """
     )
     conn.commit()

@@ -130,3 +130,87 @@ export interface FluxoCaixa {
   pontos: PontoFluxo[]
   grafico: string
 }
+
+export type DatasetFonte = 'livre' | 'locais' | 'itens'
+
+export interface Dataset {
+  id: string // string para suportar "locais-{pid}" / "itens-{pid}"
+  projeto_id: number
+  nome: string
+  schema_json: Record<string, string> // coluna → tipo ("text" | "number" | "date")
+  fonte: DatasetFonte
+  criado_em: string | null
+  atualizado_em: string | null
+  row_count?: number // opcional, só quando listar
+}
+
+export interface DatasetRow {
+  row_index: number
+  data_json: Record<string, any>
+}
+
+export interface DatasetListResponse {
+  datasets: Dataset[]
+}
+
+export type WidgetType = 'bar' | 'line' | 'pie' | 'area' | 'scatter' | 'kpi' | 'table' | 'pivot'
+export type Aggregation = 'sum' | 'avg' | 'count' | 'min' | 'max'
+export type SlicerTipo = 'lista' | 'intervalo' | 'data'
+
+export interface WidgetConfig {
+  x?: string // campo eixo X
+  y?: string[] // campos eixo Y (1+)
+  aggregation?: Aggregation
+  groupBy?: string[]
+  field?: string // para KPI
+  colunas?: string[] // para table
+  linhas?: string[] // para pivot (linhas)
+  colunas_pivot?: string[] // para pivot (colunas)
+  metrica?: string // para pivot
+  comparacao?: 'anterior' | 'media' // para KPI
+  filters?: Record<string, any>
+}
+
+export interface Widget {
+  id: number
+  dashboard_id: number
+  type: WidgetType
+  dataset_id: string // aceita "123" ou "locais-1"/"itens-1"
+  config_json: WidgetConfig
+  position_json: { x: number; y: number; w: number; h: number }
+  ordem: number
+}
+
+export interface Slicer {
+  id: number
+  dashboard_id: number
+  dataset_id: string
+  field: string
+  values_json: string[]
+  tipo: SlicerTipo
+}
+
+export interface Dashboard {
+  id: number
+  projeto_id: number
+  nome: string
+  layout_json: Record<string, any>
+  eh_interno: boolean
+  criado_em: string
+  atualizado_em: string
+  widgets?: Widget[]
+  slicers?: Slicer[]
+}
+
+export interface DashboardListResponse {
+  dashboards: Dashboard[]
+}
+
+export interface CampoCalculado {
+  id: number
+  dataset_id: number
+  nome: string
+  formula: string
+  dependencias_json: string[]
+  ordem: number
+}

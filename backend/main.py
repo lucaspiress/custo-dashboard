@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import store
-from routers import auth, projetos, users
+from routers import auth, campos_calculados, dashboards, datasets, projetos, users
 
 
 def _origens_cors() -> list[str]:
@@ -40,6 +40,9 @@ def criar_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api")
     app.include_router(users.router, prefix="/api")
     app.include_router(projetos.router, prefix="/api")
+    app.include_router(datasets.router)
+    app.include_router(dashboards.router)
+    app.include_router(campos_calculados.router)
     return app
 
 

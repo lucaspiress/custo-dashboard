@@ -204,7 +204,7 @@ export default function ProjetosPage() {
         cliente_usuario_id: clienteUsuarioCampo,
       })
       setModalNovo(false)
-      navigate(`/projetos/${criado.id}`)
+      navigate(`/projetos/${criado.id}/planilha`)
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao criar projeto.')
       setSalvando(false)
@@ -250,7 +250,7 @@ export default function ProjetosPage() {
       const form = new FormData()
       form.append('arquivo', file)
       const criado = await api.postForm<{ id: number }>('/api/projetos/importar', form)
-      navigate(`/projetos/${criado.id}`)
+      navigate(`/projetos/${criado.id}/planilha`)
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao importar planilha.')
       setImportando(false)
@@ -385,7 +385,7 @@ export default function ProjetosPage() {
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <button
-                  onClick={() => navigate(`/projetos/${projeto.id}`)}
+                  onClick={() => navigate(`/projetos/${projeto.id}/planilha`)}
                   className="text-[15px] font-semibold text-left leading-snug transition-colors"
                   style={{ color: 'var(--cor-tinta)' }}
                 >
@@ -417,7 +417,7 @@ export default function ProjetosPage() {
               style={{ borderColor: 'var(--cor-borda)' }}
             >
               <button
-                onClick={() => navigate(`/projetos/${projeto.id}`)}
+                onClick={() => navigate(`/projetos/${projeto.id}/dashboard`)}
                 className="h-8 px-2.5 rounded-lg text-[12.5px] font-medium inline-flex items-center gap-1.5 transition-colors"
                 style={{ color: 'var(--cor-mutado)' }}
               >
