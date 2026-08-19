@@ -1,10 +1,13 @@
 import type {
+  Agendamento,
   CampoCalculado,
   Dashboard,
   DashboardListResponse,
   Dataset,
   DatasetListResponse,
   DatasetRow,
+  Publicacao,
+  Relatorio,
   Slicer,
   SlicerTipo,
   Widget,
@@ -280,4 +283,79 @@ export async function atualizarCampoCalculado(
 /** Remove um campo calculado. */
 export async function deletarCampoCalculado(did: number, cid: number): Promise<void> {
   return api.delete(`/api/datasets/${did}/campos-calculados/${cid}`)
+}
+
+// ------------------------------------------------------------- publicações
+
+/** Publica um dashboard, gerando um link público `/p/{token}`. */
+export async function criarPublicacao(dbid: number): Promise<{ token: string; url_publica: string }> {
+  return api.post<{ token: string; url_publica: string }>(`/api/dashboards/${dbid}/publicar`, {})
+}
+
+/** Revoga uma publicação (o link deixa de funcionar). */
+export async function revogarPublicacao(pid: number): Promise<void> {
+  return api.delete(`/api/publicacoes/${pid}`)
+}
+
+/** Obtém uma publicação pelo id. */
+export async function obterPublicacao(pid: number): Promise<Publicacao> {
+  return api.get<Publicacao>(`/api/publicacoes/${pid}`)
+}
+
+/** Lista as publicações de um dashboard. */
+export async function listarPublicacoes(dbid: number): Promise<Publicacao[]> {
+  const dados = await api.get<Publicacao[] | { publicacoes: Publicacao[] }>(
+    `/api/dashboards/${dbid}/publicacoes`
+  )
+  return Array.isArray(dados) ? dados : dados.publicacoes
+}
+
+// ------------------------------------------------------------ compartilhados
+
+/** Lista dashboards internos (eh_interno=true) visíveis a todos os usuários logados. */
+export async function listarCompartilhados(): Promise<Dashboard[]> {
+  const dados = await api.get<Dashboard[] | DashboardListResponse>(`/api/dashboards/compartilhados`)
+  return Array.isArray(dados) ? dados : dados.dashboards
+}
+
+// ------------------------------------------------------------ agendamentos
+
+/** Lista os agendamentos do usuário. */
+export async function listarAgendamentos(): Promise<Agendamento[]> {
+  const dados = await api.get<Agendamento[] | { agendamentos: Agendamento[] }>(`/api/agendamentos`)
+  return Array.isArray(dados) ? dados : dados.agendamentos
+}
+
+/** Cria um agendamento de relatório para uma publicação. */
+export async function criarAgendamento(
+  publicacao_id: number,
+  periodicidade: Agendamento['periodicidade'],
+): Promise<Agendamento> {
+  return api.post<Agendamento>(`/api/agendamentos`, { publicacao_id, periodicidade })
+}
+
+/** Atualiza ativo/periodicidade de um agendamento. */
+export async function atualizarAgendamento(
+  aid: number,
+  dados: { ativo?: boolean; periodicidade?: Agendamento['periodicidade'] },
+): Promise<Agendamento> {
+  return api.patch<Agendamento>(`/api/agendamentos/${aid}`, dados)
+}
+
+/** Remove um agendamento. */
+export async function deletarAgendamento(aid: number): Promise<void> {
+  return api.delete(`/api/agendamentos/${aid}`)
+}
+
+// -------------------------------------------------------------- relatórios
+
+/** Lista os relatórios gerados. */
+export async function listarRelatorios(): Promise<Relatorio[]> {
+  const dados = await api.get<Relatorio[] | { relatorios: Relatorio[] }>(`/api/relatorios`)
+  return Array.isArray(dados) ? dados : dados.relatorios
+}
+
+/** Baixa o PDF de um relatório (proxy do R2 pelo backend). */
+export function baixarRelatorio(rid: number): Promise<Blob> {
+  return api.blob(`/api/relatorios/${rid}/download`)
 }

@@ -20,6 +20,7 @@ import type {
   CampoCalculado,
   Dashboard,
   Dataset,
+  Publicacao,
   Slicer,
   Widget,
   WidgetConfig,
@@ -29,16 +30,9 @@ import AppShell from '../components/AppShell'
 import Botao from '../components/ui/Botao'
 import Modal from '../components/ui/Modal'
 import SlicerBar from '../components/SlicerBar'
-import {
-  AreaChart,
-  BarChart,
-  KpiCard,
-  LineChart,
-  PieChart,
-  PivotWidget,
-  ScatterChart,
-  TableWidget,
-} from '../components/widgets'
+import PublishDialog from '../components/PublishDialog'
+import ScheduleDialog from '../components/ScheduleDialog'
+import { renderWidget } from '../components/widgets/renderWidget'
 
 const ICONE_PLANILHA = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /></svg>
@@ -74,33 +68,6 @@ const AGGREGATIONS: { value: Aggregation; label: string }[] = [
   { value: 'min', label: 'Mínimo' },
   { value: 'max', label: 'Máximo' },
 ]
-
-function renderWidget(
-  widget: Widget,
-  data: any,
-  onDrillClick?: (campo: string, valor: any) => void,
-) {
-  switch (widget.type) {
-    case 'bar':
-      return <BarChart data={data} config={widget.config_json} onDrillClick={onDrillClick} />
-    case 'line':
-      return <LineChart data={data} config={widget.config_json} onDrillClick={onDrillClick} />
-    case 'area':
-      return <AreaChart data={data} config={widget.config_json} onDrillClick={onDrillClick} />
-    case 'pie':
-      return <PieChart data={data} config={widget.config_json} onDrillClick={onDrillClick} />
-    case 'scatter':
-      return <ScatterChart data={data} config={widget.config_json} onDrillClick={onDrillClick} />
-    case 'kpi':
-      return <KpiCard data={data} config={widget.config_json} titulo={widget.config_json.field ?? 'KPI'} />
-    case 'table':
-      return <TableWidget data={data} config={widget.config_json} />
-    case 'pivot':
-      return <PivotWidget data={data} config={widget.config_json} />
-    default:
-      return <div className="text-[12.5px]" style={{ color: 'var(--cor-mutado)' }}>Widget não suportado</div>
-  }
-}
 
 function ModalNovoDashboard({
   aoSalvar,
@@ -374,7 +341,7 @@ function PainelConfigWidget({
   )
 }
 
-export default function DashboardBuilderPage() {
+export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: boolean }) {
   const { id, dbid } = useParams<{ id: string; dbid?: string }>()
   const navigate = useNavigate()
   const projetoId = Number(id)
@@ -403,6 +370,9 @@ export default function DashboardBuilderPage() {
     valor: any
   } | null>(null)
   const [camposCalculados, setCamposCalculados] = useState<Record<string, CampoCalculado[]>>({})
+  const [modalPublicar, setModalPublicar] = useState(false)
+  const [modalAgendar, setModalAgendar] = useState(false)
+  const [publicacaoAtual, setPublicacaoAtual] = useState<Publicacao | null>(null)
 
   const dashboardRef = useRef(dashboard)
   dashboardRef.current = dashboard
@@ -777,10 +747,12 @@ export default function DashboardBuilderPage() {
                   className="rounded-lg px-3 py-2 text-[15px] font-semibold border outline-none min-w-0 flex-1 sm:flex-none"
                   style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)', color: 'var(--cor-tinta)' }}
                 />
-                <Botao variante="secundario" onClick={() => setModo((m) => (m === 'editar' ? 'visualizar' : 'editar'))}>
-                  {modo === 'editar' ? 'Visualizar' : 'Editar'}
-                </Botao>
-                {modo === 'editar' && (
+                {!readOnly && (
+                  <Botao variante="secundario" onClick={() => setModo((m) => (m === 'editar' ? 'visualizar' : 'editar'))}>
+                    {modo === 'editar' ? 'Visualizar' : 'Editar'}
+                  </Botao>
+                )}
+                {modo === 'editar' && !readOnly && (
                   <>
                     <Botao variante="secundario" onClick={() => setModalNovoWidget(true)}>
                       {ICONE_MAIS}
@@ -795,20 +767,27 @@ export default function DashboardBuilderPage() {
                     </Botao>
                   </>
                 )}
-                <Botao variante="secundario" onClick={() => setErro('Compartilhamento disponível na v4.3.')}>
-                  Compartilhar
-                </Botao>
-                <button
-                  onClick={() => void alternarInterno()}
-                  title="Dashboard interno (visível para todos os usuários)"
-                  className="h-9 px-3 rounded-lg text-[12.5px] font-medium transition-colors"
-                  style={{ background: dashboard.eh_interno ? 'rgba(16,185,129,0.15)' : 'var(--cor-elevado)', color: dashboard.eh_interno ? 'var(--cor-sucesso)' : 'var(--cor-mutado)', border: '1px solid var(--cor-borda)' }}
-                >
-                  {dashboard.eh_interno ? 'Interno' : 'Privado'}
-                </button>
-                <button onClick={() => void excluirDashboard()} title="Excluir dashboard" className="h-9 w-9 rounded-lg inline-flex items-center justify-center transition-colors" style={{ color: 'var(--cor-mutado)' }}>
-                  {ICONE_LIXO}
-                </button>
+                {!readOnly && (
+                  <>
+                    <Botao variante="secundario" onClick={() => setModalPublicar(true)}>
+                      Publicar
+                    </Botao>
+                    <Botao variante="secundario" onClick={() => setModalAgendar(true)}>
+                      Agendar
+                    </Botao>
+                    <button
+                      onClick={() => void alternarInterno()}
+                      title="Dashboard interno (visível para todos os usuários)"
+                      className="h-9 px-3 rounded-lg text-[12.5px] font-medium transition-colors"
+                      style={{ background: dashboard.eh_interno ? 'rgba(16,185,129,0.15)' : 'var(--cor-elevado)', color: dashboard.eh_interno ? 'var(--cor-sucesso)' : 'var(--cor-mutado)', border: '1px solid var(--cor-borda)' }}
+                    >
+                      {dashboard.eh_interno ? 'Interno' : 'Privado'}
+                    </button>
+                    <button onClick={() => void excluirDashboard()} title="Excluir dashboard" className="h-9 w-9 rounded-lg inline-flex items-center justify-center transition-colors" style={{ color: 'var(--cor-mutado)' }}>
+                      {ICONE_LIXO}
+                    </button>
+                  </>
+                )}
               </div>
 
               {erro && <div className="text-sm mb-3" style={{ color: 'var(--cor-alerta)' }}>{erro}</div>}
@@ -856,16 +835,16 @@ export default function DashboardBuilderPage() {
                 <div className="rounded-2xl border p-10 text-center" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
                   <div className="text-[14px] font-semibold mb-1" style={{ color: 'var(--cor-tinta)' }}>Nenhum widget</div>
                   <div className="text-[13px] mb-4" style={{ color: 'var(--cor-mutado)' }}>
-                    {modo === 'editar' ? 'Clique em “+ Widget” para adicionar um gráfico, KPI, tabela ou pivot.' : 'Entre no modo edição para adicionar widgets.'}
+                    {modo === 'editar' && !readOnly ? 'Clique em “+ Widget” para adicionar um gráfico, KPI, tabela ou pivot.' : 'Este dashboard não possui widgets.'}
                   </div>
-                  {modo === 'editar' && <Botao onClick={() => setModalNovoWidget(true)}>{ICONE_MAIS} Adicionar widget</Botao>}
+                  {modo === 'editar' && !readOnly && <Botao onClick={() => setModalNovoWidget(true)}>{ICONE_MAIS} Adicionar widget</Botao>}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {widgets.map((w) => (
                     <div
                       key={w.id}
-                      draggable={modo === 'editar'}
+                      draggable={modo === 'editar' && !readOnly}
                       onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', String(w.id))
                         setDragId(w.id)
@@ -876,17 +855,17 @@ export default function DashboardBuilderPage() {
                         if (dragId && dragId !== w.id) trocarWidgets(dragId, w.id)
                         setDragId(null)
                       }}
-                      onClick={() => modo === 'editar' && setWidgetSelecionado(w)}
+                      onClick={() => modo === 'editar' && !readOnly && setWidgetSelecionado(w)}
                       className="rounded-2xl border p-3 transition-colors"
                       style={{
                         background: 'var(--cor-superficie)',
                         borderColor: widgetSelecionado?.id === w.id ? 'rgba(46, 89, 246, 0.6)' : 'var(--cor-borda)',
-                        cursor: modo === 'editar' ? 'grab' : 'default',
+                        cursor: modo === 'editar' && !readOnly ? 'grab' : 'default',
                       }}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--cor-mutado)' }}>{w.type}</span>
-                        {modo === 'editar' && (
+                        {modo === 'editar' && !readOnly && (
                           <button onClick={(e) => { e.stopPropagation(); void removerWidget(w.id) }} title="Remover widget" style={{ color: 'var(--cor-mutado)' }}>×</button>
                         )}
                       </div>
@@ -924,6 +903,20 @@ export default function DashboardBuilderPage() {
       )}
       {modalNovoSlicer && (
         <ModalNovoSlicer datasets={datasets} aoSalvar={(d, f, t) => void criarNovoSlicer(d, f, t)} aoCancelar={() => setModalNovoSlicer(false)} />
+      )}
+      {modalPublicar && dashboard && (
+        <PublishDialog
+          dbid={dashboard.id}
+          publicacaoAtual={publicacaoAtual}
+          onPublicacao={(p) => setPublicacaoAtual(p)}
+          aoFechar={() => setModalPublicar(false)}
+        />
+      )}
+      {modalAgendar && dashboard && (
+        <ScheduleDialog
+          publicacaoAtual={publicacaoAtual}
+          aoFechar={() => setModalAgendar(false)}
+        />
       )}
     </AppShell>
   )

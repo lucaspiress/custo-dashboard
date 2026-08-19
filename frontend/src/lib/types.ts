@@ -214,3 +214,27 @@ export interface CampoCalculado {
   dependencias_json: string[]
   ordem: number
 }
+
+export interface Publicacao {
+  id: number
+  dashboard_id: number
+  revogado_em: string | null
+  criado_em: string
+}
+
+export interface Agendamento {
+  id: number
+  publicacao_id: number
+  periodicidade: 'diaria' | 'semanal' | 'mensal' | 'on_demand'
+  proxima_execucao: string
+  ativo: boolean
+}
+
+export interface Relatorio {
+  id: number
+  agendamento_id: number | null
+  publicacao_id: number
+  gerado_em: string
+  tamanho_bytes: number | null
+  status: 'gerado' | 'falha'
+}

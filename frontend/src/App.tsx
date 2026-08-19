@@ -8,6 +8,9 @@ import PlanilhaPage from './pages/PlanilhaPage'
 
 const DatasetsPage = lazy(() => import('./pages/DatasetsPage'))
 const DashboardBuilderPage = lazy(() => import('./pages/DashboardBuilderPage'))
+const CompartilhadosPage = lazy(() => import('./pages/CompartilhadosPage'))
+const RelatoriosPage = lazy(() => import('./pages/RelatoriosPage'))
+const PublicoPage = lazy(() => import('./pages/PublicoPage'))
 
 function RedirecionarParaDashboard() {
   const { id } = useParams<{ id: string }>()
@@ -60,6 +63,9 @@ function Rotas() {
         <Route path="/projetos/:id/datasets/:did" element={usuario ? <DatasetsPage /> : <Navigate to="/login" replace />} />
         <Route path="/projetos/:id/dashboards" element={usuario ? <DashboardBuilderPage /> : <Navigate to="/login" replace />} />
         <Route path="/projetos/:id/dashboards/:dbid" element={usuario ? <DashboardBuilderPage /> : <Navigate to="/login" replace />} />
+        <Route path="/compartilhados" element={usuario ? <CompartilhadosPage /> : <Navigate to="/login" replace />} />
+        <Route path="/relatorios" element={usuario ? <RelatoriosPage /> : <Navigate to="/login" replace />} />
+        <Route path="/p/:token" element={<PublicoPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

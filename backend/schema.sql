@@ -126,3 +126,54 @@ create table if not exists public.campos_calculados (
 
 create index if not exists idx_campos_calculados_dataset
     on public.campos_calculados (dataset_id);
+
+create table if not exists public.publicacoes (
+    id bigint generated always as identity primary key,
+    dashboard_id bigint not null references public.dashboards(id) on delete cascade,
+    token text not null unique,
+    revogado_em timestamptz,
+    criado_em timestamptz not null default now(),
+    criado_por bigint not null references public.usuarios(id)
+);
+
+create unique index if not exists idx_publicacoes_token
+    on public.publicacoes (token);
+
+create table if not exists public.agendamentos (
+    id bigint generated always as identity primary key,
+    publicacao_id bigint not null references public.publicacoes(id) on delete cascade,
+    periodicidade text not null,
+    proxima_execucao timestamptz not null,
+    ativo boolean not null default true,
+    criado_em timestamptz not null default now(),
+    criado_por bigint not null references public.usuarios(id)
+);
+
+create index if not exists idx_agendamentos_proxima
+    on public.agendamentos (proxima_execucao) where ativo = true;
+
+create table if not exists public.relatorios (
+    id bigint generated always as identity primary key,
+    agendamento_id bigint references public.agendamentos(id) on delete set null,
+    publicacao_id bigint not null references public.publicacoes(id) on delete cascade,
+    gerado_em timestamptz not null default now(),
+    storage_key text not null,
+    tamanho_bytes bigint,
+    status text not null default 'gerado'
+);
+
+create index if not exists idx_relatorios_publicacao
+    on public.relatorios (publicacao_id, gerado_em desc);
+
+create table if not exists public.audit_log (
+    id bigint generated always as identity primary key,
+    evento text not null,
+    usuario_id bigint references public.usuarios(id),
+    alvo_id bigint,
+    alvo_tipo text,
+    criado_em timestamptz not null default now(),
+    metadata_json jsonb default '{}'::jsonb
+);
+
+create index if not exists idx_audit_log_evento
+    on public.audit_log (evento, criado_em desc);

@@ -110,6 +110,20 @@ export default function AppShell({
 
           <div className="flex items-center gap-2.5 shrink-0">
             {acoes}
+            <Link
+              to="/compartilhados"
+              className="hidden md:inline-flex h-8 px-2.5 items-center text-[12.5px] font-medium transition-colors"
+              style={{ color: 'var(--cor-mutado)' }}
+            >
+              Compartilhados
+            </Link>
+            <Link
+              to="/relatorios"
+              className="hidden md:inline-flex h-8 px-2.5 items-center text-[12.5px] font-medium transition-colors"
+              style={{ color: 'var(--cor-mutado)' }}
+            >
+              Relatórios
+            </Link>
             <span className="hidden sm:block w-px h-6" style={{ background: 'var(--cor-borda)' }} />
             <button
               type="button"

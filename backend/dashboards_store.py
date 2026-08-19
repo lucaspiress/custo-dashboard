@@ -98,6 +98,32 @@ def obter_dashboard(dbid: int, projeto_id: int, db_url=None) -> dict | None:
         conn.close()
 
 
+def listar_internos(db_url=None) -> list[dict]:
+    """Lista dashboards com eh_interno=true (todos os projetos)."""
+    conn = _conn(db_url)
+    try:
+        if _sqlite(db_url):
+            linhas = conn.execute(
+                """select id, projeto_id, nome, layout_json, eh_interno, criado_em, atualizado_em
+                   from dashboards where eh_interno = 1 order by id desc""",
+            ).fetchall()
+            dashboards = [dict(linha) for linha in linhas]
+        else:
+            dashboards = list(
+                conn.execute(
+                    """select id, projeto_id, nome, layout_json, eh_interno, criado_em, atualizado_em
+                       from public.dashboards where eh_interno = true order by id desc"""
+                ).fetchall()
+            )
+        for d in dashboards:
+            d["layout_json"] = _normalizar_json(d["layout_json"])
+            d["eh_interno"] = bool(d["eh_interno"])
+            d["widgets_count"] = _contar(conn, "widgets", "dashboard_id", d["id"], _sqlite(db_url))
+        return dashboards
+    finally:
+        conn.close()
+
+
 def obter_dashboard_por_id(dbid: int, db_url=None) -> dict | None:
     """Busca dashboard por id, sem filtrar por projeto (usado nas rotas de widgets/slicers/query)."""
     conn = _conn(db_url)

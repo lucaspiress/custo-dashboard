@@ -123,6 +123,45 @@ def _inicializar(conn: sqlite3.Connection) -> None:
             dependencias_json TEXT NOT NULL DEFAULT '[]',
             ordem INTEGER NOT NULL DEFAULT 0
         );
+
+        CREATE TABLE IF NOT EXISTS publicacoes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            dashboard_id INTEGER NOT NULL REFERENCES dashboards(id) ON DELETE CASCADE,
+            token TEXT NOT NULL UNIQUE,
+            revogado_em TEXT,
+            criado_em TEXT NOT NULL,
+            criado_por INTEGER NOT NULL REFERENCES usuarios(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS agendamentos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            publicacao_id INTEGER NOT NULL REFERENCES publicacoes(id) ON DELETE CASCADE,
+            periodicidade TEXT NOT NULL,
+            proxima_execucao TEXT NOT NULL,
+            ativo INTEGER NOT NULL DEFAULT 1,
+            criado_em TEXT NOT NULL,
+            criado_por INTEGER NOT NULL REFERENCES usuarios(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS relatorios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agendamento_id INTEGER REFERENCES agendamentos(id) ON DELETE SET NULL,
+            publicacao_id INTEGER NOT NULL REFERENCES publicacoes(id) ON DELETE CASCADE,
+            gerado_em TEXT NOT NULL,
+            storage_key TEXT NOT NULL,
+            tamanho_bytes INTEGER,
+            status TEXT NOT NULL DEFAULT 'gerado'
+        );
+
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            evento TEXT NOT NULL,
+            usuario_id INTEGER REFERENCES usuarios(id),
+            alvo_id INTEGER,
+            alvo_tipo TEXT,
+            criado_em TEXT NOT NULL,
+            metadata_json TEXT NOT NULL DEFAULT '{}'
+        );
         """
     )
     conn.commit()

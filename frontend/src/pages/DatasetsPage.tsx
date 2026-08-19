@@ -102,7 +102,9 @@ const FUNCOES_FORMULA = [
 function validarFormula(formula: string, colunasValidas: string[]): { ok: boolean; msg: string } {
   if (!formula.trim()) return { ok: false, msg: 'Fórmula vazia.' }
   if (formula.length > 500) return { ok: false, msg: 'Fórmula muito longa (máx 500 caracteres).' }
-  if (/[;\[\]{}]/.test(formula)) return { ok: false, msg: 'Caracteres inválidos na fórmula.' }
+  if ([';', '[', ']', '{', '}'].some((ch) => formula.includes(ch))) {
+    return { ok: false, msg: 'Caracteres inválidos na fórmula.' }
+  }
   const tokens = formula.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? []
   const invalidos = tokens.filter(
     (t) => !FUNCOES_FORMULA.includes(t.toUpperCase()) && !colunasValidas.includes(t)
@@ -364,6 +366,11 @@ export default function DatasetsPage() {
     () => linhas.map((r) => ({ row_index: r.row_index, ...r.data_json })),
     [linhas]
   )
+  const colunasValidas = useMemo(() => {
+    const cols = Object.keys(schema)
+    const campos = camposCalculados.map((c) => c.nome)
+    return [...new Set([...cols, ...campos])]
+  }, [schema, camposCalculados])
 
   useEffect(() => {
     let ativo = true
@@ -388,6 +395,7 @@ export default function DatasetsPage() {
     autosaveRef.current?.cancelar()
     pendentesRef.current.clear()
     setLinhas([])
+    setCamposCalculados([])
     if (!did) return
     let ativo = true
     setCarregandoLinhas(true)
@@ -402,6 +410,15 @@ export default function DatasetsPage() {
       .finally(() => {
         if (ativo) setCarregandoLinhas(false)
       })
+    if (/^\d+$/.test(did)) {
+      listarCamposCalculados(Number(did))
+        .then((campos) => {
+          if (ativo) setCamposCalculados(campos)
+        })
+        .catch(() => {
+          if (ativo) setCamposCalculados([])
+        })
+    }
     return () => {
       ativo = false
     }
@@ -540,6 +557,34 @@ export default function DatasetsPage() {
       navigate(`/projetos/${projetoId}/datasets/${criado.id}`)
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao criar dataset.')
+    }
+  }
+
+  async function salvarCampo(nome: string, formula: string) {
+    if (!datasetSelecionado || readOnly) return
+    const didNum = Number(datasetSelecionado.id)
+    setErro('')
+    try {
+      if (modalCampo?.modo === 'editar' && modalCampo.campo) {
+        await atualizarCampoCalculado(didNum, modalCampo.campo.id, { nome, formula })
+      } else {
+        await criarCampoCalculado(didNum, nome, formula)
+      }
+      setModalCampo(null)
+      setCamposCalculados(await listarCamposCalculados(didNum))
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Erro ao salvar campo calculado.')
+    }
+  }
+
+  async function excluirCampo(cid: number) {
+    if (!datasetSelecionado || readOnly) return
+    setErro('')
+    try {
+      await deletarCampoCalculado(Number(datasetSelecionado.id), cid)
+      setCamposCalculados((atual) => atual.filter((c) => c.id !== cid))
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Erro ao excluir campo calculado.')
     }
   }
 
@@ -751,6 +796,59 @@ export default function DatasetsPage() {
                   </div>
                 )}
               </div>
+
+              {!readOnly && (
+                <div
+                  className="mt-5 rounded-2xl border p-4"
+                  style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: 'var(--cor-mutado)' }}>
+                      Campos Calculados
+                    </span>
+                    <Botao variante="secundario" onClick={() => setModalCampo({ modo: 'novo' })}>
+                      {ICONE_MAIS}
+                      Novo campo calculado
+                    </Botao>
+                  </div>
+                  {camposCalculados.length === 0 ? (
+                    <div className="text-[12.5px]" style={{ color: 'var(--cor-mutado)' }}>
+                      Nenhum campo calculado. Crie fórmulas como <code className="font-mono">quantidade * custo_unitario</code>.
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {camposCalculados.map((c) => (
+                        <div
+                          key={c.id}
+                          className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                          style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)' }}
+                        >
+                          <div className="min-w-0">
+                            <div className="text-[13px] font-medium" style={{ color: 'var(--cor-tinta)' }}>{c.nome}</div>
+                            <div className="text-[12px] font-mono truncate" style={{ color: 'var(--cor-mutado)' }}>{c.formula}</div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => setModalCampo({ modo: 'editar', campo: c })}
+                              className="h-8 px-2.5 rounded-lg text-[12px] font-medium transition-colors"
+                              style={{ color: 'var(--cor-mutado)' }}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              onClick={() => void excluirCampo(c.id)}
+                              className="h-8 px-2.5 rounded-lg text-[12px] font-medium transition-colors"
+                              style={{ color: 'var(--cor-alerta)' }}
+                            >
+                              Excluir
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -775,6 +873,15 @@ export default function DatasetsPage() {
             <Botao variante="perigo" onClick={() => void excluir()}>Excluir</Botao>
           </div>
         </Modal>
+      )}
+
+      {modalCampo && (
+        <ModalCampoCalculado
+          colunasValidas={colunasValidas}
+          campo={modalCampo.campo}
+          aoSalvar={(nome, formula) => void salvarCampo(nome, formula)}
+          aoCancelar={() => setModalCampo(null)}
+        />
       )}
     </AppShell>
   )
