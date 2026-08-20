@@ -245,7 +245,9 @@ export default function PlanilhaPage() {
   const [erro, setErro] = useState('')
   const [estadoAutosave, setEstadoAutosave] = useState<EstadoAutosave>('salvo')
   const [confirmarExcluirLocal, setConfirmarExcluirLocal] = useState<number | null>(null)
-  const [celulaAtiva, setCelulaAtiva] = useState<{ row: number | null; col: number | null; escopo: 'local' | 'item' }>({ row: null, col: null, escopo: 'local' })
+  const [abaAtiva, setAbaAtiva] = useState('dados')
+  const [dadosProjeto, setDadosProjeto] = useState<AnaliseUpload | null>(null)
+  const [celulaAtiva, setCelulaAtiva] = useState<{ row: number | null; col: number | null; escopo: string }>({ row: null, col: null, escopo: 'dados' })
   const [textoFormula, setTextoFormula] = useState('')
   const [tipoFormula, setTipoFormula] = useState<TipoCelula | null>(null)
   const valorOriginalRef = useRef('')
@@ -288,6 +290,7 @@ export default function PlanilhaPage() {
     setErro('')
     try {
       const dados = await api.get<AnaliseUpload>(`/api/projetos/${projetoId}`)
+      setDadosProjeto(dados)
       setNomeProjeto(dados.filename ?? '')
       setLocais(dePayload(dados))
     } catch (e) {
@@ -327,7 +330,7 @@ export default function PlanilhaPage() {
     autosaveRef.current?.agendar(chave, salvar)
   }
 
-  function ativarCelula(row: number, col: number, escopo: 'local' | 'item', tipo: TipoCelula, valor: unknown, onCommit: (v: unknown) => void, meta?: { localId?: number; itemId?: number }) {
+  function ativarCelula(row: number, col: number, escopo: string, tipo: TipoCelula, valor: unknown, onCommit: (v: unknown) => void, meta?: { localId?: number; itemId?: number }) {
     setCelulaAtiva({ row, col, escopo })
     setTipoFormula(tipo)
     commitAtivoRef.current = onCommit
@@ -347,19 +350,21 @@ export default function PlanilhaPage() {
   useEffect(() => {
     if (celulaAtiva.row === null || celulaAtiva.col === null || !tipoFormula) return
     let novoValor: unknown
-    if (celulaAtiva.escopo === 'local') {
+    if (celulaAtiva.escopo === 'dados' || celulaAtiva.escopo.startsWith('local:')) {
       const campo = mapaColunaLocal[celulaAtiva.col]
       if (!campo) return
       const linha = locais.find((l) => l.id === metaAtivaRef.current.localId)
       if (!linha) return
       novoValor = linha[campo]
-    } else {
+    } else if (celulaAtiva.escopo.startsWith('item:')) {
       const campo = mapaColunaItem[celulaAtiva.col]
       if (!campo) return
       const linha = locais.find((l) => l.id === metaAtivaRef.current.localId)
       const item = linha?.itens.find((i) => i.id === metaAtivaRef.current.itemId)
       if (!item) return
       novoValor = item[campo]
+    } else {
+      return
     }
     let texto = ''
     if (tipoFormula === 'money' || tipoFormula === 'qtd') {
@@ -401,7 +406,7 @@ export default function PlanilhaPage() {
     setTextoFormula(valorOriginalRef.current)
   }
 
-  function celulaAtivaClass(row: number, col: number, escopo: 'local' | 'item') {
+  function celulaAtivaClass(row: number, col: number, escopo: string) {
     return celulaAtiva.row === row && celulaAtiva.col === col && celulaAtiva.escopo === escopo ? 'excel-cell-active' : ''
   }
 
@@ -431,6 +436,7 @@ export default function PlanilhaPage() {
           expanso: true,
         },
       ])
+      setAbaAtiva(`local:${criado.id}`)
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao adicionar local.')
     }
@@ -470,6 +476,7 @@ export default function PlanilhaPage() {
     try {
       await api.delete(`/api/projetos/${projetoId}/locais/${linha.id}`)
       setLocais((atual) => atual.filter((l) => l.id !== linha.id))
+      if (abaAtiva === `local:${linha.id}`) setAbaAtiva('dados')
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao excluir local.')
     }
@@ -574,6 +581,334 @@ export default function PlanilhaPage() {
     }
   }
 
+  function renderSubTabelaItens(linha: LinhaLocal, escopoItem: string) {
+    const comp = computarLocal(linha)
+    return (
+      <tr>
+        <th className="excel-rn" aria-hidden="true" />
+        <td colSpan={CABECALHO_LOCAL.length} className="px-4 pb-4" style={{ background: 'rgba(46, 89, 246, 0.04)' }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: 'var(--cor-mutado)' }}>
+              Itens de equipamento · {comp.numItens} item(ns) · {fmtMoeda(comp.equipamento)}
+            </span>
+            <button
+              onClick={() => void adicionarItem(linha)}
+              className="h-7 px-2.5 rounded-md text-[12px] font-medium border transition-colors"
+              style={{ borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)', background: 'var(--cor-elevado)' }}
+            >
+              + Item
+            </button>
+          </div>
+          <div
+            className="rounded-lg border overflow-hidden"
+            style={{ borderColor: 'var(--cor-borda)' }}
+            onPaste={(e) => void colarItens(linha, e)}
+          >
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b" style={{ background: 'var(--cor-sidebar)', borderColor: 'var(--cor-borda)' }}>
+                  {CABECALHO_ITEM.map((c, i) => (
+                    <th
+                      key={i}
+                      className={`px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap ${i > 0 && i < CABECALHO_ITEM.length - 1 ? 'text-right' : ''}`}
+                      style={{ color: 'var(--cor-mutado)' }}
+                    >
+                      {c}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {linha.itens.map((item, itemIdx) => (
+                  <tr key={item.id} className="border-b group/item" style={{ borderColor: 'var(--cor-borda)' }}>
+                    <td className={`px-2.5 py-1 min-w-[120px] ${celulaAtivaClass(itemIdx + 2, 2, escopoItem)}`}><TextCell valor={item.categoria} onCommit={(v) => agendarSalvar(`item:${item.id}:categoria`, () => salvarItem(linha, item, 'categoria', v))} onAtivar={(v, commit) => ativarCelula(itemIdx + 2, 2, escopoItem, 'text', v, commit as (v: unknown) => void, { localId: linha.id, itemId: item.id })} /></td>
+                    <td className={`px-1 py-1 min-w-[80px] ${celulaAtivaClass(itemIdx + 2, 3, escopoItem)}`}><TextCell valor={item.cod} onCommit={(v) => agendarSalvar(`item:${item.id}:cod`, () => salvarItem(linha, item, 'cod', v))} onAtivar={(v, commit) => ativarCelula(itemIdx + 2, 3, escopoItem, 'text', v, commit as (v: unknown) => void, { localId: linha.id, itemId: item.id })} /></td>
+                    <td className={`px-1 py-1 min-w-[160px] ${celulaAtivaClass(itemIdx + 2, 4, escopoItem)}`}><TextCell valor={item.material} onCommit={(v) => agendarSalvar(`item:${item.id}:material`, () => salvarItem(linha, item, 'material', v))} onAtivar={(v, commit) => ativarCelula(itemIdx + 2, 4, escopoItem, 'text', v, commit as (v: unknown) => void, { localId: linha.id, itemId: item.id })} /></td>
+                    <td className={`px-1 py-1 text-right ${celulaAtivaClass(itemIdx + 2, 5, escopoItem)}`}><QtdCell valor={item.qtd} onCommit={(v) => agendarSalvar(`item:${item.id}:qtd`, () => salvarItem(linha, item, 'qtd', v ?? 0))} onAtivar={(v, commit) => ativarCelula(itemIdx + 2, 5, escopoItem, 'qtd', v, commit as (v: unknown) => void, { localId: linha.id, itemId: item.id })} /></td>
+                    <td className={`px-1 py-1 text-right ${celulaAtivaClass(itemIdx + 2, 6, escopoItem)}`}><MoneyCell valor={item.valor_unit} onCommit={(v) => agendarSalvar(`item:${item.id}:valor_unit`, () => salvarItem(linha, item, 'valor_unit', v ?? 0))} onAtivar={(v, commit) => ativarCelula(itemIdx + 2, 6, escopoItem, 'money', v, commit as (v: unknown) => void, { localId: linha.id, itemId: item.id })} /></td>
+                    <td className="px-2.5 py-1 text-right text-[13px] text-tinta tabular-nums">{fmtMoeda(item.valor_total)}</td>
+                    <td className="px-2 py-1">
+                      <button
+                        onClick={() => void excluirItem(linha, item)}
+                        title="Excluir item"
+                        className="p-1.5 rounded text-mutado hover:text-alerta hover:bg-[rgba(239,68,68,0.1)] transition-colors opacity-0 group-hover/item:opacity-100"
+                      >
+                        {ICONE_LIXO}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {linha.itens.length === 0 && (
+                  <tr>
+                    <td colSpan={CABECALHO_ITEM.length} className="px-3 py-4 text-[12.5px] text-mutado">
+                      Sem itens — cole linhas do Excel aqui (com “MATERIAL CATEGORIA” para agrupar) ou clique em “+ Item”.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </td>
+      </tr>
+    )
+  }
+
+  function renderLinhaLocal(linha: LinhaLocal, idx: number, escopo: string, expandido: boolean) {
+    const comp = computarLocal(linha)
+    return (
+      <Fragment key={linha.id}>
+        <tr className="group">
+          <th className="excel-rn" scope="row">{idx + 1}</th>
+          <td className={`excel-cell ${celulaAtivaClass(idx + 2, 2, escopo)}`}>
+            <div className="flex items-center gap-1.5 min-w-[150px] excel-cell-local">
+              {expandido ? (
+                <span className="p-1 text-mutado">{ICONE_CHEVRON}</span>
+              ) : (
+                <button
+                  onClick={() =>
+                    setLocais((atual) =>
+                      atual.map((l) => (l.id === linha.id ? { ...l, expanso: !l.expanso } : l))
+                    )
+                  }
+                  className={`p-1 rounded text-mutado hover:text-white transition-transform ${linha.expanso ? 'rotate-180' : ''}`}
+                >
+                  {ICONE_CHEVRON}
+                </button>
+              )}
+              <div className="flex-1">
+                <TextCell valor={linha.nome} onCommit={(v) => alterarLocal(linha, 'nome', v)} onAtivar={(v, commit) => ativarCelula(idx + 2, 2, escopo, 'text', v, commit as (v: unknown) => void, { localId: linha.id })} />
+              </div>
+            </div>
+          </td>
+          <td className={`excel-cell ${celulaAtivaClass(idx + 2, 3, escopo)}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.valor_mensal} onCommit={(v) => alterarLocal(linha, 'valor_mensal', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 3, escopo, 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
+          <td className={`excel-cell ${celulaAtivaClass(idx + 2, 4, escopo)}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.taxa_instalacao} onCommit={(v) => alterarLocal(linha, 'taxa_instalacao', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 4, escopo, 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
+          <td className={`excel-cell ${celulaAtivaClass(idx + 2, 5, escopo)}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.custo_manutencao} onCommit={(v) => alterarLocal(linha, 'custo_manutencao', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 5, escopo, 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
+          <td className={`excel-cell ${celulaAtivaClass(idx + 2, 6, escopo)}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.mensal_terceirizada} onCommit={(v) => alterarLocal(linha, 'mensal_terceirizada', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 6, escopo, 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
+          <td className={`excel-cell ${celulaAtivaClass(idx + 2, 7, escopo)}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.chip_mensal} onCommit={(v) => alterarLocal(linha, 'chip_mensal', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 7, escopo, 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
+          <td className={`excel-cell ${celulaAtivaClass(idx + 2, 8, escopo)}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.custos_softwares} onCommit={(v) => alterarLocal(linha, 'custos_softwares', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 8, escopo, 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
+          <td className={`excel-cell ${celulaAtivaClass(idx + 2, 9, escopo)}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.mao_de_obra} onCommit={(v) => alterarLocal(linha, 'mao_de_obra', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 9, escopo, 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
+          <td className={`excel-cell ${celulaAtivaClass(idx + 2, 10, escopo)}`}><div className="excel-cell-data"><DateCell valor={linha.data_inst} onCommit={(v) => alterarLocal(linha, 'data_inst', v)} onAtivar={(v, commit) => ativarCelula(idx + 2, 10, escopo, 'date', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
+          <td className="excel-cell"><div className="excel-cell-data text-right text-[13px] text-[#10b981] tabular-nums font-medium">{fmtMoeda(comp.saldoMensal)}</div></td>
+          <td className="excel-cell"><div className="excel-cell-data text-right text-[13px] text-[#e07b1a] tabular-nums font-medium">{fmtMoeda(comp.investimento)}</div></td>
+          <td className="excel-cell"><div className="excel-cell-data text-right text-[13px] text-mutado tabular-nums">{comp.retorno === null ? '—' : `${Math.ceil(comp.retorno)} meses`}</div></td>
+          <td className="excel-cell">
+            <div className="excel-cell-actions">
+              <button
+                onClick={() => setConfirmarExcluirLocal(linha.id)}
+                title="Excluir local"
+                className="p-1.5 rounded text-mutado hover:text-alerta hover:bg-[rgba(239,68,68,0.1)] transition-colors opacity-0 group-hover:opacity-100"
+              >
+                {ICONE_LIXO}
+              </button>
+            </div>
+          </td>
+        </tr>
+        {(expandido || linha.expanso) && renderSubTabelaItens(linha, expandido ? `item:${linha.id}` : 'item')}
+      </Fragment>
+    )
+  }
+
+  const colgroupTabela = (
+    <colgroup>
+      <col style={{ width: '44px' }} />
+      {CABECALHO_LOCAL.map((c, i) => (
+        <col
+          key={i}
+          style={{
+            minWidth:
+              c === 'Local'
+                ? '160px'
+                : c === ''
+                ? '44px'
+                : c === 'Data instalação'
+                ? '120px'
+                : c === 'Retorno'
+                ? '88px'
+                : '96px',
+          }}
+        />
+      ))}
+    </colgroup>
+  )
+
+  const theadTabela = (
+    <thead>
+      <tr>
+        <th className="excel-th" aria-hidden="true" />
+        {CABECALHO_LOCAL.map((c, i) => (
+          <th key={i} className="excel-th excel-th-letter" title={c || 'Ações'}>
+            {letraColuna(i)}
+          </th>
+        ))}
+      </tr>
+      <tr>
+        <th className="excel-th" aria-hidden="true" />
+        {CABECALHO_LOCAL.map((c, i) => (
+          <th
+            key={i}
+            className={`excel-th ${i > 0 && i < CABECALHO_LOCAL.length - 1 ? 'text-right' : ''}`}
+          >
+            {c}
+          </th>
+        ))}
+      </tr>
+    </thead>
+  )
+
+  function renderGradeDados() {
+    return (
+      <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
+        <div className="overflow-x-auto" onPaste={(e) => void colarLocais(e)}>
+          <table className="w-full text-left excel-grid">
+            {colgroupTabela}
+            {theadTabela}
+            <tbody>
+              {locais.map((linha, idx) => renderLinhaLocal(linha, idx, 'dados', false))}
+              {locais.length === 0 && (
+                <tr>
+                  <th className="excel-rn" aria-hidden="true" />
+                  <td colSpan={CABECALHO_LOCAL.length} className="px-4 py-8 text-center text-[13px] text-mutado">
+                    Nenhum local cadastrado — cole linhas do Excel aqui (colunas na ordem do template) ou clique em “+ Local”.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex items-center justify-between px-4 py-3 border-t" style={{ borderColor: 'var(--cor-borda)' }}>
+          <button
+            onClick={() => void adicionarLocal()}
+            className="h-9 rounded-lg px-4 text-[13px] font-semibold text-white inline-flex items-center gap-2 transition-opacity hover:opacity-90"
+            style={{ background: 'linear-gradient(135deg, #2e59f6 0%, #3061d9 100%)' }}
+          >
+            + Local
+          </button>
+          <Link
+            to={`/projetos/${projetoId}/dashboard`}
+            className="h-9 rounded-lg px-4 text-[13px] font-semibold inline-flex items-center gap-2 border transition-colors"
+            style={{ borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)', background: 'var(--cor-elevado)' }}
+          >
+            Ver dashboard
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  function renderGradeLocal(linha: LinhaLocal) {
+    return (
+      <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
+        <div className="overflow-x-auto" onPaste={(e) => void colarItens(linha, e)}>
+          <table className="w-full text-left excel-grid">
+            {colgroupTabela}
+            {theadTabela}
+            <tbody>
+              {renderLinhaLocal(linha, 0, `local:${linha.id}`, true)}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex items-center justify-between px-4 py-3 border-t" style={{ borderColor: 'var(--cor-borda)' }}>
+          <button
+            onClick={() => void adicionarItem(linha)}
+            className="h-9 rounded-lg px-4 text-[13px] font-semibold text-white inline-flex items-center gap-2 transition-opacity hover:opacity-90"
+            style={{ background: 'linear-gradient(135deg, #2e59f6 0%, #3061d9 100%)' }}
+          >
+            + Item
+          </button>
+          <Link
+            to={`/projetos/${projetoId}/dashboard`}
+            className="h-9 rounded-lg px-4 text-[13px] font-semibold inline-flex items-center gap-2 border transition-colors"
+            style={{ borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)', background: 'var(--cor-elevado)' }}
+          >
+            Ver dashboard
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  function corBadge(severidade: string) {
+    if (severidade === 'alerta') return { bg: 'rgba(239,68,68,0.12)', text: '#ef4444' }
+    if (severidade === 'atencao') return { bg: 'rgba(245,158,11,0.12)', text: '#f59e0b' }
+    if (severidade === 'ok') return { bg: 'rgba(16,185,129,0.12)', text: '#10b981' }
+    return { bg: 'rgba(46,89,246,0.12)', text: '#2e59f6' }
+  }
+
+  function renderInsights() {
+    const lista = dadosProjeto?.locais ?? []
+    const totalInsights = lista.reduce((s, l) => s + (l.insights?.length || 0), 0)
+    return (
+      <div className="rounded-2xl border p-5" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
+        <div className="text-[15px] font-semibold mb-4" style={{ color: 'var(--cor-tinta)' }}>Insights do projeto</div>
+        {totalInsights === 0 ? (
+          <p className="text-[13px]" style={{ color: 'var(--cor-mutado)' }}>Nenhum insight gerado ainda.</p>
+        ) : (
+          <div className="space-y-4">
+            {lista.map((local) => (
+              <div key={local.id ?? local.nome}>
+                <div className="text-[13px] font-semibold mb-2" style={{ color: 'var(--cor-primaria)' }}>{local.nome}</div>
+                <ul className="space-y-2">
+                  {(local.insights ?? []).map((insight, i) => {
+                    const cores = corBadge(insight.severidade)
+                    return (
+                      <li key={i} className="flex items-start gap-2 text-[13px]" style={{ color: 'var(--cor-tinta)' }}>
+                        <span className="inline-flex px-1.5 py-0.5 rounded text-[11px] font-semibold uppercase" style={{ background: cores.bg, color: cores.text }}>{insight.severidade}</span>
+                        <span>{insight.texto}</span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  function renderResumo() {
+    const t = dadosProjeto?.projeto?.totais
+    return (
+      <div className="rounded-2xl border p-5" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
+        <div className="text-[15px] font-semibold mb-4" style={{ color: 'var(--cor-tinta)' }}>Resumo do projeto</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)' }}>
+            <div className="text-[11px] uppercase tracking-wide mb-1" style={{ color: 'var(--cor-mutado)' }}>Receita mensal</div>
+            <div className="text-[18px] font-semibold tabular-nums" style={{ color: 'var(--cor-tinta)' }}>{fmtMoeda(t?.receita_mensal ?? 0)}</div>
+          </div>
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)' }}>
+            <div className="text-[11px] uppercase tracking-wide mb-1" style={{ color: 'var(--cor-mutado)' }}>Receita anual</div>
+            <div className="text-[18px] font-semibold tabular-nums" style={{ color: 'var(--cor-tinta)' }}>{fmtMoeda(t?.receita_anual ?? 0)}</div>
+          </div>
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)' }}>
+            <div className="text-[11px] uppercase tracking-wide mb-1" style={{ color: 'var(--cor-mutado)' }}>Saldo mensal</div>
+            <div className="text-[18px] font-semibold tabular-nums" style={{ color: 'var(--cor-tinta)' }}>{fmtMoeda(t?.saldo_mensal ?? 0)}</div>
+          </div>
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)' }}>
+            <div className="text-[11px] uppercase tracking-wide mb-1" style={{ color: 'var(--cor-mutado)' }}>Investimento</div>
+            <div className="text-[18px] font-semibold tabular-nums" style={{ color: 'var(--cor-tinta)' }}>{fmtMoeda(t?.investimento ?? 0)}</div>
+          </div>
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)' }}>
+            <div className="text-[11px] uppercase tracking-wide mb-1" style={{ color: 'var(--cor-mutado)' }}>Equipamento</div>
+            <div className="text-[18px] font-semibold tabular-nums" style={{ color: 'var(--cor-tinta)' }}>{fmtMoeda(t?.equipamento ?? 0)}</div>
+          </div>
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)' }}>
+            <div className="text-[11px] uppercase tracking-wide mb-1" style={{ color: 'var(--cor-mutado)' }}>Mão de obra</div>
+            <div className="text-[18px] font-semibold tabular-nums" style={{ color: 'var(--cor-tinta)' }}>{fmtMoeda(t?.mao_de_obra ?? 0)}</div>
+          </div>
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)' }}>
+            <div className="text-[11px] uppercase tracking-wide mb-1" style={{ color: 'var(--cor-mutado)' }}>Locais</div>
+            <div className="text-[18px] font-semibold tabular-nums" style={{ color: 'var(--cor-tinta)' }}>{t?.num_locais ?? 0}</div>
+          </div>
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)' }}>
+            <div className="text-[11px] uppercase tracking-wide mb-1" style={{ color: 'var(--cor-mutado)' }}>Itens</div>
+            <div className="text-[18px] font-semibold tabular-nums" style={{ color: 'var(--cor-tinta)' }}>{t?.num_itens ?? 0}</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (carregando) {
     return <PlanilhaCarregando />
   }
@@ -617,6 +952,35 @@ export default function PlanilhaPage() {
       .excel-cell-data { padding: 4px 8px; }
       .excel-cell-actions { padding: 4px; text-align: center; }
       .excel-cell-active { box-shadow: inset 0 0 0 2px #2e59f6; background: rgba(46, 89, 246, 0.08) !important; }
+      .sheet-tab {
+        max-width: 140px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        border: 1px solid transparent;
+        color: var(--cor-mutado);
+        background: transparent;
+        transition: all 0.15s ease;
+      }
+      .sheet-tab:hover { color: var(--cor-tinta); background: rgba(255,255,255,0.05); }
+      .sheet-tab-active {
+        color: var(--cor-tinta);
+        background: var(--cor-superficie);
+        border-color: var(--cor-borda);
+        box-shadow: inset 0 2px 0 0 var(--cor-primaria);
+      }
+      .sheet-tab-plus {
+        width: 32px;
+        padding: 6px 0;
+        text-align: center;
+        opacity: 0.7;
+        border: 1px dashed var(--cor-borda);
+      }
+      .sheet-tab-plus:hover { opacity: 1; }
     `}</style>
     <AppShell
       titulo="Planilha de dados"
@@ -687,43 +1051,6 @@ export default function PlanilhaPage() {
         </>
       }
     >
-      <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg border" style={{ background: 'var(--cor-elevado)', borderColor: 'var(--cor-borda)' }}>
-        <div
-          className="flex-shrink-0 w-16 h-8 flex items-center justify-center rounded text-[13px] font-medium tabular-nums border"
-          style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)' }}
-        >
-          {enderecoAtivo()}
-        </div>
-        {tipoFormula === 'date' ? (
-          <input
-            type="date"
-            value={textoFormula}
-            onChange={(e) => setTextoFormula(e.target.value)}
-            onBlur={commitFormula}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commitFormula()
-              if (e.key === 'Escape') cancelarFormula()
-            }}
-            className="flex-1 min-w-0 h-8 px-2 rounded text-[13px] outline-none border"
-            style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)' }}
-          />
-        ) : (
-          <input
-            type="text"
-            value={textoFormula}
-            onChange={(e) => setTextoFormula(e.target.value)}
-            onBlur={commitFormula}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commitFormula()
-              if (e.key === 'Escape') cancelarFormula()
-            }}
-            disabled={celulaAtiva.row === null}
-            placeholder={celulaAtiva.row === null ? '—' : ''}
-            className="flex-1 min-w-0 h-8 px-2 rounded text-[13px] outline-none border"
-            style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)' }}
-          />
-        )}
-      </div>
       <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
         <div>
           <div className="text-[12.5px] mb-1" style={{ color: 'var(--cor-mutado)' }}>
@@ -769,197 +1096,107 @@ export default function PlanilhaPage() {
           </div>
         )}
 
-        <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
-          <div className="overflow-x-auto" onPaste={(e) => void colarLocais(e)}>
-            <table className="w-full text-left excel-grid">
-              <colgroup>
-                <col style={{ width: '44px' }} />
-                {CABECALHO_LOCAL.map((c, i) => (
-                  <col
-                    key={i}
-                    style={{
-                      minWidth:
-                        c === 'Local'
-                          ? '160px'
-                          : c === ''
-                          ? '44px'
-                          : c === 'Data instalação'
-                          ? '120px'
-                          : c === 'Retorno'
-                          ? '88px'
-                          : '96px',
-                    }}
-                  />
-                ))}
-              </colgroup>
-              <thead>
-                <tr>
-                  <th className="excel-th" aria-hidden="true" />
-                  {CABECALHO_LOCAL.map((c, i) => (
-                    <th key={i} className="excel-th excel-th-letter" title={c || 'Ações'}>
-                      {letraColuna(i)}
-                    </th>
-                  ))}
-                </tr>
-                <tr>
-                  <th className="excel-th" aria-hidden="true" />
-                  {CABECALHO_LOCAL.map((c, i) => (
-                    <th
-                      key={i}
-                      className={`excel-th ${i > 0 && i < CABECALHO_LOCAL.length - 1 ? 'text-right' : ''}`}
-                    >
-                      {c}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {locais.map((linha, idx) => {
-                  const comp = computarLocal(linha)
-                  return (
-                    <Fragment key={linha.id}>
-                      <tr className="group">
-                        <th className="excel-rn" scope="row">{idx + 1}</th>
-                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 2, 'local')}`}>
-                          <div className="flex items-center gap-1.5 min-w-[150px] excel-cell-local">
-                            <button
-                              onClick={() =>
-                                setLocais((atual) =>
-                                  atual.map((l) => (l.id === linha.id ? { ...l, expanso: !l.expanso } : l))
-                                )
-                              }
-                              className={`p-1 rounded text-mutado hover:text-white transition-transform ${linha.expanso ? 'rotate-180' : ''}`}
-                            >
-                              {ICONE_CHEVRON}
-                            </button>
-                            <div className="flex-1">
-                              <TextCell valor={linha.nome} onCommit={(v) => alterarLocal(linha, 'nome', v)} onAtivar={(v, commit) => ativarCelula(idx + 2, 2, 'local', 'text', v, commit as (v: unknown) => void, { localId: linha.id })} />
-                            </div>
-                          </div>
-                        </td>
-                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 3, 'local')}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.valor_mensal} onCommit={(v) => alterarLocal(linha, 'valor_mensal', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 3, 'local', 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
-                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 4, 'local')}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.taxa_instalacao} onCommit={(v) => alterarLocal(linha, 'taxa_instalacao', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 4, 'local', 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
-                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 5, 'local')}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.custo_manutencao} onCommit={(v) => alterarLocal(linha, 'custo_manutencao', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 5, 'local', 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
-                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 6, 'local')}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.mensal_terceirizada} onCommit={(v) => alterarLocal(linha, 'mensal_terceirizada', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 6, 'local', 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
-                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 7, 'local')}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.chip_mensal} onCommit={(v) => alterarLocal(linha, 'chip_mensal', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 7, 'local', 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
-                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 8, 'local')}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.custos_softwares} onCommit={(v) => alterarLocal(linha, 'custos_softwares', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 8, 'local', 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
-                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 9, 'local')}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.mao_de_obra} onCommit={(v) => alterarLocal(linha, 'mao_de_obra', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 9, 'local', 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
-                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 10, 'local')}`}><div className="excel-cell-data"><DateCell valor={linha.data_inst} onCommit={(v) => alterarLocal(linha, 'data_inst', v)} onAtivar={(v, commit) => ativarCelula(idx + 2, 10, 'local', 'date', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
-                        <td className="excel-cell"><div className="excel-cell-data text-right text-[13px] text-[#10b981] tabular-nums font-medium">{fmtMoeda(comp.saldoMensal)}</div></td>
-                        <td className="excel-cell"><div className="excel-cell-data text-right text-[13px] text-[#e07b1a] tabular-nums font-medium">{fmtMoeda(comp.investimento)}</div></td>
-                        <td className="excel-cell"><div className="excel-cell-data text-right text-[13px] text-mutado tabular-nums">{comp.retorno === null ? '—' : `${Math.ceil(comp.retorno)} meses`}</div></td>
-                        <td className="excel-cell">
-                          <div className="excel-cell-actions">
-                            <button
-                              onClick={() => setConfirmarExcluirLocal(linha.id)}
-                              title="Excluir local"
-                              className="p-1.5 rounded text-mutado hover:text-alerta hover:bg-[rgba(239,68,68,0.1)] transition-colors opacity-0 group-hover:opacity-100"
-                            >
-                              {ICONE_LIXO}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      {linha.expanso && (
-                        <tr>
-                          <th className="excel-rn" aria-hidden="true" />
-                          <td colSpan={CABECALHO_LOCAL.length} className="px-4 pb-4" style={{ background: 'rgba(46, 89, 246, 0.04)' }}>
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: 'var(--cor-mutado)' }}>
-                                Itens de equipamento · {comp.numItens} item(ns) · {fmtMoeda(comp.equipamento)}
-                              </span>
-                              <button
-                                onClick={() => void adicionarItem(linha)}
-                                className="h-7 px-2.5 rounded-md text-[12px] font-medium border transition-colors"
-                                style={{ borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)', background: 'var(--cor-elevado)' }}
-                              >
-                                + Item
-                              </button>
-                            </div>
-                            <div
-                              className="rounded-lg border overflow-hidden"
-                              style={{ borderColor: 'var(--cor-borda)' }}
-                              onPaste={(e) => void colarItens(linha, e)}
-                            >
-                              <table className="w-full text-left">
-                                <thead>
-                                  <tr className="border-b" style={{ background: 'var(--cor-sidebar)', borderColor: 'var(--cor-borda)' }}>
-                                    {CABECALHO_ITEM.map((c, i) => (
-                                      <th
-                                        key={i}
-                                        className={`px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap ${i > 0 && i < CABECALHO_ITEM.length - 1 ? 'text-right' : ''}`}
-                                        style={{ color: 'var(--cor-mutado)' }}
-                                      >
-                                        {c}
-                                      </th>
-                                    ))}
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {linha.itens.map((item, itemIdx) => (
-                                    <tr key={item.id} className="border-b group/item" style={{ borderColor: 'var(--cor-borda)' }}>
-                                      <td className={`px-2.5 py-1 min-w-[120px] ${celulaAtivaClass(itemIdx + 2, 2, 'item')}`}><TextCell valor={item.categoria} onCommit={(v) => agendarSalvar(`item:${item.id}:categoria`, () => salvarItem(linha, item, 'categoria', v))} onAtivar={(v, commit) => ativarCelula(itemIdx + 2, 2, 'item', 'text', v, commit as (v: unknown) => void, { localId: linha.id, itemId: item.id })} /></td>
-                                      <td className={`px-1 py-1 min-w-[80px] ${celulaAtivaClass(itemIdx + 2, 3, 'item')}`}><TextCell valor={item.cod} onCommit={(v) => agendarSalvar(`item:${item.id}:cod`, () => salvarItem(linha, item, 'cod', v))} onAtivar={(v, commit) => ativarCelula(itemIdx + 2, 3, 'item', 'text', v, commit as (v: unknown) => void, { localId: linha.id, itemId: item.id })} /></td>
-                                      <td className={`px-1 py-1 min-w-[160px] ${celulaAtivaClass(itemIdx + 2, 4, 'item')}`}><TextCell valor={item.material} onCommit={(v) => agendarSalvar(`item:${item.id}:material`, () => salvarItem(linha, item, 'material', v))} onAtivar={(v, commit) => ativarCelula(itemIdx + 2, 4, 'item', 'text', v, commit as (v: unknown) => void, { localId: linha.id, itemId: item.id })} /></td>
-                                      <td className={`px-1 py-1 text-right ${celulaAtivaClass(itemIdx + 2, 5, 'item')}`}><QtdCell valor={item.qtd} onCommit={(v) => agendarSalvar(`item:${item.id}:qtd`, () => salvarItem(linha, item, 'qtd', v ?? 0))} onAtivar={(v, commit) => ativarCelula(itemIdx + 2, 5, 'item', 'qtd', v, commit as (v: unknown) => void, { localId: linha.id, itemId: item.id })} /></td>
-                                      <td className={`px-1 py-1 text-right ${celulaAtivaClass(itemIdx + 2, 6, 'item')}`}><MoneyCell valor={item.valor_unit} onCommit={(v) => agendarSalvar(`item:${item.id}:valor_unit`, () => salvarItem(linha, item, 'valor_unit', v ?? 0))} onAtivar={(v, commit) => ativarCelula(itemIdx + 2, 6, 'item', 'money', v, commit as (v: unknown) => void, { localId: linha.id, itemId: item.id })} /></td>
-                                      <td className="px-2.5 py-1 text-right text-[13px] text-tinta tabular-nums">{fmtMoeda(item.valor_total)}</td>
-                                      <td className="px-2 py-1">
-                                        <button
-                                          onClick={() => void excluirItem(linha, item)}
-                                          title="Excluir item"
-                                          className="p-1.5 rounded text-mutado hover:text-alerta hover:bg-[rgba(239,68,68,0.1)] transition-colors opacity-0 group-hover/item:opacity-100"
-                                        >
-                                          {ICONE_LIXO}
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                  {linha.itens.length === 0 && (
-                                    <tr>
-                                      <td colSpan={CABECALHO_ITEM.length} className="px-3 py-4 text-[12.5px] text-mutado">
-                                        Sem itens — cole linhas do Excel aqui (com “MATERIAL CATEGORIA” para agrupar) ou
-                                        clique em “+ Item”.
-                                      </td>
-                                    </tr>
-                                  )}
-                                </tbody>
-                              </table>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  )
-                })}
-                {locais.length === 0 && (
-                  <tr>
-                    <th className="excel-rn" aria-hidden="true" />
-                    <td colSpan={CABECALHO_LOCAL.length} className="px-4 py-8 text-center text-[13px] text-mutado">
-                      Nenhum local cadastrado — cole linhas do Excel aqui (colunas na ordem do template) ou clique em
-                      “+ Local”.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+        {abaAtiva === 'dados' || abaAtiva.startsWith('local:') ? (
+          <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg border" style={{ background: 'var(--cor-elevado)', borderColor: 'var(--cor-borda)' }}>
+            <div
+              className="flex-shrink-0 w-16 h-8 flex items-center justify-center rounded text-[13px] font-medium tabular-nums border"
+              style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)' }}
+            >
+              {enderecoAtivo()}
+            </div>
+            {tipoFormula === 'date' ? (
+              <input
+                type="date"
+                value={textoFormula}
+                onChange={(e) => setTextoFormula(e.target.value)}
+                onBlur={commitFormula}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitFormula()
+                  if (e.key === 'Escape') cancelarFormula()
+                }}
+                className="flex-1 min-w-0 h-8 px-2 rounded text-[13px] outline-none border"
+                style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)' }}
+              />
+            ) : (
+              <input
+                type="text"
+                value={textoFormula}
+                onChange={(e) => setTextoFormula(e.target.value)}
+                onBlur={commitFormula}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitFormula()
+                  if (e.key === 'Escape') cancelarFormula()
+                }}
+                disabled={celulaAtiva.row === null}
+                placeholder={celulaAtiva.row === null ? '—' : ''}
+                className="flex-1 min-w-0 h-8 px-2 rounded text-[13px] outline-none border"
+                style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)' }}
+              />
+            )}
           </div>
-          <div className="flex items-center justify-between px-4 py-3 border-t" style={{ borderColor: 'var(--cor-borda)' }}>
+        ) : (
+          <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg border" style={{ background: 'var(--cor-elevado)', borderColor: 'var(--cor-borda)' }}>
+            <div
+              className="flex-shrink-0 w-16 h-8 flex items-center justify-center rounded text-[13px] font-medium tabular-nums border"
+              style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)', color: 'var(--cor-mutado)' }}
+            >
+              —
+            </div>
+            <input
+              type="text"
+              disabled
+              placeholder="—"
+              className="flex-1 min-w-0 h-8 px-2 rounded text-[13px] outline-none border"
+              style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)', color: 'var(--cor-mutado)' }}
+            />
+          </div>
+        )}
+
+        {abaAtiva === 'dados' && renderGradeDados()}
+        {abaAtiva.startsWith('local:') && (() => {
+          const id = Number(abaAtiva.split(':')[1])
+          const linha = locais.find((l) => l.id === id)
+          return linha ? renderGradeLocal(linha) : renderGradeDados()
+        })()}
+        {abaAtiva === 'insights' && renderInsights()}
+        {abaAtiva === 'resumo' && renderResumo()}
+
+        <div className="flex items-center gap-1 mt-4 px-2 py-2 border-t overflow-x-auto" style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)' }}>
+          <button
+            onClick={() => setAbaAtiva('dados')}
+            className={`sheet-tab ${abaAtiva === 'dados' ? 'sheet-tab-active' : ''}`}
+          >
+            DADOS
+          </button>
+          {locais.map((l) => (
             <button
-              onClick={() => void adicionarLocal()}
-              className="h-9 rounded-lg px-4 text-[13px] font-semibold text-white inline-flex items-center gap-2 transition-opacity hover:opacity-90"
-              style={{ background: 'linear-gradient(135deg, #2e59f6 0%, #3061d9 100%)' }}
+              key={l.id}
+              onClick={() => setAbaAtiva(`local:${l.id}`)}
+              className={`sheet-tab ${abaAtiva === `local:${l.id}` ? 'sheet-tab-active' : ''}`}
+              title={`ITENS · ${l.nome}`}
             >
-              + Local
+              ITENS · {l.nome}
             </button>
-            <Link
-              to={`/projetos/${projetoId}/dashboard`}
-              className="h-9 rounded-lg px-4 text-[13px] font-semibold inline-flex items-center gap-2 border transition-colors"
-              style={{ borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)', background: 'var(--cor-elevado)' }}
-            >
-              Ver dashboard
-            </Link>
-          </div>
+          ))}
+          <button
+            onClick={() => setAbaAtiva('insights')}
+            className={`sheet-tab ${abaAtiva === 'insights' ? 'sheet-tab-active' : ''}`}
+          >
+            INSIGHTS
+          </button>
+          <button
+            onClick={() => setAbaAtiva('resumo')}
+            className={`sheet-tab ${abaAtiva === 'resumo' ? 'sheet-tab-active' : ''}`}
+          >
+            RESUMO
+          </button>
+          <button
+            onClick={() => void adicionarLocal()}
+            className="sheet-tab sheet-tab-plus"
+            title="Novo local"
+          >
+            +
+          </button>
         </div>
       </AppShell>
 
