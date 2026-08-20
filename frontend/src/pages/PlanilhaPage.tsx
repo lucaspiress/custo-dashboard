@@ -72,13 +72,24 @@ function fmtDataLocal(iso: string): string {
   return `${dia}/${mes}/${ano}`
 }
 
-function MoneyCell({ valor, onCommit }: { valor: number; onCommit: (n: number | null) => void }) {
+type TipoCelula = 'money' | 'qtd' | 'text' | 'date'
+
+const mapaColunaLocal: Record<number, keyof LinhaLocal> = {
+  2: 'nome', 3: 'valor_mensal', 4: 'taxa_instalacao', 5: 'custo_manutencao',
+  6: 'mensal_terceirizada', 7: 'chip_mensal', 8: 'custos_softwares', 9: 'mao_de_obra', 10: 'data_inst',
+}
+const mapaColunaItem: Record<number, keyof ItemLinha> = {
+  2: 'categoria', 3: 'cod', 4: 'material', 5: 'qtd', 6: 'valor_unit',
+}
+
+function MoneyCell({ valor, onCommit, onAtivar }: { valor: number; onCommit: (n: number | null) => void; onAtivar?: (valor: number, commit: (v: number | null) => void) => void }) {
   const [focado, setFocado] = useState(false)
   const [texto, setTexto] = useState('')
 
   function focar() {
     setTexto(valor === 0 ? '' : String(valor))
     setFocado(true)
+    onAtivar?.(valor, onCommit)
   }
 
   function confirmar() {
@@ -112,13 +123,14 @@ function MoneyCell({ valor, onCommit }: { valor: number; onCommit: (n: number | 
   )
 }
 
-function QtdCell({ valor, onCommit }: { valor: number; onCommit: (n: number | null) => void }) {
+function QtdCell({ valor, onCommit, onAtivar }: { valor: number; onCommit: (n: number | null) => void; onAtivar?: (valor: number, commit: (v: number | null) => void) => void }) {
   const [focado, setFocado] = useState(false)
   const [texto, setTexto] = useState('')
 
   function focar() {
     setTexto(valor === 0 ? '' : String(valor))
     setFocado(true)
+    onAtivar?.(valor, onCommit)
   }
 
   function confirmar() {
@@ -151,13 +163,14 @@ function QtdCell({ valor, onCommit }: { valor: number; onCommit: (n: number | nu
   )
 }
 
-function TextCell({ valor, onCommit, placeholder = '' }: { valor: string; onCommit: (v: string) => void; placeholder?: string }) {
+function TextCell({ valor, onCommit, placeholder = '', onAtivar }: { valor: string; onCommit: (v: string) => void; placeholder?: string; onAtivar?: (valor: string, commit: (v: string) => void) => void }) {
   const [focado, setFocado] = useState(false)
   const [texto, setTexto] = useState('')
 
   function focar() {
     setTexto(valor)
     setFocado(true)
+    onAtivar?.(valor, onCommit)
   }
 
   function confirmar() {
@@ -190,8 +203,13 @@ function TextCell({ valor, onCommit, placeholder = '' }: { valor: string; onComm
   )
 }
 
-function DateCell({ valor, onCommit }: { valor: string | null; onCommit: (v: string | null) => void }) {
+function DateCell({ valor, onCommit, onAtivar }: { valor: string | null; onCommit: (v: string | null) => void; onAtivar?: (valor: string | null, commit: (v: string | null) => void) => void }) {
   const [focado, setFocado] = useState(false)
+
+  function focar() {
+    setFocado(true)
+    onAtivar?.(valor, onCommit)
+  }
 
   if (focado) {
     return (
@@ -210,7 +228,7 @@ function DateCell({ valor, onCommit }: { valor: string | null; onCommit: (v: str
   }
   return (
     <div
-      onClick={() => setFocado(true)}
+      onClick={focar}
       className="px-1.5 py-1 text-[13px] text-tinta cursor-text hover:bg-elevado rounded min-w-[92px]"
     >
       {paraInputDate(valor) ? fmtDataLocal(paraInputDate(valor)) : <span className="text-mutado/60">—</span>}
@@ -227,6 +245,12 @@ export default function PlanilhaPage() {
   const [erro, setErro] = useState('')
   const [estadoAutosave, setEstadoAutosave] = useState<EstadoAutosave>('salvo')
   const [confirmarExcluirLocal, setConfirmarExcluirLocal] = useState<number | null>(null)
+  const [celulaAtiva, setCelulaAtiva] = useState<{ row: number | null; col: number | null; escopo: 'local' | 'item' }>({ row: null, col: null, escopo: 'local' })
+  const [textoFormula, setTextoFormula] = useState('')
+  const [tipoFormula, setTipoFormula] = useState<TipoCelula | null>(null)
+  const valorOriginalRef = useRef('')
+  const commitAtivoRef = useRef<((v: unknown) => void) | null>(null)
+  const metaAtivaRef = useRef<{ localId?: number; itemId?: number }>({})
   const locaisRef = useRef(locais)
   const autosaveRef = useRef<Autosave<() => Promise<void>> | null>(null)
   locaisRef.current = locais
@@ -301,6 +325,84 @@ export default function PlanilhaPage() {
 
   function agendarSalvar(chave: string, salvar: () => Promise<void>) {
     autosaveRef.current?.agendar(chave, salvar)
+  }
+
+  function ativarCelula(row: number, col: number, escopo: 'local' | 'item', tipo: TipoCelula, valor: unknown, onCommit: (v: unknown) => void, meta?: { localId?: number; itemId?: number }) {
+    setCelulaAtiva({ row, col, escopo })
+    setTipoFormula(tipo)
+    commitAtivoRef.current = onCommit
+    metaAtivaRef.current = meta || {}
+    let texto = ''
+    if (tipo === 'money' || tipo === 'qtd') {
+      texto = (valor as number) === 0 ? '' : String(valor as number)
+    } else if (tipo === 'text') {
+      texto = String(valor ?? '')
+    } else if (tipo === 'date') {
+      texto = paraInputDate(valor as string | null) || ''
+    }
+    setTextoFormula(texto)
+    valorOriginalRef.current = texto
+  }
+
+  useEffect(() => {
+    if (celulaAtiva.row === null || celulaAtiva.col === null || !tipoFormula) return
+    let novoValor: unknown
+    if (celulaAtiva.escopo === 'local') {
+      const campo = mapaColunaLocal[celulaAtiva.col]
+      if (!campo) return
+      const linha = locais.find((l) => l.id === metaAtivaRef.current.localId)
+      if (!linha) return
+      novoValor = linha[campo]
+    } else {
+      const campo = mapaColunaItem[celulaAtiva.col]
+      if (!campo) return
+      const linha = locais.find((l) => l.id === metaAtivaRef.current.localId)
+      const item = linha?.itens.find((i) => i.id === metaAtivaRef.current.itemId)
+      if (!item) return
+      novoValor = item[campo]
+    }
+    let texto = ''
+    if (tipoFormula === 'money' || tipoFormula === 'qtd') {
+      texto = (novoValor as number) === 0 ? '' : String(novoValor as number)
+    } else if (tipoFormula === 'text') {
+      texto = String(novoValor ?? '')
+    } else if (tipoFormula === 'date') {
+      texto = paraInputDate(novoValor as string | null) || ''
+    }
+    setTextoFormula(texto)
+    valorOriginalRef.current = texto
+  }, [locais, celulaAtiva, tipoFormula])
+
+  function enderecoAtivo() {
+    if (celulaAtiva.row === null || celulaAtiva.col === null) return '—'
+    return `${letraColuna(celulaAtiva.col - 1)}${celulaAtiva.row}`
+  }
+
+  function commitFormula() {
+    if (celulaAtiva.row === null || celulaAtiva.col === null || !commitAtivoRef.current || !tipoFormula) return
+    if (tipoFormula === 'money' || tipoFormula === 'qtd') {
+      const numero = parseNumero(textoFormula)
+      if (numero !== null && numero !== parseNumero(valorOriginalRef.current)) {
+        commitAtivoRef.current(numero)
+      }
+    } else if (tipoFormula === 'text') {
+      if (textoFormula !== valorOriginalRef.current) {
+        commitAtivoRef.current(textoFormula)
+      }
+    } else if (tipoFormula === 'date') {
+      const v = textoFormula || null
+      if (v !== (valorOriginalRef.current || null)) {
+        commitAtivoRef.current(v)
+      }
+    }
+  }
+
+  function cancelarFormula() {
+    setTextoFormula(valorOriginalRef.current)
+  }
+
+  function celulaAtivaClass(row: number, col: number, escopo: 'local' | 'item') {
+    return celulaAtiva.row === row && celulaAtiva.col === col && celulaAtiva.escopo === escopo ? 'excel-cell-active' : ''
   }
 
   function alterarLocal(linha: LinhaLocal, campo: string, valor: unknown) {
@@ -514,6 +616,7 @@ export default function PlanilhaPage() {
       .excel-cell-local { padding: 4px 8px; }
       .excel-cell-data { padding: 4px 8px; }
       .excel-cell-actions { padding: 4px; text-align: center; }
+      .excel-cell-active { box-shadow: inset 0 0 0 2px #2e59f6; background: rgba(46, 89, 246, 0.08) !important; }
     `}</style>
     <AppShell
       titulo="Planilha de dados"
@@ -584,6 +687,43 @@ export default function PlanilhaPage() {
         </>
       }
     >
+      <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg border" style={{ background: 'var(--cor-elevado)', borderColor: 'var(--cor-borda)' }}>
+        <div
+          className="flex-shrink-0 w-16 h-8 flex items-center justify-center rounded text-[13px] font-medium tabular-nums border"
+          style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)' }}
+        >
+          {enderecoAtivo()}
+        </div>
+        {tipoFormula === 'date' ? (
+          <input
+            type="date"
+            value={textoFormula}
+            onChange={(e) => setTextoFormula(e.target.value)}
+            onBlur={commitFormula}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitFormula()
+              if (e.key === 'Escape') cancelarFormula()
+            }}
+            className="flex-1 min-w-0 h-8 px-2 rounded text-[13px] outline-none border"
+            style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)' }}
+          />
+        ) : (
+          <input
+            type="text"
+            value={textoFormula}
+            onChange={(e) => setTextoFormula(e.target.value)}
+            onBlur={commitFormula}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitFormula()
+              if (e.key === 'Escape') cancelarFormula()
+            }}
+            disabled={celulaAtiva.row === null}
+            placeholder={celulaAtiva.row === null ? '—' : ''}
+            className="flex-1 min-w-0 h-8 px-2 rounded text-[13px] outline-none border"
+            style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)' }}
+          />
+        )}
+      </div>
       <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
         <div>
           <div className="text-[12.5px] mb-1" style={{ color: 'var(--cor-mutado)' }}>
@@ -680,7 +820,7 @@ export default function PlanilhaPage() {
                     <Fragment key={linha.id}>
                       <tr className="group">
                         <th className="excel-rn" scope="row">{idx + 1}</th>
-                        <td className="excel-cell">
+                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 2, 'local')}`}>
                           <div className="flex items-center gap-1.5 min-w-[150px] excel-cell-local">
                             <button
                               onClick={() =>
@@ -693,18 +833,18 @@ export default function PlanilhaPage() {
                               {ICONE_CHEVRON}
                             </button>
                             <div className="flex-1">
-                              <TextCell valor={linha.nome} onCommit={(v) => alterarLocal(linha, 'nome', v)} />
+                              <TextCell valor={linha.nome} onCommit={(v) => alterarLocal(linha, 'nome', v)} onAtivar={(v, commit) => ativarCelula(idx + 2, 2, 'local', 'text', v, commit as (v: unknown) => void, { localId: linha.id })} />
                             </div>
                           </div>
                         </td>
-                        <td className="excel-cell"><div className="excel-cell-data text-right"><MoneyCell valor={linha.valor_mensal} onCommit={(v) => alterarLocal(linha, 'valor_mensal', v ?? 0)} /></div></td>
-                        <td className="excel-cell"><div className="excel-cell-data text-right"><MoneyCell valor={linha.taxa_instalacao} onCommit={(v) => alterarLocal(linha, 'taxa_instalacao', v ?? 0)} /></div></td>
-                        <td className="excel-cell"><div className="excel-cell-data text-right"><MoneyCell valor={linha.custo_manutencao} onCommit={(v) => alterarLocal(linha, 'custo_manutencao', v ?? 0)} /></div></td>
-                        <td className="excel-cell"><div className="excel-cell-data text-right"><MoneyCell valor={linha.mensal_terceirizada} onCommit={(v) => alterarLocal(linha, 'mensal_terceirizada', v ?? 0)} /></div></td>
-                        <td className="excel-cell"><div className="excel-cell-data text-right"><MoneyCell valor={linha.chip_mensal} onCommit={(v) => alterarLocal(linha, 'chip_mensal', v ?? 0)} /></div></td>
-                        <td className="excel-cell"><div className="excel-cell-data text-right"><MoneyCell valor={linha.custos_softwares} onCommit={(v) => alterarLocal(linha, 'custos_softwares', v ?? 0)} /></div></td>
-                        <td className="excel-cell"><div className="excel-cell-data text-right"><MoneyCell valor={linha.mao_de_obra} onCommit={(v) => alterarLocal(linha, 'mao_de_obra', v ?? 0)} /></div></td>
-                        <td className="excel-cell"><div className="excel-cell-data"><DateCell valor={linha.data_inst} onCommit={(v) => alterarLocal(linha, 'data_inst', v)} /></div></td>
+                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 3, 'local')}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.valor_mensal} onCommit={(v) => alterarLocal(linha, 'valor_mensal', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 3, 'local', 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
+                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 4, 'local')}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.taxa_instalacao} onCommit={(v) => alterarLocal(linha, 'taxa_instalacao', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 4, 'local', 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
+                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 5, 'local')}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.custo_manutencao} onCommit={(v) => alterarLocal(linha, 'custo_manutencao', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 5, 'local', 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
+                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 6, 'local')}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.mensal_terceirizada} onCommit={(v) => alterarLocal(linha, 'mensal_terceirizada', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 6, 'local', 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
+                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 7, 'local')}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.chip_mensal} onCommit={(v) => alterarLocal(linha, 'chip_mensal', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 7, 'local', 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
+                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 8, 'local')}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.custos_softwares} onCommit={(v) => alterarLocal(linha, 'custos_softwares', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 8, 'local', 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
+                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 9, 'local')}`}><div className="excel-cell-data text-right"><MoneyCell valor={linha.mao_de_obra} onCommit={(v) => alterarLocal(linha, 'mao_de_obra', v ?? 0)} onAtivar={(v, commit) => ativarCelula(idx + 2, 9, 'local', 'money', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
+                        <td className={`excel-cell ${celulaAtivaClass(idx + 2, 10, 'local')}`}><div className="excel-cell-data"><DateCell valor={linha.data_inst} onCommit={(v) => alterarLocal(linha, 'data_inst', v)} onAtivar={(v, commit) => ativarCelula(idx + 2, 10, 'local', 'date', v, commit as (v: unknown) => void, { localId: linha.id })} /></div></td>
                         <td className="excel-cell"><div className="excel-cell-data text-right text-[13px] text-[#10b981] tabular-nums font-medium">{fmtMoeda(comp.saldoMensal)}</div></td>
                         <td className="excel-cell"><div className="excel-cell-data text-right text-[13px] text-[#e07b1a] tabular-nums font-medium">{fmtMoeda(comp.investimento)}</div></td>
                         <td className="excel-cell"><div className="excel-cell-data text-right text-[13px] text-mutado tabular-nums">{comp.retorno === null ? '—' : `${Math.ceil(comp.retorno)} meses`}</div></td>
@@ -756,13 +896,13 @@ export default function PlanilhaPage() {
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {linha.itens.map((item) => (
+                                  {linha.itens.map((item, itemIdx) => (
                                     <tr key={item.id} className="border-b group/item" style={{ borderColor: 'var(--cor-borda)' }}>
-                                      <td className="px-2.5 py-1 min-w-[120px]"><TextCell valor={item.categoria} onCommit={(v) => agendarSalvar(`item:${item.id}:categoria`, () => salvarItem(linha, item, 'categoria', v))} /></td>
-                                      <td className="px-1 py-1 min-w-[80px]"><TextCell valor={item.cod} onCommit={(v) => agendarSalvar(`item:${item.id}:cod`, () => salvarItem(linha, item, 'cod', v))} /></td>
-                                      <td className="px-1 py-1 min-w-[160px]"><TextCell valor={item.material} onCommit={(v) => agendarSalvar(`item:${item.id}:material`, () => salvarItem(linha, item, 'material', v))} /></td>
-                                      <td className="px-1 py-1 text-right"><QtdCell valor={item.qtd} onCommit={(v) => agendarSalvar(`item:${item.id}:qtd`, () => salvarItem(linha, item, 'qtd', v ?? 0))} /></td>
-                                      <td className="px-1 py-1 text-right"><MoneyCell valor={item.valor_unit} onCommit={(v) => agendarSalvar(`item:${item.id}:valor_unit`, () => salvarItem(linha, item, 'valor_unit', v ?? 0))} /></td>
+                                      <td className={`px-2.5 py-1 min-w-[120px] ${celulaAtivaClass(itemIdx + 2, 2, 'item')}`}><TextCell valor={item.categoria} onCommit={(v) => agendarSalvar(`item:${item.id}:categoria`, () => salvarItem(linha, item, 'categoria', v))} onAtivar={(v, commit) => ativarCelula(itemIdx + 2, 2, 'item', 'text', v, commit as (v: unknown) => void, { localId: linha.id, itemId: item.id })} /></td>
+                                      <td className={`px-1 py-1 min-w-[80px] ${celulaAtivaClass(itemIdx + 2, 3, 'item')}`}><TextCell valor={item.cod} onCommit={(v) => agendarSalvar(`item:${item.id}:cod`, () => salvarItem(linha, item, 'cod', v))} onAtivar={(v, commit) => ativarCelula(itemIdx + 2, 3, 'item', 'text', v, commit as (v: unknown) => void, { localId: linha.id, itemId: item.id })} /></td>
+                                      <td className={`px-1 py-1 min-w-[160px] ${celulaAtivaClass(itemIdx + 2, 4, 'item')}`}><TextCell valor={item.material} onCommit={(v) => agendarSalvar(`item:${item.id}:material`, () => salvarItem(linha, item, 'material', v))} onAtivar={(v, commit) => ativarCelula(itemIdx + 2, 4, 'item', 'text', v, commit as (v: unknown) => void, { localId: linha.id, itemId: item.id })} /></td>
+                                      <td className={`px-1 py-1 text-right ${celulaAtivaClass(itemIdx + 2, 5, 'item')}`}><QtdCell valor={item.qtd} onCommit={(v) => agendarSalvar(`item:${item.id}:qtd`, () => salvarItem(linha, item, 'qtd', v ?? 0))} onAtivar={(v, commit) => ativarCelula(itemIdx + 2, 5, 'item', 'qtd', v, commit as (v: unknown) => void, { localId: linha.id, itemId: item.id })} /></td>
+                                      <td className={`px-1 py-1 text-right ${celulaAtivaClass(itemIdx + 2, 6, 'item')}`}><MoneyCell valor={item.valor_unit} onCommit={(v) => agendarSalvar(`item:${item.id}:valor_unit`, () => salvarItem(linha, item, 'valor_unit', v ?? 0))} onAtivar={(v, commit) => ativarCelula(itemIdx + 2, 6, 'item', 'money', v, commit as (v: unknown) => void, { localId: linha.id, itemId: item.id })} /></td>
                                       <td className="px-2.5 py-1 text-right text-[13px] text-tinta tabular-nums">{fmtMoeda(item.valor_total)}</td>
                                       <td className="px-2 py-1">
                                         <button
