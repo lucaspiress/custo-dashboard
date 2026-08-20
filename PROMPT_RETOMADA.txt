@@ -1,15 +1,1 @@
-Retomada do desenvolvimento do Custo Dashboard (segunda-feira).
-
-INSTRUÇÕES: leia o arquivo RETOMADA_DEV.md na raiz do repositório
-(C:\Users\assistentesolucoes\Desktop\custo-dashboard\RETOMADA_DEV.md)
-para o contexto completo do projeto e continue de onde paramos.
-
-PRIORIDADES:
-1. Corrigir o Export Power BI em produção (rota POST /api/uploads/powerbi retorna
-   erro 500 na Vercel). Seguir os passos da seção 3.1 do RETOMADA_DEV.md:
-   pegar o traceback real nos logs da Vercel, confirmar a versão do Python no build
-   e reproduzir a falha de import do pbix_mcp no ambiente da Vercel.
-2. Ajustar os detalhes do PDF que o usuário vai apontar (seção 3.2).
-
-EXECUÇÃO: aplicar as correções, rodar pytest (10 testes), npm run build,
-smoke_ui.py, e só commitar/push com a aprovação do usuário.
+retoma o M1 do plano de planilha excel — leia docs/superpowers/plans/2026-08-17-planilha-excel-redesign.md, confirma o estado do repo com git status e pytest, e começa a executar M1
