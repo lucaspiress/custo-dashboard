@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-26",
+  "context": "spec-kit-redesign",
+  "phase": 3,
+  "phase_name": "Rotas canônicas e shell pós-login",
+  "status": "paused",
+  "completed_tasks": [
+    {"ids": "T001-T004", "name": "baseline, fixtures e harness", "status": "done"},
+    {"ids": "T005-T009", "name": "contratos de rota, contexto e API", "status": "done"},
+    {"ids": "T010-T014", "name": "testes, rotas canônicas e shell", "status": "implemented_pending_gate", "commit": "18868cf"}
+  ],
+  "remaining_tasks": [
+    {"ids": "Gate 3", "name": "revisão visual/arquitetural e smoke manual", "status": "not_started"},
+    {"ids": "T015-T060", "name": "dados, visão executiva, acessibilidade, entregas e validação final", "status": "not_started"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "Projeto ativo vem somente do :id da rota", "rationale": "evita estado global e dados obsoletos"},
+    {"decision": "Rotas canônicas reutilizam as abas existentes", "rationale": "preserva comportamento e reduz risco"},
+    {"decision": "Importação permanece por operação", "rationale": "integridade por linha é uma feature prévia separada"},
+    {"decision": "Filtros são por componente e dados existentes", "rationale": "não criar cálculo paralelo nem alterar API/schema"},
+    {"decision": "Playwright fica fora desta feature", "rationale": "planejado como trabalho futuro não acionável"}
+  ],
+  "uncommitted_files": ["Verificar git status após este handoff; o próximo commit deve incluir o trabalho planejado desta sessão."],
+  "next_action": "Ler .planning/.continue-here.md, executar Gate 3 para o shell pós-login e só então avançar para T015.",
+  "context_notes": "Não alterar LoginPage.tsx, contratos de API/auth, schema ou cálculos. O Vercel build passou após corrigir a tipagem de project-context."
+}

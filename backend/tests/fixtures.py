@@ -105,3 +105,85 @@ def planilha_base() -> BytesIO:
             },
         ]
     )
+
+
+def projeto_escopo(numero: int) -> dict:
+    """Return deterministic project data with unique isolation markers.
+
+    The returned values are request payloads, so tests can use the fixture
+    without depending on database-generated IDs.  ``numero`` is deliberately
+    reflected in both the names and the numeric values to make accidental
+    cross-project reads easy to spot.
+    """
+    if numero < 1:
+        raise ValueError("numero deve ser positivo")
+
+    marcador = f"SC001-P{numero:02d}"
+    return {
+        "nome": marcador,
+        "cliente": f"Cliente {marcador}",
+        "local": {
+            "nome": f"{marcador}-LOCAL",
+            "valor_mensal": 10000 + numero * 1000,
+            "taxa_instalacao": 100 + numero,
+            "custo_manutencao": 200 + numero,
+            "mensal_terceirizada": 300 + numero,
+            "chip_mensal": 40 + numero,
+            "custos_softwares": 50 + numero,
+            "mao_de_obra": 1000 + numero * 10,
+        },
+        "item": {
+            "categoria": f"SC001-CATEGORIA-{numero:02d}",
+            "cod": f"{marcador}-COD",
+            "material": f"{marcador}-ITEM",
+            "qtd": numero,
+            "valor_unit": 500 + numero,
+        },
+    }
+
+
+def projetos_escopo(quantidade: int = 10) -> list[dict]:
+    """Return the deterministic project set used by isolation checks."""
+    if quantidade < 1:
+        raise ValueError("quantidade deve ser positiva")
+    return [projeto_escopo(numero) for numero in range(1, quantidade + 1)]
+
+
+def criar_projeto_escopo(cliente, numero: int) -> dict:
+    """Create one isolated project, local and item through the existing API."""
+    fixture = projeto_escopo(numero)
+
+    resposta = cliente.post(
+        "/api/projetos",
+        json={"nome": fixture["nome"], "cliente": fixture["cliente"]},
+    )
+    assert resposta.status_code == 200, resposta.text
+    projeto = resposta.json()
+
+    resposta = cliente.post(
+        f"/api/projetos/{projeto['id']}/locais",
+        json=fixture["local"],
+    )
+    assert resposta.status_code == 200, resposta.text
+    local = resposta.json()
+
+    resposta = cliente.post(
+        f"/api/projetos/locais/{local['id']}/itens",
+        json=fixture["item"],
+    )
+    assert resposta.status_code == 200, resposta.text
+    item = resposta.json()
+
+    return {
+        "fixture": fixture,
+        "projeto": projeto,
+        "local": local,
+        "item": item,
+    }
+
+
+def criar_projetos_escopo(cliente, quantidade: int = 10) -> list[dict]:
+    """Create a deterministic set of project-scoped API test records."""
+    if quantidade < 1:
+        raise ValueError("quantidade deve ser positiva")
+    return [criar_projeto_escopo(cliente, numero) for numero in range(1, quantidade + 1)]

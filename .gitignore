@@ -11,3 +11,8 @@ backend/uvicorn.out.log
 frontend/node_modules/
 frontend/dist/
 frontend/.env
+
+# Local OpenCode deepwork state
+.slim/deepwork/
+
+.vercel
