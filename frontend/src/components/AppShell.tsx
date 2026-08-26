@@ -1,28 +1,7 @@
-import type { ReactNode } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useState, type ReactNode } from 'react'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
-
-const ICONE_SAIR = (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-    <polyline points="16 17 21 12 16 7" />
-    <line x1="21" y1="12" x2="9" y2="12" />
-  </svg>
-)
-
-const ICONE_BUSCA = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="11" cy="11" r="7" />
-    <line x1="21" y1="21" x2="16.5" y2="16.5" />
-  </svg>
-)
-
-const ICONE_SINO = (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-    <path d="M13.7 21a2 2 0 0 1-3.4 0" />
-  </svg>
-)
+import ProjetoContextBar from './ProjetoContextBar'
 
 interface Props {
   titulo?: string
@@ -43,143 +22,40 @@ function saudacao(): string {
   return 'Boa noite'
 }
 
-export default function AppShell({
-  titulo,
-  sub,
-  saudacao: comSaudacao,
-  acoes,
-  busca,
-  buscaValor = '',
-  onBusca,
-  buscaPlaceholder = 'Buscar…',
-  children,
-}: Props) {
+export default function AppShell({ titulo, sub, saudacao: comSaudacao, acoes, busca, buscaValor = '', onBusca, buscaPlaceholder = 'Buscar…', children }: Props) {
   const { usuario, logout } = useAuth()
   const { pathname } = useLocation()
-  const naRaiz = pathname === '/'
+  const { id } = useParams<{ id: string }>()
+  const [menuAberto, setMenuAberto] = useState(false)
+  const contextual = Boolean(id) && pathname.startsWith('/projetos/')
+  const area = pathname.includes('/custos') ? 'Custos' : pathname.includes('/payback') ? 'Payback' : pathname.includes('/insights') ? 'Insights' : pathname.includes('/comparativo') ? 'Comparativo' : pathname.includes('/dados') ? 'Dados' : pathname.includes('/datasets') ? 'Datasets' : pathname.includes('/dashboards') ? 'Dashboards' : pathname.includes('/usuarios') ? 'Usuários' : pathname.includes('/relatorios') ? 'Relatórios' : pathname.includes('/compartilhados') ? 'Compartilhados' : contextual ? 'Visão geral' : 'Projetos'
+  const base = id ? `/projetos/${id}` : '/projetos'
+  const projetoLinks = [['Visão geral', `${base}/visao-geral`], ['Custos', `${base}/custos`], ['Payback', `${base}/payback`], ['Insights', `${base}/insights`], ['Comparativo', `${base}/comparativo`], ['Dados', `${base}/dados`], ['Datasets', `${base}/datasets`], ['Dashboards', `${base}/dashboards`]]
+  const portfolioLinks = [['Projetos', '/projetos'], ['Compartilhados', '/compartilhados'], ['Relatórios', '/relatorios']]
 
-  return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--cor-fundo)' }}>
-      <header
-        className="shrink-0 z-20 border-b"
-        style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}
-      >
-        <div className="flex items-center justify-between gap-4 px-5 h-[64px]">
-          <div className="flex items-center gap-3.5 min-w-0">
-            {!naRaiz && (
-              <Link
-                to="/"
-                className="rounded-lg p-2 shrink-0 transition-colors"
-                style={{ color: 'var(--cor-mutado)' }}
-                title="Voltar aos projetos"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </Link>
-            )}
-            <img src="/logo-sistema.png" alt="Rota Group" className="h-[32px] w-auto object-contain shrink-0" />
-            <span className="w-px h-6 shrink-0" style={{ background: 'var(--cor-borda)' }} />
-            <span className="titulo-display text-[16px] font-semibold tracking-wide truncate" style={{ color: 'var(--cor-tinta)' }}>
-              Custo Dashboard
-            </span>
-          </div>
-
-          {busca && (
-            <div className="hidden md:flex flex-1 max-w-sm justify-center">
-              <div
-                className="flex items-center gap-2 rounded-lg px-3 py-2 w-full border transition-colors"
-                style={{
-                  background: 'var(--cor-elevado)',
-                  borderColor: 'var(--cor-borda)',
-                  color: 'var(--cor-mutado)',
-                }}
-              >
-                {ICONE_BUSCA}
-                <input
-                  type="text"
-                  value={buscaValor}
-                  onChange={(e) => onBusca?.(e.target.value)}
-                  placeholder={buscaPlaceholder}
-                  className="bg-transparent border-none outline-none text-[13px] w-full min-w-0"
-                  style={{ color: 'var(--cor-tinta)' }}
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2.5 shrink-0">
-            {acoes}
-            <Link
-              to="/compartilhados"
-              className="hidden md:inline-flex h-8 px-2.5 items-center text-[12.5px] font-medium transition-colors"
-              style={{ color: 'var(--cor-mutado)' }}
-            >
-              Compartilhados
-            </Link>
-            <Link
-              to="/relatorios"
-              className="hidden md:inline-flex h-8 px-2.5 items-center text-[12.5px] font-medium transition-colors"
-              style={{ color: 'var(--cor-mutado)' }}
-            >
-              Relatórios
-            </Link>
-            <span className="hidden sm:block w-px h-6" style={{ background: 'var(--cor-borda)' }} />
-            <button
-              type="button"
-              className="rounded-lg p-2 transition-colors"
-              style={{ color: 'var(--cor-mutado)' }}
-              title="Notificações"
-            >
-              {ICONE_SINO}
-            </button>
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold shrink-0"
-              style={{ background: 'rgba(46, 89, 246, 0.18)', color: 'var(--cor-primaria)' }}
-            >
-              {usuario?.nome?.[0]?.toUpperCase() ?? 'U'}
-            </div>
-            <span className="hidden lg:block text-[12.5px]" style={{ color: 'var(--cor-mutado)' }}>
-              {usuario?.nome}
-            </span>
-            <button
-              type="button"
-              onClick={() => void logout()}
-              title="Sair"
-              className="rounded-lg p-2 transition-colors"
-              style={{ color: 'var(--cor-mutado)' }}
-            >
-              {ICONE_SAIR}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="flex-1 w-full max-w-[1280px] mx-auto px-5 py-6">
-        {comSaudacao && usuario && (
-          <div className="mb-7">
-            <h2 className="titulo-display text-[26px] font-bold leading-tight" style={{ color: 'var(--cor-tinta)' }}>
-              {saudacao()}, {usuario.nome}!
-            </h2>
-            <p className="text-[14px] mt-1" style={{ color: 'var(--cor-mutado)' }}>
-              Aqui está o que está acontecendo nos seus projetos.
-            </p>
-          </div>
-        )}
-        {titulo && (
-          <div className="mb-6">
-            <h1 className="titulo-display text-[22px] font-bold" style={{ color: 'var(--cor-tinta)' }}>
-              {titulo}
-            </h1>
-            {sub && (
-              <p className="text-[13px] mt-1" style={{ color: 'var(--cor-mutado)' }}>
-                {sub}
-              </p>
-            )}
-          </div>
-        )}
-        {children}
-      </main>
+  return <div className="min-h-screen bg-[#121622] font-['IBM_Plex_Sans'] text-[#f5f7fc]">
+    <div className="flex min-h-screen">
+      <button type="button" onClick={() => setMenuAberto(true)} className="fixed left-4 top-4 z-30 rounded-md border border-[#1f2740] bg-[#0c111c] p-2 md:hidden" aria-label="Abrir navegação">☰</button>
+      {menuAberto && <button type="button" aria-label="Fechar navegação" onClick={() => setMenuAberto(false)} className="fixed inset-0 z-30 bg-[#0c111c]/70 md:hidden" />}
+      <aside className={`${menuAberto ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-40 w-64 border-r border-[#1f2740] bg-[#0c111c] p-5 transition-transform md:static md:translate-x-0`} aria-label="Navegação principal">
+        <Link to="/projetos" onClick={() => setMenuAberto(false)} className="flex items-center gap-3 border-b border-[#1f2740] pb-5"><img src="/logo-sistema.png" alt="Rota Group" className="h-8 w-auto" /><span className="font-['Space_Grotesk'] text-sm font-semibold">Custo Dashboard</span></Link>
+        <div className="mt-7 text-[10px] font-semibold uppercase tracking-[.18em] text-[#8fa3c7]">Portfólio</div>
+        <nav className="mt-2 space-y-1">{portfolioLinks.map(([label, to]) => <Link key={to} to={to} onClick={() => setMenuAberto(false)} className={`block rounded-md border-l-2 px-3 py-2.5 text-sm ${area === label ? 'border-[#2e59f6] bg-[#2e59f6]/15 text-[#f5f7fc]' : 'border-transparent text-[#8fa3c7] hover:bg-[#222b45] hover:text-[#f5f7fc]'}`}>{label}</Link>)}</nav>
+        {contextual && <><div className="mt-8 text-[10px] font-semibold uppercase tracking-[.18em] text-[#8fa3c7]">Projeto atual</div><nav className="mt-2 space-y-1">{projetoLinks.map(([label, to]) => <Link key={to} to={to} onClick={() => setMenuAberto(false)} className={`block rounded-md border-l-2 px-3 py-2.5 text-sm ${area === label ? 'border-[#2e59f6] bg-[#2e59f6]/15 text-[#f5f7fc]' : 'border-transparent text-[#8fa3c7] hover:bg-[#222b45] hover:text-[#f5f7fc]'}`}>{label}</Link>)}</nav></>}
+      </aside>
+      <div className="min-w-0 flex-1">
+        <header className="sticky top-0 z-20 border-b border-[#1f2740] bg-[#121622]/95 backdrop-blur-sm"><div className="flex h-16 items-center justify-between gap-4 px-5 md:px-8">
+          <div className="min-w-0"><div className="hidden text-xs text-[#8fa3c7] sm:block"><Link to="/projetos" className="hover:text-[#f5f7fc]">Projetos</Link> <span aria-hidden="true">/</span> {contextual && <><span>Projeto {id}</span> <span aria-hidden="true">/</span> </>}<strong className="text-[#f5f7fc]">{area}</strong></div><h1 className="font-['Space_Grotesk'] text-lg font-semibold sm:hidden">{area}</h1></div>
+          {busca && <div className="hidden max-w-sm flex-1 md:flex"><label className="sr-only" htmlFor="busca-global">Buscar</label><input id="busca-global" value={buscaValor} onChange={(e) => onBusca?.(e.target.value)} placeholder={buscaPlaceholder} className="w-full rounded-md border border-[#1f2740] bg-[#222b45] px-3 py-2 text-sm text-[#f5f7fc] outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#18d6ec]" /> </div>}
+          <div className="flex shrink-0 items-center gap-2">{acoes}<button type="button" title="Notificações" aria-label="Notificações" className="hidden rounded-md p-2 text-[#8fa3c7] sm:block">♧</button><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#2e59f6]/20 text-sm font-semibold text-[#f5f7fc]">{usuario?.nome?.[0]?.toUpperCase() ?? 'U'}</span><span className="hidden text-xs text-[#8fa3c7] lg:block">{usuario?.nome}</span><button type="button" onClick={() => void logout()} title="Sair" aria-label="Sair da conta" className="rounded-md p-2 text-[#8fa3c7] hover:text-[#f5f7fc]">↪</button></div>
+        </div></header>
+        <main className="mx-auto w-full max-w-[1360px] px-4 py-6 md:px-8">
+          {contextual && id && <ProjetoContextBar projetoId={id} />}
+          {comSaudacao && usuario && <div className="mb-7"><h2 className="font-['Space_Grotesk'] text-2xl font-bold">{saudacao()}, {usuario.nome}!</h2><p className="mt-1 text-sm text-[#8fa3c7]">Aqui está o que está acontecendo nos seus projetos.</p></div>}
+          {titulo && <div className="mb-6"><h2 className="font-['Space_Grotesk'] text-[22px] font-bold">{titulo}</h2>{sub && <p className="mt-1 text-sm text-[#8fa3c7]">{sub}</p>}</div>}
+          {children}
+        </main>
+      </div>
     </div>
-  )
+  </div>
 }

@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage'
 import ProjetosPage from './pages/ProjetosPage'
 import DashboardPage from './pages/DashboardPage'
 import PlanilhaPage from './pages/PlanilhaPage'
+import { ALIASES_ROTAS, obterDestinoAlias, ROTA_FALLBACK, ROTAS_CANONICAS } from './lib/routes'
 
 const DatasetsPage = lazy(() => import('./pages/DatasetsPage'))
 const DashboardBuilderPage = lazy(() => import('./pages/DashboardBuilderPage'))
@@ -12,9 +13,9 @@ const CompartilhadosPage = lazy(() => import('./pages/CompartilhadosPage'))
 const RelatoriosPage = lazy(() => import('./pages/RelatoriosPage'))
 const PublicoPage = lazy(() => import('./pages/PublicoPage'))
 
-function RedirecionarParaDashboard() {
+function RedirecionarLegado({ alias }: { alias: keyof typeof ALIASES_ROTAS }) {
   const { id } = useParams<{ id: string }>()
-  return <Navigate to={`/projetos/${id}/dashboard`} replace />
+  return <Navigate to={obterDestinoAlias(alias, id) ?? ROTA_FALLBACK} replace />
 }
 
 function SucessoRedirect() {
@@ -55,18 +56,26 @@ function Rotas() {
     >
       <Routes>
         <Route path="/login" element={usuario ? <SucessoRedirect /> : <LoginPage />} />
-        <Route path="/" element={usuario ? <ProjetosPage /> : <Navigate to="/login" replace />} />
-        <Route path="/projetos/:id" element={usuario ? <RedirecionarParaDashboard /> : <Navigate to="/login" replace />} />
-        <Route path="/projetos/:id/dashboard" element={usuario ? <DashboardPage /> : <Navigate to="/login" replace />} />
-        <Route path="/projetos/:id/planilha" element={usuario ? <PlanilhaPage /> : <Navigate to="/login" replace />} />
-        <Route path="/projetos/:id/datasets" element={usuario ? <DatasetsPage /> : <Navigate to="/login" replace />} />
-        <Route path="/projetos/:id/datasets/:did" element={usuario ? <DatasetsPage /> : <Navigate to="/login" replace />} />
-        <Route path="/projetos/:id/dashboards" element={usuario ? <DashboardBuilderPage /> : <Navigate to="/login" replace />} />
-        <Route path="/projetos/:id/dashboards/:dbid" element={usuario ? <DashboardBuilderPage /> : <Navigate to="/login" replace />} />
-        <Route path="/compartilhados" element={usuario ? <CompartilhadosPage /> : <Navigate to="/login" replace />} />
-        <Route path="/relatorios" element={usuario ? <RelatoriosPage /> : <Navigate to="/login" replace />} />
-        <Route path="/p/:token" element={<PublicoPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/" element={usuario ? <Navigate to={obterDestinoAlias('/') ?? ROTA_FALLBACK} replace /> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetos} element={usuario ? <ProjetosPage /> : <Navigate to="/login" replace />} />
+        <Route path="/projetos/:id" element={usuario ? <RedirecionarLegado alias="/projetos/:id" /> : <Navigate to="/login" replace />} />
+        <Route path="/projetos/:id/dashboard" element={usuario ? <RedirecionarLegado alias="/projetos/:id/dashboard" /> : <Navigate to="/login" replace />} />
+        <Route path="/projetos/:id/planilha" element={usuario ? <RedirecionarLegado alias="/projetos/:id/planilha" /> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoVisaoGeral} element={usuario ? <DashboardPage /> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoCustos} element={usuario ? <DashboardPage /> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoPayback} element={usuario ? <DashboardPage /> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoInsights} element={usuario ? <DashboardPage /> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoComparativo} element={usuario ? <DashboardPage /> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoDados} element={usuario ? <PlanilhaPage /> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoDatasets} element={usuario ? <DatasetsPage /> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoDataset} element={usuario ? <DatasetsPage /> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoDashboards} element={usuario ? <DashboardBuilderPage /> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoDashboard} element={usuario ? <DashboardBuilderPage /> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoUsuarios} element={usuario ? <DashboardPage /> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.compartilhados} element={usuario ? <CompartilhadosPage /> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.relatorios} element={usuario ? <RelatoriosPage /> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.publico} element={<PublicoPage />} />
+        <Route path="*" element={<Navigate to={ROTA_FALLBACK} replace />} />
       </Routes>
     </Suspense>
   )
