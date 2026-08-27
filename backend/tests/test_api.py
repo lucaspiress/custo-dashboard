@@ -1,8 +1,11 @@
+from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 
 import openpyxl
+from fastapi.testclient import TestClient
 
 from fixtures import planilha_base
+from main import app
 
 
 def _login(cliente, username="admin", senha="admin123456"):
@@ -160,6 +163,42 @@ def test_item_valor_total_automatico(cliente, admin):
     resposta = cliente.patch(f"/api/projetos/itens/{item['id']}", json={"qtd": 10})
     assert resposta.status_code == 200
     assert resposta.json()["valor_total"] == 1200
+
+
+def test_patches_parciais_concorrentes_preservam_persistencia(cliente, admin):
+    projeto = _criar_projeto(cliente)
+    local = _criar_local(cliente, projeto["id"], valor_mensal=10000, mao_de_obra=2000)
+    item = _criar_item(cliente, local["id"], material="Material original", qtd=2, valor_unit=100)
+
+    def patchar(url, dados):
+        with TestClient(app) as cliente_concorrente:
+            _login(cliente_concorrente)
+            return cliente_concorrente.patch(url, json=dados)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        respostas_locais = list(executor.map(
+            lambda dados: patchar(
+                f"/api/projetos/{projeto['id']}/locais/{local['id']}", dados
+            ),
+            [{"valor_mensal": 20000}, {"mao_de_obra": 3500}],
+        ))
+
+    assert all(resposta.status_code == 200 for resposta in respostas_locais)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        respostas_itens = list(executor.map(
+            lambda dados: patchar(f"/api/projetos/itens/{item['id']}", dados),
+            [{"qtd": 7}, {"material": "Material atualizado"}],
+        ))
+
+    assert all(resposta.status_code == 200 for resposta in respostas_itens)
+
+    persistido = cliente.get(f"/api/projetos/{projeto['id']}").json()["locais"][0]
+    assert persistido["resumo"]["valor_mensal"] == 20000
+    assert persistido["resumo"]["mao_de_obra"] == 3500
+    assert persistido["itens"][0]["material"] == "Material atualizado"
+    assert persistido["itens"][0]["qtd"] == 7
+    assert persistido["itens"][0]["valor_total"] == 700
 
 
 def test_importar_planilha(cliente, admin):

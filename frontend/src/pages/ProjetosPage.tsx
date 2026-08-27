@@ -153,6 +153,10 @@ export default function ProjetosPage() {
   const [busca, setBusca] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
+  function rotaDados(projetoId: number) {
+    return construirRotaProjeto(ROTAS_CANONICAS.projetoDados, projetoId) ?? ROTAS_CANONICAS.projetos
+  }
+
   async function carregar() {
     setCarregando(true)
     try {
@@ -205,7 +209,7 @@ export default function ProjetosPage() {
         cliente_usuario_id: clienteUsuarioCampo,
       })
       setModalNovo(false)
-      navigate(construirRotaProjeto(ROTAS_CANONICAS.projetoDados, criado.id) ?? ROTAS_CANONICAS.projetos)
+      navigate(rotaDados(criado.id))
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao criar projeto.')
       setSalvando(false)
@@ -251,7 +255,7 @@ export default function ProjetosPage() {
       const form = new FormData()
       form.append('arquivo', file)
       const criado = await api.postForm<{ id: number }>('/api/projetos/importar', form)
-      navigate(construirRotaProjeto(ROTAS_CANONICAS.projetoDados, criado.id) ?? ROTAS_CANONICAS.projetos)
+      navigate(rotaDados(criado.id))
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao importar planilha.')
       setImportando(false)
@@ -430,7 +434,7 @@ export default function ProjetosPage() {
                 Abrir visão geral
               </button>
               <button
-                onClick={() => navigate(construirRotaProjeto(ROTAS_CANONICAS.projetoDados, projeto.id) ?? ROTAS_CANONICAS.projetos)}
+                onClick={() => navigate(rotaDados(projeto.id))}
                 className="h-8 px-2.5 rounded-lg text-[12.5px] font-medium inline-flex items-center gap-1.5 transition-colors"
                 style={{ color: 'var(--cor-mutado)' }}
               >

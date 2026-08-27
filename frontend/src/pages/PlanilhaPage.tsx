@@ -1,9 +1,10 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import { criarAutosave, type Autosave, type EstadoAutosave } from '../lib/autosave'
 import { baixarBlob, fmtMoeda, fmtNumero, paraInputDate, parseNumero } from '../lib/format'
 import type { AnaliseUpload, ItemLinha } from '../lib/types'
+import { construirRotaProjeto, ROTAS_CANONICAS } from '../lib/routes'
 import { PlanilhaCarregando } from '../components/ProjetoLoading'
 import AppShell from '../components/AppShell'
 
@@ -70,6 +71,10 @@ function fmtDataLocal(iso: string): string {
   const [ano, mes, dia] = iso.split('-')
   if (!ano || !mes || !dia) return iso
   return `${dia}/${mes}/${ano}`
+}
+
+function invalidarGeracao(ref: { current: number }) {
+  ref.current += 1
 }
 
 type TipoCelula = 'money' | 'qtd' | 'text' | 'date'
@@ -239,6 +244,14 @@ function DateCell({ valor, onCommit, onAtivar }: { valor: string | null; onCommi
 export default function PlanilhaPage() {
   const { id } = useParams<{ id: string }>()
   const projetoId = Number(id)
+  const navigate = useNavigate()
+  // The legacy /planilha URL is redirected by the router; links emitted by
+  // this page should always stay on the canonical data address.
+  const rotaProjetos = ROTAS_CANONICAS.projetos
+  const rotaDados = construirRotaProjeto(ROTAS_CANONICAS.projetoDados, projetoId) ?? rotaProjetos
+  const rotaVisaoGeral = construirRotaProjeto(ROTAS_CANONICAS.projetoVisaoGeral, projetoId) ?? rotaProjetos
+  const rotaDatasets = construirRotaProjeto(ROTAS_CANONICAS.projetoDatasets, projetoId) ?? rotaProjetos
+  const rotaDashboards = construirRotaProjeto(ROTAS_CANONICAS.projetoDashboards, projetoId) ?? rotaProjetos
   const [locais, setLocais] = useState<LinhaLocal[]>([])
   const [nomeProjeto, setNomeProjeto] = useState('')
   const [carregando, setCarregando] = useState(true)
@@ -247,6 +260,7 @@ export default function PlanilhaPage() {
   const [confirmarExcluirLocal, setConfirmarExcluirLocal] = useState<number | null>(null)
   const [abaAtiva, setAbaAtiva] = useState('dados')
   const [dadosProjeto, setDadosProjeto] = useState<AnaliseUpload | null>(null)
+  const [projetoRenderizadoId, setProjetoRenderizadoId] = useState<number | null>(null)
   const [celulaAtiva, setCelulaAtiva] = useState<{ row: number | null; col: number | null; escopo: string }>({ row: null, col: null, escopo: 'dados' })
   const [textoFormula, setTextoFormula] = useState('')
   const [tipoFormula, setTipoFormula] = useState<TipoCelula | null>(null)
@@ -255,11 +269,26 @@ export default function PlanilhaPage() {
   const metaAtivaRef = useRef<{ localId?: number; itemId?: number }>({})
   const locaisRef = useRef(locais)
   const autosaveRef = useRef<Autosave<() => Promise<void>> | null>(null)
+  const flushNavegacaoRef = useRef<Promise<boolean> | null>(null)
+  const geracaoRotaRef = useRef(0)
+  const geracaoDaRenderizacao = geracaoRotaRef.current
   locaisRef.current = locais
 
-  if (!autosaveRef.current) {
-    autosaveRef.current = criarAutosave(async (salvar) => salvar(), setEstadoAutosave)
-  }
+  const prepararNavegacao = useCallback(async (): Promise<boolean> => {
+    const geracao = geracaoRotaRef.current
+    const autosave = autosaveRef.current
+    if (!autosave) return true
+
+    const flush = flushNavegacaoRef.current ?? autosave.flush()
+    flushNavegacaoRef.current = flush
+    let salvou = false
+    try {
+      salvou = await flush
+    } finally {
+      if (flushNavegacaoRef.current === flush) flushNavegacaoRef.current = null
+    }
+    return salvou && geracao === geracaoRotaRef.current
+  }, [])
 
   const totais = useMemo(() => {
     const receita = locais.reduce((s, l) => s + l.valor_mensal, 0)
@@ -285,38 +314,101 @@ export default function PlanilhaPage() {
     }))
   }
 
-  async function carregar() {
+  useEffect(() => {
+    let cancelado = false
+    const geracao = ++geracaoRotaRef.current
+    const aindaAtiva = () => !cancelado && geracao === geracaoRotaRef.current
+
+    const autosave = criarAutosave<() => Promise<void>>(
+      async (salvar) => {
+        if (!aindaAtiva()) return
+        await salvar()
+      },
+      (estado) => {
+        if (aindaAtiva()) setEstadoAutosave(estado)
+      },
+    )
+    autosaveRef.current?.cancelar()
+    autosaveRef.current = autosave
+
+    // A troca de projeto não pode exibir dados, seleção ou alterações
+    // pendentes do projeto anterior enquanto a nova consulta está em voo.
+    setLocais([])
+    locaisRef.current = []
+    setNomeProjeto('')
+    setDadosProjeto(null)
+    setProjetoRenderizadoId(null)
     setCarregando(true)
     setErro('')
-    try {
-      const dados = await api.get<AnaliseUpload>(`/api/projetos/${projetoId}`)
-      setDadosProjeto(dados)
-      setNomeProjeto(dados.filename ?? '')
-      setLocais(dePayload(dados))
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao carregar projeto.')
-    } finally {
-      setCarregando(false)
-    }
-  }
+    setEstadoAutosave('salvo')
+    setConfirmarExcluirLocal(null)
+    setAbaAtiva('dados')
+    setCelulaAtiva({ row: null, col: null, escopo: 'dados' })
+    setTextoFormula('')
+    setTipoFormula(null)
+    valorOriginalRef.current = ''
+    commitAtivoRef.current = null
+    metaAtivaRef.current = {}
 
-  useEffect(() => {
-    void carregar()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    async function carregarProjeto() {
+      try {
+        const dados = await api.get<AnaliseUpload>(`/api/projetos/${projetoId}`)
+        if (!aindaAtiva()) return
+        setDadosProjeto(dados)
+        setNomeProjeto(dados.filename ?? '')
+        setLocais(dePayload(dados))
+      } catch (e) {
+        if (aindaAtiva()) setErro(e instanceof Error ? e.message : 'Erro ao carregar projeto.')
+      } finally {
+        if (aindaAtiva()) {
+          setProjetoRenderizadoId(projetoId)
+          setCarregando(false)
+        }
+      }
+    }
+
+    void carregarProjeto()
+
+    return () => {
+      // The page may be left through the shell navigation, which cannot wait
+      // for this component. Start the flush before invalidating this route so
+      // pending edits are still sent instead of being silently discarded.
+      void autosave.flush()
+      cancelado = true
+      invalidarGeracao(geracaoRotaRef)
+      autosave.cancelar()
+      flushNavegacaoRef.current = null
+      autosaveRef.current = null
+    }
   }, [projetoId])
 
-  useEffect(() => () => autosaveRef.current?.cancelar(), [])
+  function rotaAindaAtiva(geracao: number): boolean {
+    return geracao === geracaoRotaRef.current
+  }
+
+  function navegarComAutosave(event: React.MouseEvent<HTMLAnchorElement>, destino: string) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    event.preventDefault()
+    const geracao = geracaoDaRenderizacao
+    void prepararNavegacao()
+      .then((salvou) => { if (salvou && rotaAindaAtiva(geracao)) navigate(destino) })
+      .catch(() => undefined)
+  }
 
   async function salvarLocal(linha: LinhaLocal, campo: string, valor: unknown) {
+    const geracao = geracaoDaRenderizacao
     const atualizado = await api.patch<Record<string, unknown>>(
       `/api/projetos/${projetoId}/locais/${linha.id}`,
       { [campo]: valor }
     )
+    if (!rotaAindaAtiva(geracao)) return
     setLocais((atual) => atual.map((l) => (l.id === linha.id ? { ...l, ...atualizado } : l)))
   }
 
   async function salvarItem(linha: LinhaLocal, item: ItemLinha, campo: string, valor: unknown) {
+    const geracao = geracaoDaRenderizacao
     const atualizado = await api.patch<ItemLinha>(`/api/projetos/itens/${item.id}`, { [campo]: valor })
+    if (!rotaAindaAtiva(geracao)) return
     setLocais((atual) =>
       atual.map((l) =>
         l.id === linha.id
@@ -327,7 +419,11 @@ export default function PlanilhaPage() {
   }
 
   function agendarSalvar(chave: string, salvar: () => Promise<void>) {
-    autosaveRef.current?.agendar(chave, salvar)
+    const geracao = geracaoDaRenderizacao
+    if (!rotaAindaAtiva(geracao)) return
+    autosaveRef.current?.agendar(chave, async () => {
+      if (rotaAindaAtiva(geracao)) await salvar()
+    })
   }
 
   function ativarCelula(row: number, col: number, escopo: string, tipo: TipoCelula, valor: unknown, onCommit: (v: unknown) => void, meta?: { localId?: number; itemId?: number }) {
@@ -416,9 +512,11 @@ export default function PlanilhaPage() {
   }
 
   async function adicionarLocal() {
+    const geracao = geracaoDaRenderizacao
     setErro('')
     try {
       const criado = await api.post<{ id: number }>(`/api/projetos/${projetoId}/locais`, { nome: 'Novo local' })
+      if (!rotaAindaAtiva(geracao)) return
       setLocais((atual) => [
         ...atual,
         {
@@ -438,11 +536,12 @@ export default function PlanilhaPage() {
       ])
       setAbaAtiva(`local:${criado.id}`)
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao adicionar local.')
+      if (rotaAindaAtiva(geracao)) setErro(e instanceof Error ? e.message : 'Erro ao adicionar local.')
     }
   }
 
   async function adicionarItem(linha: LinhaLocal) {
+    const geracao = geracaoDaRenderizacao
     setErro('')
     try {
       const criado = await api.post<ItemLinha>(`/api/projetos/locais/${linha.id}/itens`, {
@@ -452,51 +551,60 @@ export default function PlanilhaPage() {
         qtd: 0,
         valor_unit: 0,
       })
+      if (!rotaAindaAtiva(geracao)) return
       setLocais((atual) => atual.map((l) => (l.id === linha.id ? { ...l, itens: [...l.itens, criado] } : l)))
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao adicionar item.')
+      if (rotaAindaAtiva(geracao)) setErro(e instanceof Error ? e.message : 'Erro ao adicionar item.')
     }
   }
 
   async function excluirItem(linha: LinhaLocal, item: ItemLinha) {
+    const geracao = geracaoDaRenderizacao
     setErro('')
     try {
       await api.delete(`/api/projetos/itens/${item.id}`)
+      if (!rotaAindaAtiva(geracao)) return
       setLocais((atual) =>
         atual.map((l) => (l.id === linha.id ? { ...l, itens: l.itens.filter((i) => i.id !== item.id) } : l))
       )
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao excluir item.')
+      if (rotaAindaAtiva(geracao)) setErro(e instanceof Error ? e.message : 'Erro ao excluir item.')
     }
   }
 
   async function excluirLocal(linha: LinhaLocal) {
+    const geracao = geracaoDaRenderizacao
     setConfirmarExcluirLocal(null)
     setErro('')
     try {
       await api.delete(`/api/projetos/${projetoId}/locais/${linha.id}`)
+      if (!rotaAindaAtiva(geracao)) return
       setLocais((atual) => atual.filter((l) => l.id !== linha.id))
       if (abaAtiva === `local:${linha.id}`) setAbaAtiva('dados')
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao excluir local.')
+      if (rotaAindaAtiva(geracao)) setErro(e instanceof Error ? e.message : 'Erro ao excluir local.')
     }
   }
 
   async function exportarPlanilha() {
+    const geracao = geracaoDaRenderizacao
     try {
       const blob = await api.blob(`/api/projetos/${projetoId}/planilha.xlsx`)
+      if (!rotaAindaAtiva(geracao)) return
       baixarBlob(blob, `Planilha_${nomeProjeto || 'Projeto'}.xlsx`)
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao exportar planilha.')
+      if (rotaAindaAtiva(geracao)) setErro(e instanceof Error ? e.message : 'Erro ao exportar planilha.')
     }
   }
 
   async function exportarPdf() {
+    const geracao = geracaoDaRenderizacao
     try {
       const blob = await api.postBlob(`/api/projetos/${projetoId}/relatorio`, {})
+      if (!rotaAindaAtiva(geracao)) return
       baixarBlob(blob, `Dashboard_Financeiro_${nomeProjeto || 'Projeto'}.pdf`)
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao gerar o PDF.')
+      if (rotaAindaAtiva(geracao)) setErro(e instanceof Error ? e.message : 'Erro ao gerar o PDF.')
     }
   }
 
@@ -504,9 +612,11 @@ export default function PlanilhaPage() {
     const texto = evento.clipboardData.getData('text')
     if (!texto.trim()) return
     evento.preventDefault()
+    const geracao = geracaoDaRenderizacao
     const linhas = texto.replace(/\r/g, '').split('\n').filter((l) => l.trim())
     const criadas: LinhaLocal[] = []
     for (const linhaTexto of linhas) {
+      if (!rotaAindaAtiva(geracao)) return
       const celulas = linhaTexto.split('\t').map((c) => c.trim())
       const nome = celulas[0] ?? ''
       if (!nome || nome.toUpperCase() === 'LOCAL' || nome.toUpperCase() === 'TOTAL') continue
@@ -537,20 +647,22 @@ export default function PlanilhaPage() {
           expanso: false,
         })
       } catch {
-        setErro('Erro ao colar uma linha de local.')
+        if (rotaAindaAtiva(geracao)) setErro('Erro ao colar uma linha de local.')
       }
     }
-    if (criadas.length > 0) setLocais((atual) => [...atual, ...criadas])
+    if (criadas.length > 0 && rotaAindaAtiva(geracao)) setLocais((atual) => [...atual, ...criadas])
   }
 
   async function colarItens(linha: LinhaLocal, evento: React.ClipboardEvent) {
     const texto = evento.clipboardData.getData('text')
     if (!texto.trim()) return
     evento.preventDefault()
+    const geracao = geracaoDaRenderizacao
     const linhas = texto.replace(/\r/g, '').split('\n').filter((l) => l.trim())
     let categoria = ''
     const criados: ItemLinha[] = []
     for (const linhaTexto of linhas) {
+      if (!rotaAindaAtiva(geracao)) return
       const celulas = linhaTexto.split('\t').map((c) => c.trim())
       const primeiro = celulas[0] ?? ''
       const segundo = celulas[1] ?? ''
@@ -573,10 +685,10 @@ export default function PlanilhaPage() {
         })
         criados.push(criado)
       } catch {
-        setErro('Erro ao colar um item.')
+        if (rotaAindaAtiva(geracao)) setErro('Erro ao colar um item.')
       }
     }
-    if (criados.length > 0) {
+    if (criados.length > 0 && rotaAindaAtiva(geracao)) {
       setLocais((atual) => atual.map((l) => (l.id === linha.id ? { ...l, itens: [...l.itens, ...criados] } : l)))
     }
   }
@@ -784,7 +896,8 @@ export default function PlanilhaPage() {
             + Local
           </button>
           <Link
-            to={`/projetos/${projetoId}/dashboard`}
+            to={rotaVisaoGeral}
+            onClick={(event) => navegarComAutosave(event, rotaVisaoGeral)}
             className="h-9 rounded-lg px-4 text-[13px] font-semibold inline-flex items-center gap-2 border transition-colors"
             style={{ borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)', background: 'var(--cor-elevado)' }}
           >
@@ -816,7 +929,8 @@ export default function PlanilhaPage() {
             + Item
           </button>
           <Link
-            to={`/projetos/${projetoId}/dashboard`}
+            to={rotaVisaoGeral}
+            onClick={(event) => navegarComAutosave(event, rotaVisaoGeral)}
             className="h-9 rounded-lg px-4 text-[13px] font-semibold inline-flex items-center gap-2 border transition-colors"
             style={{ borderColor: 'var(--cor-borda)', color: 'var(--cor-tinta)', background: 'var(--cor-elevado)' }}
           >
@@ -909,7 +1023,7 @@ export default function PlanilhaPage() {
     )
   }
 
-  if (carregando) {
+  if (carregando || projetoRenderizadoId !== projetoId) {
     return <PlanilhaCarregando />
   }
 
@@ -993,7 +1107,8 @@ export default function PlanilhaPage() {
             aria-label="Visualização do projeto"
           >
             <Link
-              to={`/projetos/${projetoId}/planilha`}
+              to={rotaDados}
+              onClick={(event) => navegarComAutosave(event, rotaDados)}
               role="tab"
               aria-selected="true"
               className="h-8 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors"
@@ -1003,7 +1118,8 @@ export default function PlanilhaPage() {
               Planilha
             </Link>
             <Link
-              to={`/projetos/${projetoId}/dashboard`}
+              to={rotaVisaoGeral}
+              onClick={(event) => navegarComAutosave(event, rotaVisaoGeral)}
               role="tab"
               aria-selected="false"
               className="h-8 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors hover:text-tinta"
@@ -1012,7 +1128,8 @@ export default function PlanilhaPage() {
               Dashboard
             </Link>
             <Link
-              to={`/projetos/${projetoId}/datasets`}
+              to={rotaDatasets}
+              onClick={(event) => navegarComAutosave(event, rotaDatasets)}
               role="tab"
               aria-selected="false"
               className="h-8 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors hover:text-tinta"
@@ -1021,7 +1138,8 @@ export default function PlanilhaPage() {
               Datasets
             </Link>
             <Link
-              to={`/projetos/${projetoId}/dashboards`}
+              to={rotaDashboards}
+              onClick={(event) => navegarComAutosave(event, rotaDashboards)}
               role="tab"
               aria-selected="false"
               className="h-8 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors hover:text-tinta"
@@ -1050,11 +1168,12 @@ export default function PlanilhaPage() {
           </button>
         </>
       }
+      onAntesDeNavegar={prepararNavegacao}
     >
       <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
         <div>
           <div className="text-[12.5px] mb-1" style={{ color: 'var(--cor-mutado)' }}>
-            <Link to="/" className="transition-colors" style={{ color: 'var(--cor-mutado)' }}>Projetos</Link>
+            <Link to={rotaProjetos} onClick={(event) => navegarComAutosave(event, rotaProjetos)} className="transition-colors" style={{ color: 'var(--cor-mutado)' }}>Projetos</Link>
             <span className="mx-1.5">/</span>
             <span className="font-medium" style={{ color: 'var(--cor-primaria)' }}>{nomeProjeto || 'Projeto'}</span>
           </div>

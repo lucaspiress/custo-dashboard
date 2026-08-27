@@ -254,41 +254,61 @@ def get_local(local_id: int) -> dict | None:
         conn.close()
 
 
+def _get_local_conn(conn, local_id: int) -> dict | None:
+    if _sqlite():
+        linha = conn.execute(
+            "select id, projeto_id, " + COLS_LOCAL + " from locais where id = ?",
+            (local_id,),
+        ).fetchone()
+        return dict(linha) if linha else None
+    return conn.execute(
+        """select id, projeto_id, """ + COLS_LOCAL + " from public.locais where id = %s""",
+        (local_id,),
+    ).fetchone()
+
+
 def atualizar_local(local_id: int, dados: dict) -> dict | None:
     conn = _conn()
     try:
-        atual = get_local(local_id)
-        if atual is None:
+        if _get_local_conn(conn, local_id) is None:
             return None
-        campos = ["nome", "valor_mensal", "taxa_instalacao", "custo_manutencao",
-                  "mensal_terceirizada", "chip_mensal", "custos_softwares", "mao_de_obra", "data_inst"]
-        for campo in campos:
-            if campo in dados:
-                valor = dados[campo]
-                if campo != "nome" and campo != "data_inst":
-                    valor = _isolar_valor(valor)
-                atual[campo] = valor
+
+        campos_numericos = (
+            "valor_mensal", "taxa_instalacao", "custo_manutencao",
+            "mensal_terceirizada", "chip_mensal", "custos_softwares", "mao_de_obra",
+        )
+        sets = []
+        parametros = []
+        for campo in ("nome", *campos_numericos, "data_inst"):
+            if campo not in dados:
+                continue
+            valor = dados[campo]
+            if campo == "nome":
+                valor = valor.strip() if isinstance(valor, str) else ""
+                if not valor:
+                    continue
+            elif campo in campos_numericos:
+                valor = _isolar_valor(valor)
+            sets.append(campo + (" = ?" if _sqlite() else " = %s"))
+            parametros.append(valor)
+
+        if not sets:
+            return _get_local_conn(conn, local_id)
+
+        parametros.append(local_id)
         if _sqlite():
             conn.execute(
-                """update locais set nome = ?, valor_mensal = ?, taxa_instalacao = ?,
-                   custo_manutencao = ?, mensal_terceirizada = ?, chip_mensal = ?,
-                   custos_softwares = ?, mao_de_obra = ?, data_inst = ? where id = ?""",
-                (atual["nome"].strip(), atual["valor_mensal"], atual["taxa_instalacao"],
-                 atual["custo_manutencao"], atual["mensal_terceirizada"], atual["chip_mensal"],
-                 atual["custos_softwares"], atual["mao_de_obra"], atual["data_inst"], local_id),
+                "update locais set " + ", ".join(sets) + " where id = ?",
+                parametros,
             )
             conn.commit()
         else:
             conn.execute(
-                """update public.locais set nome = %s, valor_mensal = %s, taxa_instalacao = %s,
-                   custo_manutencao = %s, mensal_terceirizada = %s, chip_mensal = %s,
-                   custos_softwares = %s, mao_de_obra = %s, data_inst = %s where id = %s""",
-                (atual["nome"].strip(), atual["valor_mensal"], atual["taxa_instalacao"],
-                 atual["custo_manutencao"], atual["mensal_terceirizada"], atual["chip_mensal"],
-                 atual["custos_softwares"], atual["mao_de_obra"], atual["data_inst"], local_id),
+                "update public.locais set " + ", ".join(sets) + " where id = %s",
+                parametros,
             )
             conn.commit()
-        return get_local(local_id)
+        return _get_local_conn(conn, local_id)
     finally:
         conn.close()
 
@@ -376,34 +396,75 @@ def get_item(item_id: int) -> dict | None:
         conn.close()
 
 
+def _get_item_conn(conn, item_id: int) -> dict | None:
+    if _sqlite():
+        linha = conn.execute(
+            "select id, local_id, " + COLS_ITEM + " from itens where id = ?",
+            (item_id,),
+        ).fetchone()
+        return dict(linha) if linha else None
+    return conn.execute(
+        """select id, local_id, """ + COLS_ITEM + " from public.itens where id = %s""",
+        (item_id,),
+    ).fetchone()
+
+
 def atualizar_item(item_id: int, dados: dict) -> dict | None:
     conn = _conn()
     try:
-        atual = get_item(item_id)
-        if atual is None:
+        if _get_item_conn(conn, item_id) is None:
             return None
-        campos = ["categoria", "cod", "material", "qtd", "valor_unit"]
-        for campo in campos:
-            if campo in dados:
-                atual[campo] = dados[campo]
-        atual["valor_total"] = _isolar_valor(atual.get("qtd")) * _isolar_valor(atual.get("valor_unit"))
+
+        sets = []
+        parametros = []
+        valores_numericos = {}
+        for campo in ("categoria", "cod", "material"):
+            if campo not in dados:
+                continue
+            valor = dados[campo]
+            valor = valor.strip() if isinstance(valor, str) else ""
+            sets.append(campo + (" = ?" if _sqlite() else " = %s"))
+            parametros.append(valor)
+        for campo in ("qtd", "valor_unit"):
+            if campo not in dados:
+                continue
+            valor = _isolar_valor(dados[campo])
+            sets.append(campo + (" = ?" if _sqlite() else " = %s"))
+            parametros.append(valor)
+            valores_numericos[campo] = valor
+
+        # Recalcular com o valor enviado para cada campo alterado e com o valor
+        # persistido para o outro campo. Assim, patches concorrentes de qtd e
+        # valor_unit compõem o resultado atual, em vez de regravar um snapshot
+        # lido anteriormente. O total também é mantido derivado para patches
+        # de texto, como acontecia antes desta atualização.
+        if sets:
+            placeholder = "?" if _sqlite() else "%s"
+            qtd_expr = placeholder if "qtd" in valores_numericos else "qtd"
+            unit_expr = placeholder if "valor_unit" in valores_numericos else "valor_unit"
+            sets.append("valor_total = " + qtd_expr + " * " + unit_expr)
+            if "qtd" in valores_numericos:
+                parametros.append(valores_numericos["qtd"])
+            if "valor_unit" in valores_numericos:
+                parametros.append(valores_numericos["valor_unit"])
+
+        if not sets:
+            return _get_item_conn(conn, item_id)
+
+        parametros.append(item_id)
         if _sqlite():
             conn.execute(
-                """update itens set categoria = ?, cod = ?, material = ?, qtd = ?,
-                   valor_unit = ?, valor_total = ? where id = ?""",
-                (atual["categoria"].strip(), (atual.get("cod") or "").strip(), atual["material"].strip(),
-                 _isolar_valor(atual["qtd"]), _isolar_valor(atual["valor_unit"]), atual["valor_total"], item_id),
+                "update itens set " + ", ".join(sets) + " where id = ?",
+                parametros,
             )
             conn.commit()
         else:
             conn.execute(
-                """update public.itens set categoria = %s, cod = %s, material = %s, qtd = %s,
-                   valor_unit = %s, valor_total = %s where id = %s""",
-                (atual["categoria"].strip(), (atual.get("cod") or "").strip(), atual["material"].strip(),
-                 _isolar_valor(atual["qtd"]), _isolar_valor(atual["valor_unit"]), atual["valor_total"], item_id),
+                "update public.itens set " + ", ".join(sets) + " where id = %s",
+                parametros,
             )
             conn.commit()
-        return get_item(item_id)
+        return _get_item_conn(conn, item_id)
     finally:
         conn.close()
 

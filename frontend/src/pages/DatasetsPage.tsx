@@ -23,6 +23,7 @@ import { baixarBlob, paraInputDate } from '../lib/format'
 import { criarAutosave } from '../lib/autosave'
 import type { Autosave, EstadoAutosave } from '../lib/autosave'
 import type { CampoCalculado, Dataset, DatasetRow } from '../lib/types'
+import { ROTAS_CANONICAS } from '../lib/routes'
 import AppShell from '../components/AppShell'
 import Botao from '../components/ui/Botao'
 import Modal from '../components/ui/Modal'
@@ -116,6 +117,49 @@ function validarFormula(formula: string, colunasValidas: string[]): { ok: boolea
 interface DateEditorProps {
   value: string | null | undefined
   stopEditing: (suppressNavigateAfterEdit?: boolean) => void
+}
+
+interface PayloadAutosave {
+  projetoId: number
+  did: string
+  rows: DatasetRow[]
+}
+
+interface EscopoToken {
+  chave: string
+  ciclo: number
+}
+
+interface PendenciasEscopo extends EscopoToken {
+  valores: Map<number, Record<string, any>>
+}
+
+function mesmoEscopo(a: EscopoToken | null | undefined, b: EscopoToken): boolean {
+  return a?.chave === b.chave && a.ciclo === b.ciclo
+}
+
+export function mesclarLinhaPendente(
+  linhaAtual: DatasetRow | undefined,
+  linhaPendente: Record<string, any> | undefined,
+  campo: string,
+  novoValor: any,
+): Record<string, any> {
+  return { ...(linhaAtual?.data_json ?? {}), ...(linhaPendente ?? {}), [campo]: novoValor }
+}
+
+export async function navegarDepoisDoFlush(
+  flush: (() => Promise<boolean>) | null | undefined,
+  navegar: (destino: string) => void,
+  destino: string,
+  aindaAtual: () => boolean = () => true,
+): Promise<boolean> {
+  if (!flush) {
+    if (aindaAtual()) navegar(destino)
+    return true
+  }
+  const salvou = await flush()
+  if (salvou && aindaAtual()) navegar(destino)
+  return salvou
 }
 
 const DateCellEditor = forwardRef<{ getValue: () => string | null }, DateEditorProps>(
@@ -325,46 +369,100 @@ export default function DatasetsPage() {
   const { id, did } = useParams<{ id: string; did?: string }>()
   const navigate = useNavigate()
   const projetoId = Number(id)
+  const chaveEscopo = `${projetoId}:${did ?? ''}`
+  const cicloEscopoRef = useRef({ chave: chaveEscopo, ciclo: 0 })
+  if (cicloEscopoRef.current.chave !== chaveEscopo) {
+    cicloEscopoRef.current = { chave: chaveEscopo, ciclo: cicloEscopoRef.current.ciclo + 1 }
+  }
+  const cicloEscopo = cicloEscopoRef.current.ciclo
+  const escopoAtual: EscopoToken = {
+    chave: chaveEscopo,
+    ciclo: cicloEscopo,
+  }
+  const rotaDatasets = ROTAS_CANONICAS.projetoDatasets.replace(':id', String(projetoId))
+  const rotaDataset = ROTAS_CANONICAS.projetoDataset.replace(':id', String(projetoId))
 
   const [datasets, setDatasets] = useState<Dataset[]>([])
+  const [escopoDatasets, setEscopoDatasets] = useState<EscopoToken | null>(null)
   const [linhas, setLinhas] = useState<DatasetRow[]>([])
+  const [escopoLinhas, setEscopoLinhas] = useState<EscopoToken | null>(null)
   const [carregandoDatasets, setCarregandoDatasets] = useState(true)
   const [carregandoLinhas, setCarregandoLinhas] = useState(false)
   const [erro, setErro] = useState('')
-  const [modalNovo, setModalNovo] = useState(false)
-  const [confirmarExcluir, setConfirmarExcluir] = useState(false)
+  const [modalNovo, setModalNovo] = useState<EscopoToken | null>(null)
+  const [confirmarExcluir, setConfirmarExcluir] = useState<EscopoToken | null>(null)
   const [estadoAutosave, setEstadoAutosave] = useState<EstadoAutosave>('salvo')
-  const [importando, setImportando] = useState(false)
+  const [importacaoAtiva, setImportacaoAtiva] = useState<EscopoToken | null>(null)
+  const [criacaoAtiva, setCriacaoAtiva] = useState<EscopoToken | null>(null)
   const [nomeEditando, setNomeEditando] = useState<string | null>(null)
   const [camposCalculados, setCamposCalculados] = useState<CampoCalculado[]>([])
-  const [modalCampo, setModalCampo] = useState<{ modo: 'novo' | 'editar'; campo?: CampoCalculado } | null>(null)
+  const [modalCampo, setModalCampo] = useState<
+    (EscopoToken & { modo: 'novo' | 'editar'; campo?: CampoCalculado }) | null
+  >(null)
 
   const didRef = useRef(did)
   didRef.current = did
+  const projetoIdRef = useRef(projetoId)
+  projetoIdRef.current = projetoId
+  const escopoRef = useRef(chaveEscopo)
+  escopoRef.current = chaveEscopo
+  const importacaoRef = useRef<EscopoToken | null>(null)
+  const pendentesRef = useRef<PendenciasEscopo>({ chave: chaveEscopo, ciclo: escopoAtual.ciclo, valores: new Map() })
+  if (!mesmoEscopo(pendentesRef.current, escopoAtual)) {
+    pendentesRef.current = { ...escopoAtual, valores: new Map() }
+  }
   const linhasRef = useRef(linhas)
-  linhasRef.current = linhas
-  const pendentesRef = useRef<Map<number, Record<string, any>>>(new Map())
-  const autosaveRef = useRef<Autosave<{ did: string; rows: DatasetRow[] }> | null>(null)
+  linhasRef.current = mesmoEscopo(escopoLinhas, escopoAtual) ? linhas : []
+  const autosaveRef = useRef<Autosave<PayloadAutosave> | null>(null)
+  const flushNavegacaoRef = useRef<Promise<boolean> | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  if (!autosaveRef.current) {
-    autosaveRef.current = criarAutosave(async (payload) => {
-      await adicionarLinhas(payload.did, payload.rows)
-      for (const { row_index: ri, data_json: dj } of payload.rows) {
-        if (pendentesRef.current.get(ri) === dj) pendentesRef.current.delete(ri)
-      }
-    }, setEstadoAutosave)
+  function escopoAindaAtual(token: EscopoToken): boolean {
+    return escopoRef.current === token.chave && cicloEscopoRef.current.ciclo === token.ciclo
   }
 
+  const autosave = useMemo(() => {
+    const escopo = chaveEscopo
+    const ciclo = cicloEscopo
+    return criarAutosave<PayloadAutosave>(async (payload) => {
+      if (
+        payload.projetoId !== projetoIdRef.current ||
+        payload.did !== didRef.current ||
+        escopoRef.current !== escopo ||
+        cicloEscopoRef.current.ciclo !== ciclo
+      ) return
+
+      await adicionarLinhas(payload.did, payload.rows)
+      if (escopoRef.current !== escopo || cicloEscopoRef.current.ciclo !== ciclo) return
+      if (!mesmoEscopo(pendentesRef.current, { chave: escopo, ciclo })) return
+      for (const { row_index: ri, data_json: dj } of payload.rows) {
+        if (pendentesRef.current.valores.get(ri) === dj) pendentesRef.current.valores.delete(ri)
+      }
+    }, (estado) => {
+      if (escopoRef.current === escopo && cicloEscopoRef.current.ciclo === ciclo) setEstadoAutosave(estado)
+    })
+  }, [chaveEscopo, cicloEscopo])
+  autosaveRef.current = autosave
+
+  const datasetsDoEscopo = useMemo(
+    () => (mesmoEscopo(escopoDatasets, { chave: chaveEscopo, ciclo: cicloEscopo }) ? datasets : []),
+    [datasets, escopoDatasets, chaveEscopo, cicloEscopo]
+  )
+
   const datasetSelecionado = useMemo(
-    () => datasets.find((d) => d.id === did) ?? null,
-    [datasets, did]
+    () => datasetsDoEscopo.find((d) => String(d.id) === did && d.projeto_id === projetoId) ?? null,
+    [datasetsDoEscopo, did, projetoId]
   )
   const readOnly = datasetSelecionado?.fonte !== 'livre'
   const schema = useMemo(() => normalizarSchema(datasetSelecionado?.schema_json), [datasetSelecionado])
+  const linhasDoEscopo = useMemo(
+    () => (mesmoEscopo(escopoLinhas, { chave: chaveEscopo, ciclo: cicloEscopo }) ? linhas : []),
+    [escopoLinhas, linhas, chaveEscopo, cicloEscopo]
+  )
+  const importando = mesmoEscopo(importacaoAtiva, escopoAtual)
   const linhasPlanas = useMemo(
-    () => linhas.map((r) => ({ row_index: r.row_index, ...r.data_json })),
-    [linhas]
+    () => linhasDoEscopo.map((r) => ({ row_index: r.row_index, ...r.data_json })),
+    [linhasDoEscopo]
   )
   const colunasValidas = useMemo(() => {
     const cols = Object.keys(schema)
@@ -373,58 +471,88 @@ export default function DatasetsPage() {
   }, [schema, camposCalculados])
 
   useEffect(() => {
-    let ativo = true
+    const token: EscopoToken = { chave: chaveEscopo, ciclo: cicloEscopo }
+    setNomeEditando(null)
+    setConfirmarExcluir(null)
+    setModalNovo(null)
+    setCriacaoAtiva(null)
+    setModalCampo(null)
+    setEstadoAutosave('salvo')
+    importacaoRef.current = null
+    setImportacaoAtiva(null)
     setCarregandoDatasets(true)
-    setErro('')
-    listarDatasets(projetoId)
-      .then((dados) => {
-        if (ativo) setDatasets(dados)
-      })
-      .catch((e) => {
-        if (ativo) setErro(e instanceof Error ? e.message : 'Erro ao carregar datasets.')
-      })
-      .finally(() => {
-        if (ativo) setCarregandoDatasets(false)
-      })
-    return () => {
-      ativo = false
-    }
-  }, [projetoId])
-
-  useEffect(() => {
-    autosaveRef.current?.cancelar()
-    pendentesRef.current.clear()
+    setCarregandoLinhas(Boolean(did))
+    setDatasets([])
+    setEscopoDatasets(null)
+    pendentesRef.current.valores.clear()
     setLinhas([])
+    setEscopoLinhas(null)
     setCamposCalculados([])
-    if (!did) return
-    let ativo = true
-    setCarregandoLinhas(true)
     setErro('')
-    listarLinhas(did)
-      .then((rows) => {
-        if (ativo) setLinhas(rows)
-      })
-      .catch((e) => {
-        if (ativo) setErro(e instanceof Error ? e.message : 'Erro ao carregar linhas.')
-      })
-      .finally(() => {
-        if (ativo) setCarregandoLinhas(false)
-      })
-    if (/^\d+$/.test(did)) {
-      listarCamposCalculados(Number(did))
-        .then((campos) => {
-          if (ativo) setCamposCalculados(campos)
-        })
-        .catch(() => {
-          if (ativo) setCamposCalculados([])
-        })
+    let ativo = true
+
+    autosave.cancelar()
+    async function carregarEscopo() {
+      try {
+        const dados = await listarDatasets(projetoId)
+        if (!ativo || !escopoAindaAtual(token)) return
+        setDatasets(dados)
+        setEscopoDatasets(token)
+        setCarregandoDatasets(false)
+
+        if (!did) {
+          setCarregandoLinhas(false)
+          return
+        }
+
+        const datasetDoProjeto = dados.find(
+          (dataset) => String(dataset.id) === did && dataset.projeto_id === projetoId
+        )
+        if (!datasetDoProjeto) {
+          setCarregandoLinhas(false)
+          setErro('Dataset não encontrado neste projeto.')
+          return
+        }
+
+        const camposPromise = /^\d+$/.test(did)
+          ? listarCamposCalculados(Number(did)).catch(() => [] as CampoCalculado[])
+          : Promise.resolve([] as CampoCalculado[])
+        let rows: DatasetRow[] = []
+        let campos: CampoCalculado[] = []
+        try {
+          const resultado = await Promise.all([listarLinhas(did), camposPromise])
+          rows = resultado[0]
+          campos = resultado[1]
+        } catch (e) {
+          if (ativo && escopoAindaAtual(token)) {
+            setErro(e instanceof Error ? e.message : 'Erro ao carregar linhas.')
+          }
+          return
+        }
+        if (!ativo || !escopoAindaAtual(token)) return
+        setLinhas(rows)
+        setEscopoLinhas(token)
+        setCamposCalculados(campos)
+      } catch (e) {
+        if (!ativo || !escopoAindaAtual(token)) return
+        setErro(e instanceof Error ? e.message : 'Erro ao carregar datasets.')
+      } finally {
+        if (ativo && escopoAindaAtual(token)) {
+          setCarregandoDatasets(false)
+          setCarregandoLinhas(false)
+          setEscopoDatasets(token)
+        }
+      }
     }
+
+    void carregarEscopo()
     return () => {
       ativo = false
+      void autosave.flush()
+      autosave.cancelar()
+      flushNavegacaoRef.current = null
     }
-  }, [did])
-
-  useEffect(() => () => autosaveRef.current?.cancelar(), [])
+  }, [autosave, chaveEscopo, did, projetoId, cicloEscopo])
 
   const colunas = useMemo<ColDef[]>(
     () =>
@@ -444,19 +572,53 @@ export default function DatasetsPage() {
   )
 
   function aoAlterarCelula(evento: CellValueChangedEvent) {
+    if (
+      !datasetSelecionado ||
+      datasetSelecionado.projeto_id !== projetoId ||
+      String(datasetSelecionado.id) !== did ||
+      !mesmoEscopo(escopoLinhas, escopoAtual)
+    ) return
     const rowIndex = evento.data?.row_index as number | undefined
     const campo = evento.colDef.field as string | undefined
     if (rowIndex === undefined || !campo) return
     const novoValor = evento.newValue
-    setLinhas((atual) =>
-      atual.map((r) => (r.row_index === rowIndex ? { ...r, data_json: { ...r.data_json, [campo]: novoValor } } : r))
-    )
     const atual = linhasRef.current.find((r) => r.row_index === rowIndex)
-    pendentesRef.current.set(rowIndex, { ...(atual?.data_json ?? {}), [campo]: novoValor })
+    const dataJson = mesclarLinhaPendente(
+      atual,
+      pendentesRef.current.valores.get(rowIndex),
+      campo,
+      novoValor,
+    )
+    setLinhas((atual) =>
+      atual.map((r) => (r.row_index === rowIndex ? { ...r, data_json: dataJson } : r))
+    )
+    pendentesRef.current.valores.set(rowIndex, dataJson)
     const didAtual = didRef.current
     if (!didAtual) return
-    const rows = [...pendentesRef.current.entries()].map(([ri, dj]) => ({ row_index: ri, data_json: dj }))
-    autosaveRef.current?.agendar('linhas', { did: didAtual, rows })
+    const rows = [...pendentesRef.current.valores.entries()].map(([ri, dj]) => ({ row_index: ri, data_json: dj }))
+    autosaveRef.current?.agendar('linhas', { projetoId, did: didAtual, rows })
+  }
+
+  function navegarComAutosave(destino: string) {
+    const token = escopoAtual
+    void navegarDepoisDoFlush(flushAntesDeNavegar, navigate, destino, () => escopoAindaAtual(token))
+  }
+
+  function flushAntesDeNavegar(): Promise<boolean> {
+    if (flushNavegacaoRef.current) return flushNavegacaoRef.current
+    const autosaveAtual = autosaveRef.current
+    if (!autosaveAtual) return Promise.resolve(true)
+    const flush = autosaveAtual.flush()
+    flushNavegacaoRef.current = flush
+    void flush.then(
+      () => {
+        if (flushNavegacaoRef.current === flush) flushNavegacaoRef.current = null
+      },
+      () => {
+        if (flushNavegacaoRef.current === flush) flushNavegacaoRef.current = null
+      },
+    )
+    return flush
   }
 
   async function salvarNome() {
@@ -467,101 +629,153 @@ export default function DatasetsPage() {
     const novo = (nomeEditando ?? datasetSelecionado.nome).trim()
     setNomeEditando(null)
     if (!novo || novo === datasetSelecionado.nome) return
+    const token = escopoAtual
     try {
       const atualizado = await renomearDataset(projetoId, datasetSelecionado.id, novo)
+      if (!escopoAindaAtual(token)) return
       setDatasets((atual) => atual.map((d) => (d.id === atualizado.id ? { ...d, nome: atualizado.nome } : d)))
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao renomear dataset.')
+      if (escopoAindaAtual(token)) {
+        setErro(e instanceof Error ? e.message : 'Erro ao renomear dataset.')
+      }
     }
   }
 
   async function importarArquivo(file: File) {
     if (!datasetSelecionado || readOnly) return
+    const token = escopoAtual
+    const didImportado = String(datasetSelecionado.id)
     if (file.size > 10 * 1024 * 1024) {
       setErro('Arquivo muito grande. O limite é de 10MB.')
       return
     }
-    setImportando(true)
+    autosave.cancelar()
+    pendentesRef.current.valores.clear()
+    setEstadoAutosave('salvo')
+    importacaoRef.current = token
+    setImportacaoAtiva(token)
     setErro('')
     try {
       await importarDataset(datasetSelecionado.id, file)
+      if (!escopoAindaAtual(token) || didRef.current !== did) return
       // o backend atualiza o schema_json do dataset; recarrega lista + linhas
       const [dados, rows] = await Promise.all([
         listarDatasets(projetoId),
-        listarLinhas(datasetSelecionado.id),
+        listarLinhas(didImportado),
       ])
+      if (
+        !escopoAindaAtual(token) ||
+        didRef.current !== did ||
+        !dados.some((dataset) => String(dataset.id) === didImportado && dataset.projeto_id === projetoId)
+      ) return
       setDatasets(dados)
       setLinhas(rows)
+      setEscopoDatasets(token)
+      setEscopoLinhas(token)
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao importar arquivo.')
+      if (escopoAindaAtual(token)) {
+        setErro(e instanceof Error ? e.message : 'Erro ao importar arquivo.')
+      }
     } finally {
-      setImportando(false)
-      if (fileRef.current) fileRef.current.value = ''
+      if (importacaoRef.current && mesmoEscopo(importacaoRef.current, token)) {
+        importacaoRef.current = null
+        setImportacaoAtiva(null)
+        if (fileRef.current) fileRef.current.value = ''
+      }
     }
   }
 
   async function exportarCSV() {
     if (!datasetSelecionado) return
+    const token = escopoAtual
     try {
       const blob = await exportarDatasetCSV(datasetSelecionado.id)
+      if (!escopoAindaAtual(token)) return
       baixarBlob(blob, `${datasetSelecionado.nome}.csv`)
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao exportar CSV.')
+      if (escopoAindaAtual(token)) {
+        setErro(e instanceof Error ? e.message : 'Erro ao exportar CSV.')
+      }
     }
   }
 
   async function exportarXLSX() {
     if (!datasetSelecionado) return
+    const token = escopoAtual
     try {
       const blob = await exportarDatasetXLSX(datasetSelecionado.id)
+      if (!escopoAindaAtual(token)) return
       baixarBlob(blob, `${datasetSelecionado.nome}.xlsx`)
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao exportar XLSX.')
+      if (escopoAindaAtual(token)) {
+        setErro(e instanceof Error ? e.message : 'Erro ao exportar XLSX.')
+      }
     }
   }
 
   function adicionarLinha() {
-    if (!datasetSelecionado || readOnly) return
-    const novoIndex = linhas.reduce((max, r) => Math.max(max, r.row_index), -1) + 1
+    if (
+      !datasetSelecionado ||
+      readOnly ||
+      datasetSelecionado.projeto_id !== projetoId ||
+      !mesmoEscopo(escopoLinhas, escopoAtual) ||
+      carregandoLinhas
+    ) return
+    const novoIndex = linhasDoEscopo.reduce((max, r) => Math.max(max, r.row_index), -1) + 1
     const dataJson: Record<string, any> = {}
     for (const campo of Object.keys(schema)) dataJson[campo] = null
     const nova: DatasetRow = { row_index: novoIndex, data_json: dataJson }
     setLinhas((atual) => [...atual, nova])
-    pendentesRef.current.set(novoIndex, dataJson)
+    pendentesRef.current.valores.set(novoIndex, dataJson)
     const didAtual = didRef.current
-    if (didAtual) {
-      const rows = [...pendentesRef.current.entries()].map(([ri, dj]) => ({ row_index: ri, data_json: dj }))
-      autosaveRef.current?.agendar('linhas', { did: didAtual, rows })
+    if (didAtual && mesmoEscopo(escopoLinhas, escopoAtual)) {
+      const rows = [...pendentesRef.current.valores.entries()].map(([ri, dj]) => ({ row_index: ri, data_json: dj }))
+      autosaveRef.current?.agendar('linhas', { projetoId, did: didAtual, rows })
     }
   }
 
   async function excluir() {
     if (!datasetSelecionado || readOnly) return
-    setConfirmarExcluir(false)
+    const token = escopoAtual
+    setConfirmarExcluir(null)
     setErro('')
     try {
       await deletarDataset(projetoId, datasetSelecionado.id)
+      if (!escopoAindaAtual(token)) return
       setDatasets((atual) => atual.filter((d) => d.id !== datasetSelecionado.id))
-      navigate(`/projetos/${projetoId}/datasets`)
+      setEscopoDatasets(token)
+      navegarComAutosave(rotaDatasets)
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao excluir dataset.')
+      if (escopoAindaAtual(token)) {
+        setErro(e instanceof Error ? e.message : 'Erro ao excluir dataset.')
+      }
     }
   }
 
   async function salvarNovo(nome: string, schemaNovo: Record<string, string>) {
-    setModalNovo(false)
+    const token = escopoAtual
+    if (mesmoEscopo(criacaoAtiva, token)) return
+    setCriacaoAtiva(token)
     setErro('')
     try {
       const criado = await criarDataset(projetoId, nome, schemaNovo)
+      if (!escopoAindaAtual(token)) return
+      setCriacaoAtiva(null)
+      setModalNovo(null)
       setDatasets((atual) => [...atual, criado])
-      navigate(`/projetos/${projetoId}/datasets/${criado.id}`)
+      setEscopoDatasets(token)
+      navegarComAutosave(rotaDataset.replace(':did', String(criado.id)))
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao criar dataset.')
+      if (escopoAindaAtual(token)) {
+        setCriacaoAtiva(null)
+        setErro(e instanceof Error ? e.message : 'Erro ao criar dataset.')
+      }
     }
   }
 
   async function salvarCampo(nome: string, formula: string) {
     if (!datasetSelecionado || readOnly) return
+    const token = escopoAtual
     const didNum = Number(datasetSelecionado.id)
     setErro('')
     try {
@@ -570,27 +784,37 @@ export default function DatasetsPage() {
       } else {
         await criarCampoCalculado(didNum, nome, formula)
       }
+      if (!escopoAindaAtual(token)) return
       setModalCampo(null)
-      setCamposCalculados(await listarCamposCalculados(didNum))
+      const campos = await listarCamposCalculados(didNum)
+      if (!escopoAindaAtual(token)) return
+      setCamposCalculados(campos)
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao salvar campo calculado.')
+      if (escopoAindaAtual(token)) {
+        setErro(e instanceof Error ? e.message : 'Erro ao salvar campo calculado.')
+      }
     }
   }
 
   async function excluirCampo(cid: number) {
     if (!datasetSelecionado || readOnly) return
+    const token = escopoAtual
     setErro('')
     try {
       await deletarCampoCalculado(Number(datasetSelecionado.id), cid)
+      if (!escopoAindaAtual(token)) return
       setCamposCalculados((atual) => atual.filter((c) => c.id !== cid))
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao excluir campo calculado.')
+      if (escopoAindaAtual(token)) {
+        setErro(e instanceof Error ? e.message : 'Erro ao excluir campo calculado.')
+      }
     }
   }
 
   return (
     <AppShell
       titulo="Datasets"
+      onAntesDeNavegar={flushAntesDeNavegar}
       acoes={
         <div
           className="inline-flex rounded-lg p-0.5 border"
@@ -599,7 +823,11 @@ export default function DatasetsPage() {
           aria-label="Visualização do projeto"
         >
           <Link
-            to={`/projetos/${projetoId}/planilha`}
+            to={ROTAS_CANONICAS.projetoDados.replace(':id', String(projetoId))}
+            onClick={(event) => {
+              event.preventDefault()
+              navegarComAutosave(ROTAS_CANONICAS.projetoDados.replace(':id', String(projetoId)))
+            }}
             role="tab"
             aria-selected="false"
             className="h-8 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors hover:text-tinta"
@@ -609,7 +837,11 @@ export default function DatasetsPage() {
             Planilha
           </Link>
           <Link
-            to={`/projetos/${projetoId}/dashboard`}
+            to={ROTAS_CANONICAS.projetoVisaoGeral.replace(':id', String(projetoId))}
+            onClick={(event) => {
+              event.preventDefault()
+              navegarComAutosave(ROTAS_CANONICAS.projetoVisaoGeral.replace(':id', String(projetoId)))
+            }}
             role="tab"
             aria-selected="false"
             className="h-8 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors hover:text-tinta"
@@ -619,7 +851,11 @@ export default function DatasetsPage() {
             Dashboard
           </Link>
           <Link
-            to={`/projetos/${projetoId}/datasets`}
+            to={rotaDatasets}
+            onClick={(event) => {
+              event.preventDefault()
+              navegarComAutosave(rotaDatasets)
+            }}
             role="tab"
             aria-selected="true"
             className="h-8 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors"
@@ -641,7 +877,7 @@ export default function DatasetsPage() {
               Datasets
             </span>
             <button
-              onClick={() => setModalNovo(true)}
+              onClick={() => setModalNovo(escopoAtual)}
               title="Novo dataset"
               className="h-7 w-7 rounded-lg inline-flex items-center justify-center transition-colors"
               style={{ background: 'var(--cor-elevado)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}
@@ -650,20 +886,20 @@ export default function DatasetsPage() {
             </button>
           </div>
           <div className="flex flex-col gap-1">
-            {carregandoDatasets && (
+            {(!mesmoEscopo(escopoDatasets, escopoAtual) || carregandoDatasets) && (
               <div className="text-[12.5px] px-1 py-2" style={{ color: 'var(--cor-mutado)' }}>Carregando…</div>
             )}
-            {!carregandoDatasets && datasets.length === 0 && (
+            {mesmoEscopo(escopoDatasets, escopoAtual) && !carregandoDatasets && datasetsDoEscopo.length === 0 && (
               <div className="text-[12.5px] px-1 py-2" style={{ color: 'var(--cor-mutado)' }}>
                 Nenhum dataset. Clique em “+” para criar.
               </div>
             )}
-            {datasets.map((d) => {
-              const selecionado = d.id === did
+            {datasetsDoEscopo.map((d) => {
+              const selecionado = String(d.id) === did && d.projeto_id === projetoId
               return (
                 <button
                   key={d.id}
-                  onClick={() => navigate(`/projetos/${projetoId}/datasets/${d.id}`)}
+                  onClick={() => navegarComAutosave(rotaDataset.replace(':did', String(d.id)))}
                   className="text-left rounded-lg px-3 py-2.5 transition-colors"
                   style={
                     selecionado
@@ -681,7 +917,7 @@ export default function DatasetsPage() {
                     />
                     {d.fonte === 'livre' ? 'Livre' : 'Read-only'}
                     <span>·</span>
-                    <span>{selecionado ? linhas.length : '—'} linhas</span>
+                    <span>{selecionado ? linhasDoEscopo.length : (d.row_count ?? '—')} linhas</span>
                   </div>
                 </button>
               )
@@ -752,7 +988,7 @@ export default function DatasetsPage() {
                       Linha
                     </Botao>
                     <button
-                      onClick={() => setConfirmarExcluir(true)}
+                      onClick={() => setConfirmarExcluir(escopoAtual)}
                       title="Excluir dataset"
                       className="h-9 w-9 rounded-lg inline-flex items-center justify-center transition-colors"
                       style={{ color: 'var(--cor-mutado)' }}
@@ -806,7 +1042,7 @@ export default function DatasetsPage() {
                     <span className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: 'var(--cor-mutado)' }}>
                       Campos Calculados
                     </span>
-                    <Botao variante="secundario" onClick={() => setModalCampo({ modo: 'novo' })}>
+                    <Botao variante="secundario" onClick={() => setModalCampo({ ...escopoAtual, modo: 'novo' })}>
                       {ICONE_MAIS}
                       Novo campo calculado
                     </Botao>
@@ -829,7 +1065,7 @@ export default function DatasetsPage() {
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
                             <button
-                              onClick={() => setModalCampo({ modo: 'editar', campo: c })}
+                              onClick={() => setModalCampo({ ...escopoAtual, modo: 'editar', campo: c })}
                               className="h-8 px-2.5 rounded-lg text-[12px] font-medium transition-colors"
                               style={{ color: 'var(--cor-mutado)' }}
                             >
@@ -854,28 +1090,30 @@ export default function DatasetsPage() {
         </div>
       </div>
 
-      {modalNovo && (
+      {mesmoEscopo(modalNovo, escopoAtual) && (
         <ModalNovoDataset
           aoSalvar={(nome, schemaNovo) => void salvarNovo(nome, schemaNovo)}
-          aoCancelar={() => setModalNovo(false)}
-          salvando={false}
+          aoCancelar={() => {
+            if (!mesmoEscopo(criacaoAtiva, escopoAtual)) setModalNovo(null)
+          }}
+          salvando={mesmoEscopo(criacaoAtiva, escopoAtual)}
         />
       )}
 
-      {confirmarExcluir && datasetSelecionado && (
-        <Modal titulo="Excluir dataset?" onFechar={() => setConfirmarExcluir(false)}>
+      {mesmoEscopo(confirmarExcluir, escopoAtual) && datasetSelecionado && (
+        <Modal titulo="Excluir dataset?" onFechar={() => setConfirmarExcluir(null)}>
           <p className="text-[13px] leading-relaxed" style={{ color: 'var(--cor-mutado)' }}>
             O dataset <b style={{ color: 'var(--cor-tinta)' }}>{datasetSelecionado.nome}</b> e todas as suas linhas
             serão removidos. Essa ação não pode ser desfeita.
           </p>
           <div className="flex justify-end gap-2 mt-5">
-            <Botao variante="fantasma" onClick={() => setConfirmarExcluir(false)}>Cancelar</Botao>
+            <Botao variante="fantasma" onClick={() => setConfirmarExcluir(null)}>Cancelar</Botao>
             <Botao variante="perigo" onClick={() => void excluir()}>Excluir</Botao>
           </div>
         </Modal>
       )}
 
-      {modalCampo && (
+      {modalCampo && mesmoEscopo(modalCampo, escopoAtual) && (
         <ModalCampoCalculado
           colunasValidas={colunasValidas}
           campo={modalCampo.campo}

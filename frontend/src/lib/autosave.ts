@@ -2,6 +2,7 @@ export type EstadoAutosave = 'salvo' | 'pendente' | 'salvando' | 'erro'
 
 export interface Autosave<T> {
   agendar: (chave: string, valor: T) => void
+  flush: () => Promise<boolean>
   tentarNovamente: () => Promise<void>
   erroAtual: () => string | null
   cancelar: () => void
@@ -19,6 +20,8 @@ export function criarAutosave<T>(
   const temporizadores = new Map<string, ReturnType<typeof setTimeout>>()
   const alteracoes = new Map<string, Alteracao<T>>()
   const erros = new Map<string, string>()
+  const persistencias = new Set<Promise<void>>()
+  const persistenciasPorChave = new Map<string, Promise<void>>()
   let proximaVersao = 0
   let salvamentosEmAndamento = 0
 
@@ -56,6 +59,23 @@ export function criarAutosave<T>(
     }
   }
 
+  function iniciarPersistencia(chave: string) {
+    if (persistenciasPorChave.has(chave)) return
+
+    const persistencia = persistir(chave)
+    persistenciasPorChave.set(chave, persistencia)
+    persistencias.add(persistencia)
+    void persistencia.then(() => {
+      persistencias.delete(persistencia)
+      if (persistenciasPorChave.get(chave) !== persistencia) return
+      persistenciasPorChave.delete(chave)
+
+      if (!temporizadores.has(chave) && alteracoes.has(chave) && !erros.has(chave)) {
+        iniciarPersistencia(chave)
+      }
+    })
+  }
+
   return {
     agendar(chave, valor) {
       alteracoes.set(chave, { valor, versao: proximaVersao++ })
@@ -64,14 +84,32 @@ export function criarAutosave<T>(
       if (temporizadorAnterior) clearTimeout(temporizadorAnterior)
       temporizadores.set(chave, setTimeout(() => {
         temporizadores.delete(chave)
-        void persistir(chave)
+        iniciarPersistencia(chave)
       }, 400))
       atualizarEstado()
+    },
+    async flush() {
+      // Drain both the debounce queue and requests already in flight. If a
+      // value changes while its previous request is in flight, the loop sends
+      // the newer version before allowing navigation to continue.
+      do {
+        for (const chave of [...temporizadores.keys()]) {
+          const temporizador = temporizadores.get(chave)
+          if (temporizador === undefined) continue
+          clearTimeout(temporizador)
+          temporizadores.delete(chave)
+          iniciarPersistencia(chave)
+        }
+        await Promise.all([...persistencias])
+      } while ((temporizadores.size > 0 || persistencias.size > 0 || alteracoes.size > 0) && erros.size === 0)
+
+      return erros.size === 0 && temporizadores.size === 0 && persistencias.size === 0 && alteracoes.size === 0
     },
     async tentarNovamente() {
       const chavesComErro = [...erros.keys()]
       erros.clear()
-      await Promise.all(chavesComErro.map(persistir))
+      chavesComErro.forEach(iniciarPersistencia)
+      await Promise.all([...persistencias])
     },
     erroAtual: () => erros.values().next().value ?? null,
     cancelar() {
