@@ -1,11 +1,11 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 import LoginPage from './pages/LoginPage'
 import ProjetosPage from './pages/ProjetosPage'
 import DashboardPage from './pages/DashboardPage'
 import PlanilhaPage from './pages/PlanilhaPage'
-import { ALIASES_ROTAS, obterDestinoAlias, ROTA_FALLBACK, ROTAS_CANONICAS } from './lib/routes'
+import { ALIASES_ROTAS, obterDestinoAlias, parseProjetoId, ROTA_FALLBACK, ROTAS_CANONICAS } from './lib/routes'
 
 const DatasetsPage = lazy(() => import('./pages/DatasetsPage'))
 const DashboardBuilderPage = lazy(() => import('./pages/DashboardBuilderPage'))
@@ -16,6 +16,17 @@ const PublicoPage = lazy(() => import('./pages/PublicoPage'))
 function RedirecionarLegado({ alias }: { alias: keyof typeof ALIASES_ROTAS }) {
   const { id } = useParams<{ id: string }>()
   return <Navigate to={obterDestinoAlias(alias, id) ?? ROTA_FALLBACK} replace />
+}
+
+function RotaProjeto({ children, adminOnly = false }: { children: ReactElement; adminOnly?: boolean }) {
+  const { id } = useParams<{ id: string }>()
+  const { usuario } = useAuth()
+
+  if (parseProjetoId(id) === null || (adminOnly && usuario?.papel !== 'admin')) {
+    return <Navigate to={ROTA_FALLBACK} replace />
+  }
+
+  return children
 }
 
 function SucessoRedirect() {
@@ -58,20 +69,20 @@ function Rotas() {
         <Route path="/login" element={usuario ? <SucessoRedirect /> : <LoginPage />} />
         <Route path="/" element={usuario ? <Navigate to={obterDestinoAlias('/') ?? ROTA_FALLBACK} replace /> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.projetos} element={usuario ? <ProjetosPage /> : <Navigate to="/login" replace />} />
-        <Route path="/projetos/:id" element={usuario ? <RedirecionarLegado alias="/projetos/:id" /> : <Navigate to="/login" replace />} />
-        <Route path="/projetos/:id/dashboard" element={usuario ? <RedirecionarLegado alias="/projetos/:id/dashboard" /> : <Navigate to="/login" replace />} />
-        <Route path="/projetos/:id/planilha" element={usuario ? <RedirecionarLegado alias="/projetos/:id/planilha" /> : <Navigate to="/login" replace />} />
-        <Route path={ROTAS_CANONICAS.projetoVisaoGeral} element={usuario ? <DashboardPage /> : <Navigate to="/login" replace />} />
-        <Route path={ROTAS_CANONICAS.projetoCustos} element={usuario ? <DashboardPage /> : <Navigate to="/login" replace />} />
-        <Route path={ROTAS_CANONICAS.projetoPayback} element={usuario ? <DashboardPage /> : <Navigate to="/login" replace />} />
-        <Route path={ROTAS_CANONICAS.projetoInsights} element={usuario ? <DashboardPage /> : <Navigate to="/login" replace />} />
-        <Route path={ROTAS_CANONICAS.projetoComparativo} element={usuario ? <DashboardPage /> : <Navigate to="/login" replace />} />
-        <Route path={ROTAS_CANONICAS.projetoDados} element={usuario ? <PlanilhaPage /> : <Navigate to="/login" replace />} />
-        <Route path={ROTAS_CANONICAS.projetoDatasets} element={usuario ? <DatasetsPage /> : <Navigate to="/login" replace />} />
-        <Route path={ROTAS_CANONICAS.projetoDataset} element={usuario ? <DatasetsPage /> : <Navigate to="/login" replace />} />
-        <Route path={ROTAS_CANONICAS.projetoDashboards} element={usuario ? <DashboardBuilderPage /> : <Navigate to="/login" replace />} />
-        <Route path={ROTAS_CANONICAS.projetoDashboard} element={usuario ? <DashboardBuilderPage /> : <Navigate to="/login" replace />} />
-        <Route path={ROTAS_CANONICAS.projetoUsuarios} element={usuario ? <DashboardPage /> : <Navigate to="/login" replace />} />
+        <Route path="/projetos/:id" element={usuario ? <RotaProjeto><RedirecionarLegado alias="/projetos/:id" /></RotaProjeto> : <Navigate to="/login" replace />} />
+        <Route path="/projetos/:id/dashboard" element={usuario ? <RotaProjeto><RedirecionarLegado alias="/projetos/:id/dashboard" /></RotaProjeto> : <Navigate to="/login" replace />} />
+        <Route path="/projetos/:id/planilha" element={usuario ? <RotaProjeto><RedirecionarLegado alias="/projetos/:id/planilha" /></RotaProjeto> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoVisaoGeral} element={usuario ? <RotaProjeto><DashboardPage abaInicial="Visão Geral" /></RotaProjeto> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoCustos} element={usuario ? <RotaProjeto><DashboardPage abaInicial="Custos" /></RotaProjeto> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoPayback} element={usuario ? <RotaProjeto><DashboardPage abaInicial="Payback" /></RotaProjeto> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoInsights} element={usuario ? <RotaProjeto><DashboardPage abaInicial="Insights" /></RotaProjeto> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoComparativo} element={usuario ? <RotaProjeto><DashboardPage abaInicial="Comparativo" /></RotaProjeto> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoDados} element={usuario ? <RotaProjeto><PlanilhaPage /></RotaProjeto> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoDatasets} element={usuario ? <RotaProjeto><DatasetsPage /></RotaProjeto> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoDataset} element={usuario ? <RotaProjeto><DatasetsPage /></RotaProjeto> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoDashboards} element={usuario ? <RotaProjeto><DashboardBuilderPage /></RotaProjeto> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoDashboard} element={usuario ? <RotaProjeto><DashboardBuilderPage /></RotaProjeto> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoUsuarios} element={usuario ? <RotaProjeto adminOnly><DashboardPage abaInicial="Usuários" /></RotaProjeto> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.compartilhados} element={usuario ? <CompartilhadosPage /> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.relatorios} element={usuario ? <RelatoriosPage /> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.publico} element={<PublicoPage />} />

@@ -59,20 +59,20 @@ const currentRouteInventory: readonly RouteInventoryEntry[] = [
   { path: '/login', authenticated: 'SucessoRedirect', unauthenticated: 'LoginPage', api: ['POST /api/auth/login', 'POST /api/auth/logout', 'GET /api/auth/me'] },
   { path: '/', authenticated: 'Navigate', unauthenticated: 'Navigate', api: [] },
   { path: '/projetos', authenticated: 'ProjetosPage', unauthenticated: 'Navigate', api: ['GET /api/projetos', 'POST /api/projetos', 'POST /api/projetos/importar'] },
-  { path: '/projetos/:id', authenticated: 'RedirecionarLegado', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
-  { path: '/projetos/:id/dashboard', authenticated: 'RedirecionarLegado', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id', 'POST /api/projetos/:id/relatorio', 'GET /api/projetos/:id/planilha.xlsx'] },
-  { path: '/projetos/:id/planilha', authenticated: 'RedirecionarLegado', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id', 'PATCH /api/projetos/:id/locais/:local_id', 'PATCH /api/projetos/itens/:item_id'] },
-  { path: '/projetos/:id/visao-geral', authenticated: 'DashboardPage', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
-  { path: '/projetos/:id/custos', authenticated: 'DashboardPage', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
-  { path: '/projetos/:id/payback', authenticated: 'DashboardPage', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
-  { path: '/projetos/:id/insights', authenticated: 'DashboardPage', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
-  { path: '/projetos/:id/comparativo', authenticated: 'DashboardPage', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
-  { path: '/projetos/:id/dados', authenticated: 'PlanilhaPage', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id', 'PATCH /api/projetos/:id/locais/:local_id', 'PATCH /api/projetos/itens/:item_id'] },
-  { path: '/projetos/:id/datasets', authenticated: 'lazy', unauthenticated: 'Navigate', api: ['GET/POST /api/projetos/:id/datasets', 'GET/POST /api/datasets/:did/rows'] },
-  { path: '/projetos/:id/datasets/:did', authenticated: 'lazy', unauthenticated: 'Navigate', api: ['GET/PATCH/DELETE /api/projetos/:id/datasets/:did', 'GET/POST /api/datasets/:did/rows'] },
-  { path: '/projetos/:id/dashboards', authenticated: 'lazy', unauthenticated: 'Navigate', api: ['GET/POST /api/projetos/:id/dashboards', 'POST /api/dashboards/:dbid/widgets', 'POST /api/dashboards/:dbid/publicar'] },
-  { path: '/projetos/:id/dashboards/:dbid', authenticated: 'lazy', unauthenticated: 'Navigate', api: ['GET/PATCH /api/projetos/:id/dashboards/:dbid', 'POST /api/dashboards/:dbid/query'] },
-  { path: '/projetos/:id/usuarios', authenticated: 'DashboardPage', unauthenticated: 'Navigate', api: ['GET/POST/PATCH /api/users'] },
+  { path: '/projetos/:id', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
+  { path: '/projetos/:id/dashboard', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id', 'POST /api/projetos/:id/relatorio', 'GET /api/projetos/:id/planilha.xlsx'] },
+  { path: '/projetos/:id/planilha', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id', 'PATCH /api/projetos/:id/locais/:local_id', 'PATCH /api/projetos/itens/:item_id'] },
+  { path: '/projetos/:id/visao-geral', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
+  { path: '/projetos/:id/custos', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
+  { path: '/projetos/:id/payback', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
+  { path: '/projetos/:id/insights', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
+  { path: '/projetos/:id/comparativo', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
+  { path: '/projetos/:id/dados', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id', 'PATCH /api/projetos/:id/locais/:local_id', 'PATCH /api/projetos/itens/:item_id'] },
+  { path: '/projetos/:id/datasets', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET/POST /api/projetos/:id/datasets', 'GET/POST /api/datasets/:did/rows'] },
+  { path: '/projetos/:id/datasets/:did', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET/PATCH/DELETE /api/projetos/:id/datasets/:did', 'GET/POST /api/datasets/:did/rows'] },
+  { path: '/projetos/:id/dashboards', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET/POST /api/projetos/:id/dashboards', 'POST /api/dashboards/:dbid/widgets', 'POST /api/dashboards/:dbid/publicar'] },
+  { path: '/projetos/:id/dashboards/:dbid', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET/PATCH /api/projetos/:id/dashboards/:dbid', 'POST /api/dashboards/:dbid/query'] },
+  { path: '/projetos/:id/usuarios', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET/POST/PATCH /api/users'] },
   { path: '/compartilhados', authenticated: 'lazy', unauthenticated: 'Navigate', api: ['GET /api/dashboards/compartilhados'] },
   { path: '/relatorios', authenticated: 'lazy', unauthenticated: 'Navigate', api: ['GET /api/relatorios', 'GET /api/relatorios/:rid/download'] },
   { path: '/p/:token', authenticated: 'lazy', unauthenticated: 'lazy', api: ['GET /p/:token'] },
@@ -98,14 +98,20 @@ function elementName(element: ReactElement): string {
   return 'lazy'
 }
 
-function routeElements(authenticated: boolean): RouteElement[] {
-  harnessState.usuario = authenticated ? { username: 'teste', papel: 'admin' } : null
+type HarnessUsuario = { username: string; papel: string }
+
+function routeElementsFor(usuario: HarnessUsuario | null): RouteElement[] {
+  harnessState.usuario = usuario
   const appTree = App() as unknown as ReactElement
   const authTree = childOf(appTree)
   const rotasTree = childOf(authTree)
   const suspenseTree = (rotasTree.type as () => ReactElement)()
   const routesTree = childOf(suspenseTree)
   return childrenOf(propsOf(routesTree).children)
+}
+
+function routeElements(authenticated: boolean): RouteElement[] {
+  return routeElementsFor(authenticated ? { username: 'teste', papel: 'admin' } : null)
 }
 
 function routeFor(routes: readonly RouteElement[], path: string): RouteElement {
@@ -116,6 +122,15 @@ function routeFor(routes: readonly RouteElement[], path: string): RouteElement {
 
 function destinationOf(route: RouteElement): ReactElement {
   return propsOf(route).element as ReactElement
+}
+
+function renderComponent(element: ReactElement): ReactElement {
+  return (element.type as (props: Record<string, unknown>) => ReactElement)(propsOf(element))
+}
+
+function pageDestinationOf(route: RouteElement): ReactElement {
+  const destination = destinationOf(route)
+  return elementName(destination) === 'RotaProjeto' ? propsOf(destination).children as ReactElement : destination
 }
 
 describe('baseline de rotas pós-login', () => {
@@ -150,8 +165,8 @@ describe('baseline de rotas pós-login', () => {
     for (const id of ['101', '202']) {
       harnessState.params.id = id
       for (const alias of aliases) {
-        const redirectComponent = destinationOf(routeFor(routes, alias))
-        const redirect = (redirectComponent.type as (props: { alias: typeof alias }) => ReactElement)({ alias })
+        const redirectComponent = renderComponent(destinationOf(routeFor(routes, alias)))
+        const redirect = renderComponent(redirectComponent)
         expect(elementName(redirect)).toBe('Navigate')
         expect(propsOf(redirect).to).toBe(obterDestinoAlias(alias, id))
         expect(propsOf(redirect).replace).toBe(true)
@@ -169,25 +184,29 @@ describe('baseline de rotas pós-login', () => {
 
   it('expõe toda a navegação canônica autenticada por área de projeto', () => {
     const routes = routeElements(true)
-    const canonicalDestinations: readonly [string, string][] = [
+    const canonicalDestinations: readonly [string, string, string?][] = [
       [ROTAS_CANONICAS.projetos, 'ProjetosPage'],
-      [ROTAS_CANONICAS.projetoVisaoGeral, 'DashboardPage'],
-      [ROTAS_CANONICAS.projetoCustos, 'DashboardPage'],
-      [ROTAS_CANONICAS.projetoPayback, 'DashboardPage'],
-      [ROTAS_CANONICAS.projetoInsights, 'DashboardPage'],
-      [ROTAS_CANONICAS.projetoComparativo, 'DashboardPage'],
+      [ROTAS_CANONICAS.projetoVisaoGeral, 'DashboardPage', 'Visão Geral'],
+      [ROTAS_CANONICAS.projetoCustos, 'DashboardPage', 'Custos'],
+      [ROTAS_CANONICAS.projetoPayback, 'DashboardPage', 'Payback'],
+      [ROTAS_CANONICAS.projetoInsights, 'DashboardPage', 'Insights'],
+      [ROTAS_CANONICAS.projetoComparativo, 'DashboardPage', 'Comparativo'],
       [ROTAS_CANONICAS.projetoDados, 'PlanilhaPage'],
       [ROTAS_CANONICAS.projetoDatasets, 'lazy'],
       [ROTAS_CANONICAS.projetoDataset, 'lazy'],
       [ROTAS_CANONICAS.projetoDashboards, 'lazy'],
       [ROTAS_CANONICAS.projetoDashboard, 'lazy'],
-      [ROTAS_CANONICAS.projetoUsuarios, 'DashboardPage'],
+      [ROTAS_CANONICAS.projetoUsuarios, 'DashboardPage', 'Usuários'],
       [ROTAS_CANONICAS.relatorios, 'lazy'],
       [ROTAS_CANONICAS.compartilhados, 'lazy'],
     ]
 
-    for (const [path, destinationName] of canonicalDestinations) {
-      expect(elementName(destinationOf(routeFor(routes, path)))).toBe(destinationName)
+    for (const [path, destinationName, tab] of canonicalDestinations) {
+      const destination = pageDestinationOf(routeFor(routes, path))
+      expect(elementName(destination)).toBe(destinationName)
+      if (destinationName === 'DashboardPage') {
+        expect(propsOf(destination).abaInicial).toBe(tab)
+      }
     }
 
     const publicRoute = routeFor(routes, ROTAS_CANONICAS.publico)
@@ -223,8 +242,8 @@ describe('baseline de rotas pós-login', () => {
     )
     for (const alias of legacyAliases) {
       harnessState.params.id = projectId
-      const legacyDestination = destinationOf(routeFor(routes, alias))
-      const redirect = (legacyDestination.type as (props: { alias: typeof alias }) => ReactElement)({ alias })
+      const legacyDestination = renderComponent(destinationOf(routeFor(routes, alias)))
+      const redirect = renderComponent(legacyDestination)
 
       expect(elementName(redirect)).toBe('Navigate')
       expect(propsOf(redirect).to).toBe(obterDestinoAlias(alias, projectId))
@@ -232,12 +251,58 @@ describe('baseline de rotas pós-login', () => {
     }
   })
 
-  it('expõe o destino de Usuários para o administrador autenticado', () => {
-    const usersDestination = destinationOf(
+  it('expõe o destino de Usuários para o administrador mesmo em projeto vazio', () => {
+    // A project with no locais still resolves to the same DashboardPage route;
+    // the page decides whether to show the empty analytical state or UsuariosTab.
+    const usersDestination = pageDestinationOf(
       routeFor(routeElements(true), ROTAS_CANONICAS.projetoUsuarios),
     )
 
     expect(elementName(usersDestination)).toBe('DashboardPage')
+    expect(propsOf(usersDestination).abaInicial).toBe('Usuários')
+  })
+
+  it('redireciona IDs de projeto inválidos antes de montar páginas com escopo', () => {
+    const projectRoutes = [
+      '/projetos/:id',
+      '/projetos/:id/dashboard',
+      '/projetos/:id/planilha',
+      ROTAS_CANONICAS.projetoVisaoGeral,
+      ROTAS_CANONICAS.projetoCustos,
+      ROTAS_CANONICAS.projetoPayback,
+      ROTAS_CANONICAS.projetoInsights,
+      ROTAS_CANONICAS.projetoComparativo,
+      ROTAS_CANONICAS.projetoDados,
+      ROTAS_CANONICAS.projetoDatasets,
+      ROTAS_CANONICAS.projetoDataset,
+      ROTAS_CANONICAS.projetoDashboards,
+      ROTAS_CANONICAS.projetoDashboard,
+      ROTAS_CANONICAS.projetoUsuarios,
+    ]
+
+    for (const id of ['0', '-1', '1.5', '1e2', 'nao-numerico']) {
+      harnessState.params.id = id
+      const routes = routeElements(true)
+      for (const path of projectRoutes) {
+        const guarded = destinationOf(routeFor(routes, path))
+        const fallback = renderComponent(guarded)
+
+        expect(elementName(fallback)).toBe('Navigate')
+        expect(propsOf(fallback).to).toBe(ROTA_FALLBACK)
+      }
+    }
+  })
+
+  it('nega a rota de Usuários para não administradores', () => {
+    harnessState.params.id = '17'
+    const usersRoute = routeFor(
+      routeElementsFor({ username: 'cliente', papel: 'usuario' }),
+      ROTAS_CANONICAS.projetoUsuarios,
+    )
+    const fallback = renderComponent(destinationOf(usersRoute))
+
+    expect(elementName(fallback)).toBe('Navigate')
+    expect(propsOf(fallback).to).toBe(ROTA_FALLBACK)
   })
 
   it('usa o fallback canônico para rotas desconhecidas autenticadas', () => {

@@ -13,21 +13,21 @@ import Modal from '../components/ui/Modal'
 import KpiCard from '../components/KpiCard'
 
 const ICONE_UPLOAD = (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
     <polyline points="17 8 12 3 7 8" />
     <line x1="12" y1="3" x2="12" y2="15" />
   </svg>
 )
 const ICONE_ABRIR = (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
     <polyline points="15 3 21 3 21 9" />
     <line x1="10" y1="14" x2="21" y2="3" />
   </svg>
 )
 const ICONE_PLANILHA = (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="3" width="18" height="18" rx="2" />
     <line x1="3" y1="9" x2="21" y2="9" />
     <line x1="3" y1="15" x2="21" y2="15" />
@@ -35,13 +35,13 @@ const ICONE_PLANILHA = (
   </svg>
 )
 const ICONE_EDITAR = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
     <path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z" />
   </svg>
 )
 const ICONE_LIXO = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="3 6 5 6 21 6" />
     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
   </svg>
@@ -305,7 +305,7 @@ export default function ProjetosPage() {
               {importando ? 'Importando…' : 'Importar planilha'}
             </Botao>
             <Botao onClick={abrirNovo}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
               Novo projeto
             </Botao>
           </>
@@ -322,9 +322,8 @@ export default function ProjetosPage() {
       )}
 
       <div
-        role="button"
-        tabIndex={0}
-        aria-label="Importar planilha por arrastar e soltar"
+        {...(!somenteLeitura ? { role: 'button' as const, tabIndex: 0 } : {})}
+        aria-label={somenteLeitura ? 'Importação de planilha indisponível para leitura' : 'Importar planilha por arrastar e soltar'}
         onClick={() => !somenteLeitura && fileRef.current?.click()}
         onKeyDown={(e) => {
           if (somenteLeitura) return
@@ -345,8 +344,8 @@ export default function ProjetosPage() {
           background: 'rgba(46, 89, 246, 0.04)',
         }}
       >
-        <div className="text-[13px] font-medium" style={{ color: 'var(--cor-tinta)' }}>Arraste uma planilha aqui</div>
-        <div className="mt-0.5 text-[12px]" style={{ color: 'var(--cor-mutado)' }}>ou clique para selecionar um arquivo .xlsx</div>
+        <div className="text-[13px] font-medium" style={{ color: 'var(--cor-tinta)' }}>{somenteLeitura ? 'Importação indisponível' : 'Arraste uma planilha aqui'}</div>
+        <div className="mt-0.5 text-[12px]" style={{ color: 'var(--cor-mutado)' }}>{somenteLeitura ? 'Seu perfil tem acesso somente para leitura.' : 'ou clique para selecionar um arquivo .xlsx'}</div>
       </div>
 
       {erro && <div className="text-sm mb-4" style={{ color: 'var(--cor-alerta)' }}>{erro}</div>}
@@ -363,9 +362,9 @@ export default function ProjetosPage() {
               ? `Nada corresponde a “${busca}”.`
               : 'Crie um projeto e preencha os dados na tela, ou importe uma planilha no template padrão para começar.'}
           </div>
-          {!busca && (
+          {busca ? <Botao variante="secundario" onClick={() => setBusca('')}>Limpar busca</Botao> : !somenteLeitura && (
             <Botao onClick={abrirNovo}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
               Criar primeiro projeto
             </Botao>
           )}
@@ -386,7 +385,8 @@ export default function ProjetosPage() {
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <button
-                  onClick={() => navigate(construirRotaProjeto(ROTAS_CANONICAS.projetoVisaoGeral, projeto.id) ?? ROTAS_CANONICAS.projetos)}
+                  type="button"
+                 onClick={() => navigate(construirRotaProjeto(ROTAS_CANONICAS.projetoVisaoGeral, projeto.id) ?? ROTAS_CANONICAS.projetos)}
                   className="text-[15px] font-semibold text-left leading-snug transition-colors"
                   style={{ color: 'var(--cor-tinta)' }}
                 >
@@ -396,6 +396,9 @@ export default function ProjetosPage() {
                   {projeto.cliente ?? 'Sem cliente'} · {fmtData(projeto.criado_em)}
                 </div>
               </div>
+              <span className="shrink-0 rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: projeto.num_locais === 0 && projeto.num_itens === 0 ? 'rgba(224,123,26,.45)' : 'rgba(16,185,129,.4)', color: projeto.num_locais === 0 && projeto.num_itens === 0 ? 'var(--cor-destaque)' : 'var(--cor-sucesso)' }}>
+                {projeto.num_locais === 0 && projeto.num_itens === 0 ? 'Sem dados' : 'Dados cadastrados'}
+              </span>
             </div>
 
             <div className="grid grid-cols-3 gap-2 text-center">
@@ -418,12 +421,13 @@ export default function ProjetosPage() {
               style={{ borderColor: 'var(--cor-borda)' }}
             >
               <button
+                type="button"
                 onClick={() => navigate(construirRotaProjeto(ROTAS_CANONICAS.projetoVisaoGeral, projeto.id) ?? ROTAS_CANONICAS.projetos)}
-                className="h-8 px-2.5 rounded-lg text-[12.5px] font-medium inline-flex items-center gap-1.5 transition-colors"
-                style={{ color: 'var(--cor-mutado)' }}
+                aria-label={`Abrir visão geral do projeto ${projeto.nome}`}
+                className="h-9 rounded-lg bg-[#2e59f6] px-3 text-[12.5px] font-semibold text-white inline-flex items-center gap-1.5 transition-colors hover:bg-[#4669f7]"
               >
                 {ICONE_ABRIR}
-                Dashboard
+                Abrir visão geral
               </button>
               <button
                 onClick={() => navigate(construirRotaProjeto(ROTAS_CANONICAS.projetoDados, projeto.id) ?? ROTAS_CANONICAS.projetos)}
@@ -436,16 +440,20 @@ export default function ProjetosPage() {
               {!somenteLeitura && (
                 <>
                   <button
+                    type="button"
                     onClick={() => abrirEditar(projeto)}
                     title="Renomear"
+                    aria-label={`Editar projeto ${projeto.nome}`}
                     className="h-8 w-8 rounded-lg inline-flex items-center justify-center transition-colors"
                     style={{ color: 'var(--cor-mutado)' }}
                   >
                     {ICONE_EDITAR}
                   </button>
                   <button
+                    type="button"
                     onClick={() => setModalExcluir(projeto)}
                     title="Excluir"
+                    aria-label={`Excluir projeto ${projeto.nome}`}
                     className="h-8 w-8 rounded-lg inline-flex items-center justify-center transition-colors"
                     style={{ color: 'var(--cor-mutado)' }}
                   >

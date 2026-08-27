@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
@@ -30,18 +30,23 @@ const ICONES_ABAS: Record<string, ReactNode> = {
   Usuários: (<><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" /><circle cx="10" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>),
 }
 
-export default function DashboardPage() {
+interface DashboardPageProps {
+  abaInicial?: string
+}
+
+export default function DashboardPage({ abaInicial = 'Visão Geral' }: DashboardPageProps) {
   const { id } = useParams<{ id: string }>()
   const projetoId = Number(id)
   const { usuario } = useAuth()
   const [analise, setAnalise] = useState<AnaliseUpload | null>(null)
   const [localNome, setLocalNome] = useState<string | null>(null)
-  const [aba, setAba] = useState('Visão Geral')
+  const [aba, setAba] = useState(abaInicial)
   const [categoriasFiltro, setCategoriasFiltro] = useState<string[]>([])
   const [erro, setErro] = useState('')
   const [carregando, setCarregando] = useState(true)
 
   const abas = usuario?.papel === 'admin' ? [...ABAS_PADRAO, 'Usuários'] : ABAS_PADRAO
+  const usuariosSelecionados = aba === 'Usuários' && usuario?.papel === 'admin'
 
   const local = analise?.locais.find((l) => l.nome === localNome) ?? analise?.locais[0] ?? null
 
@@ -53,17 +58,18 @@ export default function DashboardPage() {
   useEffect(() => {
     setCarregando(true)
     setErro('')
+    setAba(abaInicial)
     api
       .get<AnaliseUpload>(`/api/projetos/${projetoId}`)
       .then((dados) => {
         setAnalise(dados)
         setLocalNome(dados.locais[0]?.nome ?? null)
         setCategoriasFiltro([])
-        setAba('Visão Geral')
+        setAba(abaInicial)
       })
       .catch((e) => setErro(e instanceof Error ? e.message : 'Erro ao carregar projeto.'))
       .finally(() => setCarregando(false))
-  }, [projetoId])
+  }, [abaInicial, projetoId])
 
   function alternarCategoria(categoria: string) {
     setCategoriasFiltro((atual) =>
@@ -138,7 +144,7 @@ export default function DashboardPage() {
               <button
                 key={nome}
                 onClick={() => setAba(nome)}
-                className={`flex shrink-0 items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium border-l-2 transition-colors whitespace-nowrap ${
+                className={`flex shrink-0 items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium ring-1 ring-inset transition-colors whitespace-nowrap ${
                   aba === nome ? '' : ''
                 }`}
                 style={
@@ -226,7 +232,7 @@ export default function DashboardPage() {
         <main className="flex-1 min-w-0">
           {erro && <div className="text-sm mb-4" style={{ color: 'var(--cor-alerta)' }}>{erro}</div>}
 
-          {analise && analise.locais.length === 0 && (
+          {analise && analise.locais.length === 0 && !usuariosSelecionados && (
             <div className="rounded-2xl border p-7 text-center" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
               <div className="text-[15px] font-semibold mb-1.5" style={{ color: 'var(--cor-tinta)' }}>Nenhum local cadastrado</div>
               <div className="text-[13px] leading-relaxed mb-4" style={{ color: 'var(--cor-mutado)' }}>
@@ -259,9 +265,9 @@ export default function DashboardPage() {
               {aba === 'Payback' && local && <PaybackTab local={local} />}
               {aba === 'Insights' && local && <InsightsTab local={local} />}
               {aba === 'Comparativo' && <ComparativoTab projeto={analise.projeto} />}
-              {aba === 'Usuários' && usuario?.papel === 'admin' && <UsuariosTab />}
             </>
           )}
+          {analise && usuariosSelecionados && <UsuariosTab />}
         </main>
       </div>
     </AppShell>
