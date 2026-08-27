@@ -88,6 +88,24 @@ describe('criarAutosave', () => {
     expect(salvar).toHaveBeenCalledWith('alterado')
   })
 
+  it('não perde a alteração quando o debounce é cancelado após iniciar o flush', async () => {
+    vi.useFakeTimers()
+    let concluir!: () => void
+    const salvar = vi.fn(() => new Promise<void>((resolve) => {
+      concluir = resolve
+    }))
+    const autosave = criarAutosave(salvar)
+
+    autosave.agendar('dataset:1:linhas', { row_index: 0 })
+    const flush = autosave.flush()
+    autosave.cancelar()
+
+    expect(salvar).toHaveBeenCalledWith({ row_index: 0 })
+    concluir()
+
+    await expect(flush).resolves.toBe(true)
+  })
+
   it('não libera a navegação quando o flush não consegue salvar', async () => {
     vi.useFakeTimers()
     const autosave = criarAutosave(vi.fn().mockRejectedValue(new Error('Rede indisponível')))

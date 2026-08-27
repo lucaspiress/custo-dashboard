@@ -138,6 +138,10 @@ function mesmoEscopo(a: EscopoToken | null | undefined, b: EscopoToken): boolean
   return a?.chave === b.chave && a.ciclo === b.ciclo
 }
 
+function mesmaChaveEscopo(a: EscopoToken | null | undefined, b: EscopoToken): boolean {
+  return a?.chave === b.chave
+}
+
 export function mesclarLinhaPendente(
   linhaAtual: DatasetRow | undefined,
   linhaPendente: Record<string, any> | undefined,
@@ -402,8 +406,6 @@ export default function DatasetsPage() {
 
   const didRef = useRef(did)
   didRef.current = did
-  const projetoIdRef = useRef(projetoId)
-  projetoIdRef.current = projetoId
   const escopoRef = useRef(chaveEscopo)
   escopoRef.current = chaveEscopo
   const importacaoRef = useRef<EscopoToken | null>(null)
@@ -414,7 +416,10 @@ export default function DatasetsPage() {
   const linhasRef = useRef(linhas)
   linhasRef.current = mesmoEscopo(escopoLinhas, escopoAtual) ? linhas : []
   const autosaveRef = useRef<Autosave<PayloadAutosave> | null>(null)
-  const flushNavegacaoRef = useRef<Promise<boolean> | null>(null)
+  const flushNavegacaoRef = useRef<{
+    autosave: Autosave<PayloadAutosave>
+    promise: Promise<boolean>
+  } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   function escopoAindaAtual(token: EscopoToken): boolean {
@@ -425,13 +430,11 @@ export default function DatasetsPage() {
     const escopo = chaveEscopo
     const ciclo = cicloEscopo
     return criarAutosave<PayloadAutosave>(async (payload) => {
-      if (
-        payload.projetoId !== projetoIdRef.current ||
-        payload.did !== didRef.current ||
-        escopoRef.current !== escopo ||
-        cicloEscopoRef.current.ciclo !== ciclo
-      ) return
-
+      // This callback can still be flushing after the route has changed. The
+      // payload carries the dataset it belongs to, so it is safe (and
+      // necessary) to persist it even when the component now renders another
+      // scope. Guarding it with the current route would make cleanup treat an
+      // unsaved edit as successfully persisted without sending it.
       await adicionarLinhas(payload.did, payload.rows)
       if (escopoRef.current !== escopo || cicloEscopoRef.current.ciclo !== ciclo) return
       if (!mesmoEscopo(pendentesRef.current, { chave: escopo, ciclo })) return
@@ -460,6 +463,7 @@ export default function DatasetsPage() {
     [escopoLinhas, linhas, chaveEscopo, cicloEscopo]
   )
   const importando = mesmoEscopo(importacaoAtiva, escopoAtual)
+  const importacaoEmAndamento = importando || mesmaChaveEscopo(importacaoRef.current, escopoAtual)
   const linhasPlanas = useMemo(
     () => linhasDoEscopo.map((r) => ({ row_index: r.row_index, ...r.data_json })),
     [linhasDoEscopo]
@@ -478,7 +482,6 @@ export default function DatasetsPage() {
     setCriacaoAtiva(null)
     setModalCampo(null)
     setEstadoAutosave('salvo')
-    importacaoRef.current = null
     setImportacaoAtiva(null)
     setCarregandoDatasets(true)
     setCarregandoLinhas(Boolean(did))
@@ -550,7 +553,7 @@ export default function DatasetsPage() {
       ativo = false
       void autosave.flush()
       autosave.cancelar()
-      flushNavegacaoRef.current = null
+      if (flushNavegacaoRef.current?.autosave === autosave) flushNavegacaoRef.current = null
     }
   }, [autosave, chaveEscopo, did, projetoId, cicloEscopo])
 
@@ -559,7 +562,7 @@ export default function DatasetsPage() {
       Object.entries(schema).map(([campo, tipo]) => ({
         field: campo,
         headerName: campo,
-        editable: !readOnly,
+        editable: !readOnly && !importacaoEmAndamento,
         cellEditor:
           tipo === 'number' ? 'agNumberCellEditor' : tipo === 'date' ? 'dateCellEditor' : 'agTextCellEditor',
         valueFormatter:
@@ -568,7 +571,7 @@ export default function DatasetsPage() {
             : undefined,
         minWidth: 120,
       })),
-    [schema, readOnly]
+    [schema, readOnly, importacaoEmAndamento]
   )
 
   function aoAlterarCelula(evento: CellValueChangedEvent) {
@@ -576,6 +579,8 @@ export default function DatasetsPage() {
       !datasetSelecionado ||
       datasetSelecionado.projeto_id !== projetoId ||
       String(datasetSelecionado.id) !== did ||
+      importacaoEmAndamento ||
+      mesmoEscopo(importacaoRef.current, escopoAtual) ||
       !mesmoEscopo(escopoLinhas, escopoAtual)
     ) return
     const rowIndex = evento.data?.row_index as number | undefined
@@ -605,17 +610,17 @@ export default function DatasetsPage() {
   }
 
   function flushAntesDeNavegar(): Promise<boolean> {
-    if (flushNavegacaoRef.current) return flushNavegacaoRef.current
     const autosaveAtual = autosaveRef.current
     if (!autosaveAtual) return Promise.resolve(true)
+    if (flushNavegacaoRef.current?.autosave === autosaveAtual) return flushNavegacaoRef.current.promise
     const flush = autosaveAtual.flush()
-    flushNavegacaoRef.current = flush
+    flushNavegacaoRef.current = { autosave: autosaveAtual, promise: flush }
     void flush.then(
       () => {
-        if (flushNavegacaoRef.current === flush) flushNavegacaoRef.current = null
+        if (flushNavegacaoRef.current?.promise === flush) flushNavegacaoRef.current = null
       },
       () => {
-        if (flushNavegacaoRef.current === flush) flushNavegacaoRef.current = null
+        if (flushNavegacaoRef.current?.promise === flush) flushNavegacaoRef.current = null
       },
     )
     return flush
@@ -645,17 +650,31 @@ export default function DatasetsPage() {
     if (!datasetSelecionado || readOnly) return
     const token = escopoAtual
     const didImportado = String(datasetSelecionado.id)
+    if (importacaoRef.current && mesmaChaveEscopo(importacaoRef.current, token)) return
     if (file.size > 10 * 1024 * 1024) {
       setErro('Arquivo muito grande. O limite é de 10MB.')
       return
     }
-    autosave.cancelar()
-    pendentesRef.current.valores.clear()
-    setEstadoAutosave('salvo')
+
+    // Import replaces the dataset contents. Drain the edit queue first;
+    // cancelling the debounce timer here would otherwise discard edits that
+    // have not reached the API yet. Keep the import marked as active while
+    // flushing so no new cell edit can be queued in that interval.
     importacaoRef.current = token
     setImportacaoAtiva(token)
     setErro('')
     try {
+      const salvou = await flushAntesDeNavegar()
+      if (!salvou) {
+        if (escopoAindaAtual(token)) {
+          setErro(autosave.erroAtual() ?? 'Não foi possível salvar as alterações antes da importação.')
+        }
+        return
+      }
+      if (!escopoAindaAtual(token) || didRef.current !== did) return
+
+      pendentesRef.current.valores.clear()
+      setEstadoAutosave('salvo')
       await importarDataset(datasetSelecionado.id, file)
       if (!escopoAindaAtual(token) || didRef.current !== did) return
       // o backend atualiza o schema_json do dataset; recarrega lista + linhas
@@ -668,6 +687,10 @@ export default function DatasetsPage() {
         didRef.current !== did ||
         !dados.some((dataset) => String(dataset.id) === didImportado && dataset.projeto_id === projetoId)
       ) return
+      // Cell edits are disabled while importing, but clear defensively before
+      // installing the replacement rows so an old queue can never be sent
+      // against the newly imported contents.
+      pendentesRef.current.valores.clear()
       setDatasets(dados)
       setLinhas(rows)
       setEscopoDatasets(token)
@@ -717,6 +740,8 @@ export default function DatasetsPage() {
     if (
       !datasetSelecionado ||
       readOnly ||
+      importacaoEmAndamento ||
+      mesmoEscopo(importacaoRef.current, escopoAtual) ||
       datasetSelecionado.projeto_id !== projetoId ||
       !mesmoEscopo(escopoLinhas, escopoAtual) ||
       carregandoLinhas

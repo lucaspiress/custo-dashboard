@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
 import { baixarBlob } from '../lib/format'
 import type { AnaliseUpload } from '../lib/types'
+import { construirRotaProjeto, ROTAS_CANONICAS } from '../lib/routes'
 import VisaoGeralTab from '../components/tabs/VisaoGeralTab'
 import CustosTab from '../components/tabs/CustosTab'
 import PaybackTab from '../components/tabs/PaybackTab'
@@ -34,9 +35,23 @@ interface DashboardPageProps {
   abaInicial?: string
 }
 
+export function obterRotasDashboard(projetoId: number) {
+  const rotaProjetos = ROTAS_CANONICAS.projetos
+  return {
+    dados: construirRotaProjeto(ROTAS_CANONICAS.projetoDados, projetoId) ?? rotaProjetos,
+    datasets: construirRotaProjeto(ROTAS_CANONICAS.projetoDatasets, projetoId) ?? rotaProjetos,
+    dashboards: construirRotaProjeto(ROTAS_CANONICAS.projetoDashboards, projetoId) ?? rotaProjetos,
+  }
+}
+
+export function geracaoDashboardAtiva(cancelado: boolean, geracao: number, geracaoAtual: number): boolean {
+  return !cancelado && geracao === geracaoAtual
+}
+
 export default function DashboardPage({ abaInicial = 'Visão Geral' }: DashboardPageProps) {
   const { id } = useParams<{ id: string }>()
   const projetoId = Number(id)
+  const rotas = obterRotasDashboard(projetoId)
   const { usuario } = useAuth()
   const [analise, setAnalise] = useState<AnaliseUpload | null>(null)
   const [localNome, setLocalNome] = useState<string | null>(null)
@@ -44,6 +59,9 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
   const [categoriasFiltro, setCategoriasFiltro] = useState<string[]>([])
   const [erro, setErro] = useState('')
   const [carregando, setCarregando] = useState(true)
+  const [projetoRenderizadoId, setProjetoRenderizadoId] = useState<number | null>(null)
+  const geracaoRotaRef = useRef(0)
+  const geracaoDaRenderizacao = geracaoRotaRef.current
 
   const abas = usuario?.papel === 'admin' ? [...ABAS_PADRAO, 'Usuários'] : ABAS_PADRAO
   const usuariosSelecionados = aba === 'Usuários' && usuario?.papel === 'admin'
@@ -56,20 +74,43 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
   )
 
   useEffect(() => {
+    let cancelado = false
+    const geracao = ++geracaoRotaRef.current
+    const aindaAtiva = () => geracaoDashboardAtiva(cancelado, geracao, geracaoRotaRef.current)
+
+    setAnalise(null)
+    setLocalNome(null)
+    setCategoriasFiltro([])
+    setProjetoRenderizadoId(null)
     setCarregando(true)
     setErro('')
-    setAba(abaInicial)
-    api
-      .get<AnaliseUpload>(`/api/projetos/${projetoId}`)
-      .then((dados) => {
+    async function carregarProjeto() {
+      try {
+        const dados = await api.get<AnaliseUpload>(`/api/projetos/${projetoId}`)
+        if (!aindaAtiva()) return
         setAnalise(dados)
         setLocalNome(dados.locais[0]?.nome ?? null)
         setCategoriasFiltro([])
-        setAba(abaInicial)
-      })
-      .catch((e) => setErro(e instanceof Error ? e.message : 'Erro ao carregar projeto.'))
-      .finally(() => setCarregando(false))
-  }, [abaInicial, projetoId])
+      } catch (e) {
+        if (aindaAtiva()) setErro(e instanceof Error ? e.message : 'Erro ao carregar projeto.')
+      } finally {
+        if (aindaAtiva()) {
+          setProjetoRenderizadoId(projetoId)
+          setCarregando(false)
+        }
+      }
+    }
+
+    void carregarProjeto()
+    return () => {
+      cancelado = true
+      if (geracaoRotaRef.current === geracao) geracaoRotaRef.current += 1
+    }
+  }, [projetoId])
+
+  useEffect(() => {
+    setAba(abaInicial)
+  }, [abaInicial])
 
   function alternarCategoria(categoria: string) {
     setCategoriasFiltro((atual) =>
@@ -78,24 +119,32 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
   }
 
   async function baixarPdf() {
+    const geracao = geracaoDaRenderizacao
     try {
       const blob = await api.postBlob(`/api/projetos/${projetoId}/relatorio`, {})
+      if (!geracaoDashboardAtiva(false, geracao, geracaoRotaRef.current)) return
       baixarBlob(blob, `Dashboard_Financeiro_${analise?.filename ?? 'Projeto'}.pdf`)
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao gerar o PDF.')
+      if (geracaoDashboardAtiva(false, geracao, geracaoRotaRef.current)) {
+        setErro(e instanceof Error ? e.message : 'Erro ao gerar o PDF.')
+      }
     }
   }
 
   async function baixarPlanilha() {
+    const geracao = geracaoDaRenderizacao
     try {
       const blob = await api.blob(`/api/projetos/${projetoId}/planilha.xlsx`)
+      if (!geracaoDashboardAtiva(false, geracao, geracaoRotaRef.current)) return
       baixarBlob(blob, `Planilha_${analise?.filename ?? 'Projeto'}.xlsx`)
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro ao exportar planilha.')
+      if (geracaoDashboardAtiva(false, geracao, geracaoRotaRef.current)) {
+        setErro(e instanceof Error ? e.message : 'Erro ao exportar planilha.')
+      }
     }
   }
 
-  if (carregando) {
+  if (carregando || projetoRenderizadoId !== projetoId) {
     return <DashboardCarregando />
   }
 
@@ -114,16 +163,16 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
               <span className="hidden sm:inline">Exportar planilha</span>
             </Botao>
             {usuario?.papel !== 'cliente' && (
-              <Link to={`/projetos/${projetoId}/planilha`} aria-label="Editar dados" className="h-9 rounded-lg px-3.5 text-[13px] font-medium inline-flex items-center gap-2 transition-colors" style={{ background: 'var(--cor-elevado)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}>
+              <Link to={rotas.dados} aria-label="Editar dados" className="h-9 rounded-lg px-3.5 text-[13px] font-medium inline-flex items-center gap-2 transition-colors" style={{ background: 'var(--cor-elevado)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}>
                 {ICONE_PLANILHA}
                 <span className="hidden sm:inline">Editar dados</span>
               </Link>
             )}
-            <Link to={`/projetos/${projetoId}/datasets`} aria-label="Datasets" className="h-9 rounded-lg px-3.5 text-[13px] font-medium inline-flex items-center gap-2 transition-colors" style={{ background: 'var(--cor-elevado)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}>
+            <Link to={rotas.datasets} aria-label="Datasets" className="h-9 rounded-lg px-3.5 text-[13px] font-medium inline-flex items-center gap-2 transition-colors" style={{ background: 'var(--cor-elevado)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}>
               {ICONE_PLANILHA}
               <span className="hidden sm:inline">Datasets</span>
             </Link>
-            <Link to={`/projetos/${projetoId}/dashboards`} aria-label="Dashboards" className="h-9 rounded-lg px-3.5 text-[13px] font-medium inline-flex items-center gap-2 transition-colors" style={{ background: 'var(--cor-elevado)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}>
+            <Link to={rotas.dashboards} aria-label="Dashboards" className="h-9 rounded-lg px-3.5 text-[13px] font-medium inline-flex items-center gap-2 transition-colors" style={{ background: 'var(--cor-elevado)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}>
               {ICONE_DASHBOARD}
               <span className="hidden sm:inline">Dashboards</span>
             </Link>
@@ -240,7 +289,7 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
                 os gráficos e a análise do projeto.
               </div>
               <Link
-                to={`/projetos/${projetoId}/planilha`}
+                to={rotas.dados}
                 className="h-9 rounded-lg px-4 text-[13px] font-semibold text-white inline-flex items-center gap-2"
                 style={{ background: 'linear-gradient(135deg, #2e59f6 0%, #3061d9 100%)' }}
               >
