@@ -73,6 +73,8 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
   const [apresentacaoAtiva, setApresentacaoAtiva] = useState(false)
   const [tentativa, setTentativa] = useState(0)
 
+  const [sidebarRecolhida, setSidebarRecolhida] = useState(false)
+
   const geracaoRotaRef = useRef(0)
   const geracaoDaRenderizacao = geracaoRotaRef.current
 
@@ -85,6 +87,25 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
     () => (local ? Array.from(new Set(local.itens.map((i) => i.categoria))).sort() : []),
     [local]
   )
+
+  const gruposAbas = useMemo(() => {
+    const financas = ['Visão Geral', 'Custos', 'Payback', 'DRE & Sensibilidade'].filter((a) => abas.includes(a))
+    const inteligencia = ['Simulador', 'Analytics Avançado', 'Insights', 'Comparativo'].filter((a) => abas.includes(a))
+    const gestao = abas.includes('Usuários') ? ['Usuários'] : []
+    return [
+      { id: 'financas', titulo: 'Finanças & Custos', itens: financas },
+      { id: 'inteligencia', titulo: 'Inteligência & IA', itens: inteligencia },
+      ...(gestao.length ? [{ id: 'gestao', titulo: 'Gestão', itens: gestao }] : []),
+    ]
+  }, [abas])
+
+  const contagemCategorias = useMemo(() => {
+    const counts: Record<string, number> = {}
+    local?.itens.forEach((i) => {
+      counts[i.categoria] = (counts[i.categoria] || 0) + 1
+    })
+    return counts
+  }, [local])
 
   useEffect(() => {
     let cancelado = false
@@ -212,106 +233,207 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
         )
       }
     >
-      <div className="flex flex-col lg:flex-row gap-5">
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        {/* Painel de Navegação Lateral - Arquitetura Double-Bezel (High-End Visual Design) */}
         <aside
-          className="w-full lg:w-64 shrink-0 rounded-2xl border p-4 lg:self-start"
-          style={{
-            background: 'var(--cor-sidebar)',
-            borderColor: 'var(--cor-borda)',
-          }}
+          className={`shrink-0 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] self-start ${
+            sidebarRecolhida ? 'w-full lg:w-[72px]' : 'w-full lg:w-72'
+          } rounded-2xl p-1.5 border border-[#1e2746]/80 bg-[#0c111c]/90 shadow-[0_16px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl`}
         >
-          <nav className="flex lg:flex-col gap-1 overflow-x-auto" aria-label="Áreas da análise">
-            {abas.map((nome) => (
-              <Link
-                key={nome}
-                to={rotasAbas[nome] ?? rotas.dados}
-                className={`flex shrink-0 items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium ring-1 ring-inset transition-colors whitespace-nowrap ${
-                  aba === nome ? '' : ''
-                }`}
-                aria-current={aba === nome ? 'page' : undefined}
-                style={
-                  aba === nome
-                    ? {
-                        background: 'rgba(46, 89, 246, 0.14)',
-                        color: 'var(--cor-tinta)',
-                        borderColor: 'var(--cor-primaria)',
-                      }
-                    : {
-                        borderColor: 'transparent',
-                        color: 'var(--cor-mutado)',
-                      }
-                }
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                  {ICONES_ABAS[nome]}
-                </svg>
-                {nome}
-              </Link>
-            ))}
-          </nav>
-
-          {analise && analise.locais.length > 0 && (
-            <div className="mt-4 flex flex-col gap-4 border-t pt-4" style={{ borderColor: 'var(--cor-borda)' }}>
-              <div>
-                <label htmlFor="filtro-local" className="text-[11px] font-semibold uppercase tracking-wider mb-2 block" style={{ color: 'var(--cor-mutado)' }}>
-                  Local
-                </label>
-                <select
-                  id="filtro-local"
-                  value={localNome ?? ''}
-                  onChange={(e) => setLocalNome(e.target.value)}
-                  className="w-full rounded-lg px-2 py-1.5 text-sm border outline-none"
-                  style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-superficie)', color: 'var(--cor-tinta)' }}
-                >
-                  {analise.locais.map((l) => (
-                    <option key={l.nome} value={l.nome}>{l.nome}</option>
-                  ))}
-                </select>
-              </div>
-
-              {categorias.length > 0 && (
-                <div>
-                  <div id="filtro-categorias-label" className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--cor-mutado)' }}>
-                    Categorias
-                  </div>
-                  <div className="flex lg:flex-col flex-wrap gap-1" role="group" aria-labelledby="filtro-categorias-label">
-                    <button
-                      onClick={() => setCategoriasFiltro([])}
-                      aria-pressed={categoriasFiltro.length === 0}
-                      className={`text-left text-[12.5px] px-2.5 py-1.5 rounded-md border transition-colors ${
-                        categoriasFiltro.length === 0 ? '' : ''
-                      }`}
-                      style={
-                        categoriasFiltro.length === 0
-                          ? { borderColor: 'var(--cor-primaria)', color: 'var(--cor-tinta)', background: 'rgba(46, 89, 246, 0.14)' }
-                          : { borderColor: 'transparent', color: 'var(--cor-mutado)' }
-                      }
-                    >
-                      Todas
-                    </button>
-                    {categorias.map((c) => (
-                      <button
-                        key={c}
-                        onClick={() => alternarCategoria(c)}
-                        aria-pressed={categoriasFiltro.includes(c)}
-                        className={`text-left text-[12.5px] px-2.5 py-1.5 rounded-md border transition-colors ${
-                          categoriasFiltro.includes(c) ? '' : ''
-                        }`}
-                        style={
-                          categoriasFiltro.includes(c)
-                            ? { borderColor: 'var(--cor-primaria)', color: 'var(--cor-tinta)', background: 'rgba(46, 89, 246, 0.14)' }
-                            : { borderColor: 'transparent', color: 'var(--cor-mutado)' }
-                        }
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
+          <div className="rounded-[calc(1rem-2px)] p-3 border border-[#1f2740]/40 bg-[#121622]/95 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)]">
+            {/* Header do Menu com Toggle de Recolher */}
+            <div className="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-[#1f2740]/70">
+              {!sidebarRecolhida && (
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="h-2 w-2 rounded-full bg-[#18d6ec] shadow-[0_0_8px_#18d6ec]" />
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8fa3c7] truncate">
+                    Painel do Projeto
+                  </span>
                 </div>
               )}
+              <button
+                type="button"
+                onClick={() => setSidebarRecolhida((v) => !v)}
+                title={sidebarRecolhida ? 'Expandir menu lateral' : 'Recolher menu lateral'}
+                aria-label={sidebarRecolhida ? 'Expandir menu' : 'Recolher menu'}
+                className="p-1.5 rounded-lg border border-[#1f2740] bg-[#1a2238]/60 text-[#8fa3c7] hover:text-[#f5f7fc] hover:border-[#2e59f6]/60 transition-all active:scale-95 ml-auto"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`transition-transform duration-200 ${sidebarRecolhida ? 'rotate-180' : ''}`}
+                >
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
             </div>
-          )}
+
+            {/* Lista de Abas Agrupadas */}
+            <nav className="flex lg:flex-col gap-3 overflow-x-auto" aria-label="Áreas da análise">
+              {gruposAbas.map((grupo) => (
+                <div key={grupo.id} className="space-y-1">
+                  {!sidebarRecolhida && (
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8fa3c7]/60 px-2 py-1 select-none">
+                      {grupo.titulo}
+                    </div>
+                  )}
+                  {grupo.itens.map((nome) => {
+                    const ativo = aba === nome
+                    return (
+                      <Link
+                        key={nome}
+                        to={rotasAbas[nome] ?? rotas.dados}
+                        title={sidebarRecolhida ? nome : undefined}
+                        className={`group relative flex shrink-0 items-center ${
+                          sidebarRecolhida ? 'justify-center px-2' : 'justify-between px-3'
+                        } py-2 rounded-xl text-[13px] font-medium transition-all duration-200 whitespace-nowrap active:scale-[0.98] ${
+                          ativo
+                            ? 'bg-gradient-to-r from-[#2e59f6]/25 via-[#2e59f6]/10 to-transparent border border-[#2e59f6]/60 text-[#f5f7fc] shadow-[0_0_16px_rgba(46,89,246,0.22)]'
+                            : 'border border-transparent text-[#8fa3c7] hover:bg-[#1a2238]/70 hover:text-[#f5f7fc] hover:border-[#1f2740]/80'
+                        }`}
+                        aria-current={ativo ? 'page' : undefined}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className={`shrink-0 transition-colors ${
+                              ativo ? 'text-[#18d6ec]' : 'text-[#8fa3c7] group-hover:text-[#f5f7fc]'
+                            }`}
+                          >
+                            {ICONES_ABAS[nome]}
+                          </svg>
+                          {!sidebarRecolhida && (
+                            <span className="truncate">{nome}</span>
+                          )}
+                        </div>
+                        {!sidebarRecolhida && (
+                          <div className="flex items-center gap-1.5">
+                            {nome === 'Analytics Avançado' && (
+                              <span className="h-1.5 w-1.5 rounded-full bg-[#18d6ec] shadow-[0_0_6px_#18d6ec]" />
+                            )}
+                            {nome === 'Insights' && (
+                              <span className="h-1.5 w-1.5 rounded-full bg-[#a855f7] shadow-[0_0_6px_#a855f7]" />
+                            )}
+                          </div>
+                        )}
+                      </Link>
+                    )
+                  })}
+                </div>
+              ))}
+            </nav>
+
+            {/* Filtros de Local e Categorias */}
+            {analise && analise.locais.length > 0 && !sidebarRecolhida && (
+              <div className="mt-5 pt-4 border-t border-[#1f2740]/80 space-y-4">
+                {/* Seletor de Local */}
+                <div>
+                  <label
+                    htmlFor="filtro-local"
+                    className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8fa3c7] mb-2"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                      <circle cx="12" cy="10" r="3" />
+                    </svg>
+                    Local da Análise
+                  </label>
+                  <div className="relative">
+                    <select
+                      id="filtro-local"
+                      value={localNome ?? ''}
+                      onChange={(e) => setLocalNome(e.target.value)}
+                      className="w-full rounded-xl px-3 py-2 pr-8 text-xs font-medium border border-[#1f2740] bg-[#1a2238]/90 text-[#f5f7fc] hover:border-[#2e59f6]/50 focus:border-[#18d6ec] outline-none transition-all appearance-none cursor-pointer shadow-inner"
+                    >
+                      {analise.locais.map((l) => (
+                        <option key={l.nome} value={l.nome} className="bg-[#121622] text-[#f5f7fc]">
+                          {l.nome}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-[#8fa3c7]">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filtro de Categorias como Chips */}
+                {categorias.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div
+                        id="filtro-categorias-label"
+                        className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8fa3c7]"
+                      >
+                        Filtrar Categorias
+                      </div>
+                      {categoriasFiltro.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setCategoriasFiltro([])}
+                          className="text-[10px] text-[#18d6ec] hover:underline"
+                        >
+                          Limpar ({categoriasFiltro.length})
+                        </button>
+                      )}
+                    </div>
+                    <div
+                      className="flex flex-wrap gap-1.5"
+                      role="group"
+                      aria-labelledby="filtro-categorias-label"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setCategoriasFiltro([])}
+                        aria-pressed={categoriasFiltro.length === 0}
+                        className={`text-left text-[11px] px-2.5 py-1.5 rounded-lg border transition-all duration-150 active:scale-95 ${
+                          categoriasFiltro.length === 0
+                            ? 'border-[#2e59f6]/60 bg-[#2e59f6]/20 text-[#f5f7fc] shadow-[0_0_10px_rgba(46,89,246,0.2)] font-semibold'
+                            : 'border-[#1f2740]/80 bg-[#1a2238]/50 text-[#8fa3c7] hover:border-[#1f2740] hover:text-[#f5f7fc]'
+                        }`}
+                      >
+                        Todas · {local?.itens.length ?? 0}
+                      </button>
+                      {categorias.map((c) => {
+                        const selecionada = categoriasFiltro.includes(c)
+                        const qtd = contagemCategorias[c] ?? 0
+                        return (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => alternarCategoria(c)}
+                            aria-pressed={selecionada}
+                            className={`text-left text-[11px] px-2.5 py-1.5 rounded-lg border transition-all duration-150 active:scale-95 ${
+                              selecionada
+                                ? 'border-[#18d6ec]/60 bg-[#18d6ec]/15 text-[#18d6ec] shadow-[0_0_10px_rgba(24,214,236,0.15)] font-semibold'
+                                : 'border-[#1f2740]/80 bg-[#1a2238]/50 text-[#8fa3c7] hover:border-[#1f2740] hover:text-[#f5f7fc]'
+                            }`}
+                          >
+                            {c} <span className="opacity-60 text-[10px]">({qtd})</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </aside>
 
         <div className="flex-1 min-w-0">
