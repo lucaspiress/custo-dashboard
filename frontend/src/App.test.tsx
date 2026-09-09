@@ -65,6 +65,8 @@ const currentRouteInventory: readonly RouteInventoryEntry[] = [
   { path: '/projetos/:id/visao-geral', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
   { path: '/projetos/:id/custos', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
   { path: '/projetos/:id/payback', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
+  { path: '/projetos/:id/simulador', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
+  { path: '/projetos/:id/dre-sensibilidade', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
   { path: '/projetos/:id/insights', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
   { path: '/projetos/:id/comparativo', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
   { path: '/projetos/:id/analytics-avancado', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },

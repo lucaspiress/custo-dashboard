@@ -79,6 +79,8 @@ function Rotas() {
         <Route path={ROTAS_CANONICAS.projetoVisaoGeral} element={usuario ? <RotaProjeto><DashboardPage abaInicial="Visão Geral" /></RotaProjeto> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.projetoCustos} element={usuario ? <RotaProjeto><DashboardPage abaInicial="Custos" /></RotaProjeto> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.projetoPayback} element={usuario ? <RotaProjeto><DashboardPage abaInicial="Payback" /></RotaProjeto> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoSimulador} element={usuario ? <RotaProjeto><DashboardPage abaInicial="Simulador" /></RotaProjeto> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoDreSensibilidade} element={usuario ? <RotaProjeto><DashboardPage abaInicial="DRE & Sensibilidade" /></RotaProjeto> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.projetoInsights} element={usuario ? <RotaProjeto><DashboardPage abaInicial="Insights" /></RotaProjeto> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.projetoComparativo} element={usuario ? <RotaProjeto><DashboardPage abaInicial="Comparativo" /></RotaProjeto> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.projetoAnalyticsAvancado} element={usuario ? <RotaProjeto><DashboardPage abaInicial="Analytics Avançado" /></RotaProjeto> : <Navigate to="/login" replace />} />

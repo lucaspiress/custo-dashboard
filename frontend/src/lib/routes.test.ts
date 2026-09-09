@@ -16,6 +16,8 @@ const expectedCanonicalRoutes = {
   projetoVisaoGeral: '/projetos/:id/visao-geral',
   projetoCustos: '/projetos/:id/custos',
   projetoPayback: '/projetos/:id/payback',
+  projetoSimulador: '/projetos/:id/simulador',
+  projetoDreSensibilidade: '/projetos/:id/dre-sensibilidade',
   projetoInsights: '/projetos/:id/insights',
   projetoComparativo: '/projetos/:id/comparativo',
   projetoAnalyticsAvancado: '/projetos/:id/analytics-avancado',

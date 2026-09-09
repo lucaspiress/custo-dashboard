@@ -167,6 +167,8 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
     'Visão Geral': construirRotaProjeto(ROTAS_CANONICAS.projetoVisaoGeral, projetoId) ?? rotas.dados,
     Custos: construirRotaProjeto(ROTAS_CANONICAS.projetoCustos, projetoId) ?? rotas.dados,
     Payback: construirRotaProjeto(ROTAS_CANONICAS.projetoPayback, projetoId) ?? rotas.dados,
+    Simulador: construirRotaProjeto(ROTAS_CANONICAS.projetoSimulador, projetoId) ?? rotas.dados,
+    'DRE & Sensibilidade': construirRotaProjeto(ROTAS_CANONICAS.projetoDreSensibilidade, projetoId) ?? rotas.dados,
     'Analytics Avançado': construirRotaProjeto(ROTAS_CANONICAS.projetoAnalyticsAvancado, projetoId) ?? rotas.dados,
     Insights: construirRotaProjeto(ROTAS_CANONICAS.projetoInsights, projetoId) ?? rotas.dados,
     Comparativo: construirRotaProjeto(ROTAS_CANONICAS.projetoComparativo, projetoId) ?? rotas.dados,
