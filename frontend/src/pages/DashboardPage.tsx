@@ -17,7 +17,6 @@ import ModoApresentacao from '../components/ModoApresentacao'
 import UsuariosTab from '../components/tabs/UsuariosTab'
 import { DashboardCarregando } from '../components/ProjetoLoading'
 import AppShell from '../components/AppShell'
-import Botao from '../components/ui/Botao'
 
 const ABAS_PADRAO = ['Visão Geral', 'Custos', 'Payback', 'Simulador', 'DRE & Sensibilidade', 'Analytics Avançado', 'Insights', 'Comparativo']
 
@@ -203,31 +202,67 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
       acoes={
         analise && (
           <>
-            <Botao variante="secundario" onClick={() => setApresentacaoAtiva(true)} aria-label="Modo Apresentação">
-              <span className="hidden sm:inline">📺 Modo Apresentação</span>
-            </Botao>
-            <Botao variante="secundario" onClick={() => void baixarPdf()} aria-label="Relatório PDF">
-              {ICONE_PDF}
-              <span className="hidden sm:inline">Relatório PDF</span>
-            </Botao>
+            <button
+              type="button"
+              onClick={() => setApresentacaoAtiva(true)}
+              aria-label="Modo Apresentação"
+              className="h-8 rounded-xl px-2.5 sm:px-3 text-xs font-semibold inline-flex items-center gap-1.5 transition-all duration-150 border border-[#1f2740] bg-[#161d30]/90 text-[#f5f7fc] hover:border-[#2e59f6]/60 hover:bg-[#1a233d] shadow-[0_2px_8px_rgba(0,0,0,0.2)] active:scale-95"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#18d6ec]">
+                <rect x="2" y="3" width="20" height="14" rx="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+              <span className="hidden md:inline">Apresentação</span>
+            </button>
 
-            <Botao variante="secundario" onClick={() => void baixarPlanilha()} aria-label="Exportar planilha">
-              {ICONE_XLSX}
-              <span className="hidden sm:inline">Exportar planilha</span>
-            </Botao>
+            <button
+              type="button"
+              onClick={() => void baixarPdf()}
+              aria-label="Relatório PDF"
+              className="h-8 rounded-xl px-2.5 sm:px-3 text-xs font-semibold inline-flex items-center gap-1.5 transition-all duration-150 border border-[#1f2740] bg-[#161d30]/90 text-[#f5f7fc] hover:border-[#2e59f6]/60 hover:bg-[#1a233d] shadow-[0_2px_8px_rgba(0,0,0,0.2)] active:scale-95"
+            >
+              <span className="text-[#e07b1a]">{ICONE_PDF}</span>
+              <span className="hidden md:inline">PDF</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void baixarPlanilha()}
+              aria-label="Exportar planilha"
+              className="h-8 rounded-xl px-2.5 sm:px-3 text-xs font-semibold inline-flex items-center gap-1.5 transition-all duration-150 border border-[#1f2740] bg-[#161d30]/90 text-[#f5f7fc] hover:border-[#2e59f6]/60 hover:bg-[#1a233d] shadow-[0_2px_8px_rgba(0,0,0,0.2)] active:scale-95"
+            >
+              <span className="text-[#10b981]">{ICONE_XLSX}</span>
+              <span className="hidden md:inline">Excel</span>
+            </button>
+
             {usuario?.papel !== 'cliente' && (
-              <Link to={rotas.dados} aria-label="Editar dados" className="h-9 rounded-lg px-3.5 text-[13px] font-medium inline-flex items-center gap-2 transition-colors" style={{ background: 'var(--cor-elevado)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}>
-                {ICONE_PLANILHA}
-                <span className="hidden sm:inline">Editar dados</span>
+              <Link
+                to={rotas.dados}
+                aria-label="Editar dados"
+                className="h-8 rounded-xl px-2.5 sm:px-3 text-xs font-semibold inline-flex items-center gap-1.5 transition-all duration-150 border border-[#1f2740] bg-[#161d30]/90 text-[#f5f7fc] hover:border-[#2e59f6]/60 hover:bg-[#1a233d] shadow-[0_2px_8px_rgba(0,0,0,0.2)] active:scale-95"
+              >
+                <span className="text-[#8fa3c7]">{ICONE_PLANILHA}</span>
+                <span className="hidden md:inline">Editar</span>
               </Link>
             )}
-            <Link to={rotas.datasets} aria-label="Datasets" className="h-9 rounded-lg px-3.5 text-[13px] font-medium inline-flex items-center gap-2 transition-colors" style={{ background: 'var(--cor-elevado)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}>
-              {ICONE_PLANILHA}
-              <span className="hidden sm:inline">Datasets</span>
+
+            <Link
+              to={rotas.datasets}
+              aria-label="Datasets"
+              className="h-8 rounded-xl px-2.5 sm:px-3 text-xs font-semibold inline-flex items-center gap-1.5 transition-all duration-150 border border-[#1f2740] bg-[#161d30]/90 text-[#f5f7fc] hover:border-[#2e59f6]/60 hover:bg-[#1a233d] shadow-[0_2px_8px_rgba(0,0,0,0.2)] active:scale-95"
+            >
+              <span className="text-[#8fa3c7]">{ICONE_PLANILHA}</span>
+              <span className="hidden md:inline">Datasets</span>
             </Link>
-            <Link to={rotas.dashboards} aria-label="Dashboards" className="h-9 rounded-lg px-3.5 text-[13px] font-medium inline-flex items-center gap-2 transition-colors" style={{ background: 'var(--cor-elevado)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}>
-              {ICONE_DASHBOARD}
-              <span className="hidden sm:inline">Dashboards</span>
+
+            <Link
+              to={rotas.dashboards}
+              aria-label="Dashboards"
+              className="h-8 rounded-xl px-2.5 sm:px-3 text-xs font-semibold inline-flex items-center gap-1.5 transition-all duration-150 border border-[#1f2740] bg-[#161d30]/90 text-[#f5f7fc] hover:border-[#2e59f6]/60 hover:bg-[#1a233d] shadow-[0_2px_8px_rgba(0,0,0,0.2)] active:scale-95"
+            >
+              <span className="text-[#8fa3c7]">{ICONE_DASHBOARD}</span>
+              <span className="hidden md:inline">Dashboards</span>
             </Link>
           </>
         )

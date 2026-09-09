@@ -12,10 +12,10 @@ def _fmt_br(valor: float, casas: int = 2) -> str:
 
 def _layout(titulo: str, altura: int, x_titulo: str | None = None, y_titulo: str | None = None) -> dict:
     return dict(
-        template="plotly_white",
+        template="plotly_dark",
         title=dict(text=titulo, font=dict(size=14, color=theme.COR["tinta"], family=theme.FONTE_UI)),
-        paper_bgcolor=theme.COR["superficie"],
-        plot_bgcolor=theme.COR["superficie"],
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family=theme.FONTE_UI, color=theme.COR["mutado"], size=11),
         xaxis=dict(title=x_titulo, gridcolor=theme.COR["grid"], zeroline=False, tickfont=dict(size=10)),
         yaxis=dict(title=y_titulo, gridcolor=theme.COR["grid"], zeroline=False, tickfont=dict(size=10)),

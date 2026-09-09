@@ -379,60 +379,56 @@ export default function ProjetosPage() {
         {filtrados.map((projeto) => (
           <div
             key={projeto.id}
-            className="rounded-2xl border p-5 flex flex-col gap-4 transition-colors"
-            style={{
-              background: 'var(--cor-superficie)',
-              borderColor: 'var(--cor-borda)',
-              boxShadow: '0 4px 14px rgba(0,0,0,0.18)',
-            }}
+            className="group rounded-2xl border border-[#1e2746]/80 bg-[#0c111c]/90 p-1 shadow-[0_8px_24px_rgba(0,0,0,0.3)] hover:border-[#2e59f6]/60 hover:shadow-[0_12px_32px_rgba(46,89,246,0.18)] transition-all duration-200"
           >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <button
-                  type="button"
-                 onClick={() => navigate(construirRotaProjeto(ROTAS_CANONICAS.projetoVisaoGeral, projeto.id) ?? ROTAS_CANONICAS.projetos)}
-                  className="text-[15px] font-semibold text-left leading-snug transition-colors"
-                  style={{ color: 'var(--cor-tinta)' }}
-                >
-                  {projeto.nome}
-                </button>
-                <div className="text-[12.5px] mt-0.5 truncate" style={{ color: 'var(--cor-mutado)' }}>
-                  {projeto.cliente ?? 'Sem cliente'} · {fmtData(projeto.criado_em)}
+            <div className="rounded-[calc(1rem-2px)] p-4 border border-[#1f2740]/40 bg-[#121622]/90 flex flex-col gap-4 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => navigate(construirRotaProjeto(ROTAS_CANONICAS.projetoVisaoGeral, projeto.id) ?? ROTAS_CANONICAS.projetos)}
+                    className="text-[15px] font-semibold text-left leading-snug transition-colors text-[#f5f7fc] group-hover:text-[#18d6ec]"
+                  >
+                    {projeto.nome}
+                  </button>
+                  <div className="text-[12px] mt-1 truncate text-[#8fa3c7]">
+                    {projeto.cliente ?? 'Sem cliente'} · {fmtData(projeto.criado_em)}
+                  </div>
+                </div>
+                <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                  projeto.num_locais === 0 && projeto.num_itens === 0
+                    ? 'border-[#e07b1a]/40 bg-[#e07b1a]/10 text-[#e07b1a]'
+                    : 'border-[#10b981]/40 bg-[#10b981]/10 text-[#10b981]'
+                }`}>
+                  {projeto.num_locais === 0 && projeto.num_itens === 0 ? 'Sem dados' : 'Cadastrado'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-xl px-2 py-2 border border-[#1f2740]/60 bg-[#172036]/60">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-[#8fa3c7]">Locais</div>
+                  <div className="text-[14px] font-bold tabular-nums text-[#f5f7fc]">{projeto.num_locais}</div>
+                </div>
+                <div className="rounded-xl px-2 py-2 border border-[#1f2740]/60 bg-[#172036]/60">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-[#8fa3c7]">Itens</div>
+                  <div className="text-[14px] font-bold tabular-nums text-[#f5f7fc]">{projeto.num_itens}</div>
+                </div>
+                <div className="rounded-xl px-2 py-2 border border-[#1f2740]/60 bg-[#172036]/60">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-[#8fa3c7]">Invest.</div>
+                  <div className="text-[14px] font-bold tabular-nums text-[#f5f7fc]">{fmtMoeda(projeto.totais.investimento)}</div>
                 </div>
               </div>
-              <span className="shrink-0 rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: projeto.num_locais === 0 && projeto.num_itens === 0 ? 'rgba(224,123,26,.45)' : 'rgba(16,185,129,.4)', color: projeto.num_locais === 0 && projeto.num_itens === 0 ? 'var(--cor-destaque)' : 'var(--cor-sucesso)' }}>
-                {projeto.num_locais === 0 && projeto.num_itens === 0 ? 'Sem dados' : 'Dados cadastrados'}
-              </span>
-            </div>
 
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-lg px-2 py-2" style={{ background: 'var(--cor-elevado)' }}>
-                <div className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--cor-mutado)' }}>Locais</div>
-                <div className="text-[14px] font-semibold tabular-nums" style={{ color: 'var(--cor-tinta)' }}>{projeto.num_locais}</div>
-              </div>
-              <div className="rounded-lg px-2 py-2" style={{ background: 'var(--cor-elevado)' }}>
-                <div className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--cor-mutado)' }}>Itens</div>
-                <div className="text-[14px] font-semibold tabular-nums" style={{ color: 'var(--cor-tinta)' }}>{projeto.num_itens}</div>
-              </div>
-              <div className="rounded-lg px-2 py-2" style={{ background: 'var(--cor-elevado)' }}>
-                <div className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--cor-mutado)' }}>Invest.</div>
-                <div className="text-[14px] font-semibold tabular-nums" style={{ color: 'var(--cor-tinta)' }}>{fmtMoeda(projeto.totais.investimento)}</div>
-              </div>
-            </div>
-
-            <div
-              className="flex items-center justify-between gap-1.5 pt-1 border-t"
-              style={{ borderColor: 'var(--cor-borda)' }}
-            >
-              <button
-                type="button"
-                onClick={() => navigate(construirRotaProjeto(ROTAS_CANONICAS.projetoVisaoGeral, projeto.id) ?? ROTAS_CANONICAS.projetos)}
-                aria-label={`Abrir visão geral do projeto ${projeto.nome}`}
-                className="h-9 rounded-lg bg-[#2e59f6] px-3 text-[12.5px] font-semibold text-white inline-flex items-center gap-1.5 transition-colors hover:bg-[#4669f7]"
-              >
-                {ICONE_ABRIR}
-                Abrir visão geral
-              </button>
+              <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-[#1f2740]/80">
+                <button
+                  type="button"
+                  onClick={() => navigate(construirRotaProjeto(ROTAS_CANONICAS.projetoVisaoGeral, projeto.id) ?? ROTAS_CANONICAS.projetos)}
+                  aria-label={`Abrir visão geral do projeto ${projeto.nome}`}
+                  className="h-8 rounded-xl bg-gradient-to-r from-[#2e59f6] to-[#1f4fe6] px-3 text-xs font-semibold text-white inline-flex items-center gap-1.5 shadow-[0_2px_8px_rgba(46,89,246,0.3)] hover:brightness-110 active:scale-95 transition-all"
+                >
+                  {ICONE_ABRIR}
+                  Abrir visão geral
+                </button>
               <button
                 onClick={() => navigate(rotaDados(projeto.id))}
                 className="h-8 px-2.5 rounded-lg text-[12.5px] font-medium inline-flex items-center gap-1.5 transition-colors"
@@ -467,6 +463,7 @@ export default function ProjetosPage() {
               )}
             </div>
           </div>
+        </div>
         ))}
       </div>
 

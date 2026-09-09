@@ -15,7 +15,13 @@ export default function PlotlyChart({ figJson }: Props) {
   const fig = useMemo<Fig | null>(() => { try { return JSON.parse(figJson) as Fig } catch { return null } }, [figJson])
   if (!fig) return <div role="alert" className="rounded-xl border p-4 text-sm text-alerta">Não foi possível exibir este gráfico.</div>
 
-  const layout = fig.layout ?? {}
+  const rawLayout = (fig.layout ?? {}) as Record<string, unknown>
+  const layout = useMemo<Record<string, unknown>>(() => ({
+    ...rawLayout,
+    template: 'plotly_dark',
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+  }), [rawLayout])
   const titulo = texto(layout.title)
   const axes = Object.entries(layout).filter(([key, value]) => /^xaxis\d*$|^yaxis\d*$/.test(key) && value && typeof value === 'object') as Array<[string, Axis]>
   const unidades = axes.map(([, axis]) => texto(axis.title)).filter(Boolean)
