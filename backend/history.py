@@ -67,6 +67,16 @@ def _inicializar(conn: sqlite3.Connection) -> None:
             valor_total REAL NOT NULL DEFAULT 0
         );
 
+        CREATE TABLE IF NOT EXISTS cenarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            projeto_id INTEGER NOT NULL REFERENCES projetos(id) ON DELETE CASCADE,
+            nome TEXT NOT NULL,
+            variacao_mensal REAL NOT NULL DEFAULT 0,
+            variacao_instalacao REAL NOT NULL DEFAULT 0,
+            criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+
         CREATE TABLE IF NOT EXISTS datasets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             projeto_id INTEGER NOT NULL REFERENCES projetos(id) ON DELETE CASCADE,

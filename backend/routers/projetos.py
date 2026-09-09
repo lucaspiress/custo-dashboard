@@ -11,8 +11,11 @@ import loader
 import planilha_export
 import projetos_store
 import report
+import schemas
 import serialize
-from deps import admin_obrigatorio, exigir_projeto, usuario_atual
+from deps import admin_obrigatorio, escrita_obrigatoria, exigir_projeto, usuario_atual
+
+
 
 router = APIRouter(prefix="/projetos", tags=["projetos"])
 
@@ -96,14 +99,25 @@ def _payload_projeto(workbook: loader.WorkbookData, nome_projeto: str) -> dict:
         locais.append(payload_local)
 
     resumo_projeto = analysis.resumo_projeto(workbook.locais)
+    score_saude = analysis.calcular_score_saude(workbook.locais)
+    simulacao_mc = analysis.simulacao_monte_carlo(workbook.locais)
+
     projeto = {
         "locais": [serialize.resumo_payload(r) for r in resumo_projeto["locais"]],
         "totais": resumo_projeto["totais"],
+        "score_saude": score_saude,
+        "monte_carlo": simulacao_mc,
         "graficos": {
             "investimento": charts.grafico_barras_comparativo(workbook.locais, "investimento", "Investimento por local").to_json(),
             "saldo": charts.grafico_barras_comparativo(workbook.locais, "saldo_mensal", "Saldo mensal por local").to_json(),
             "retorno": charts.grafico_barras_comparativo(workbook.locais, "tempo_retorno", "Tempo de retorno por local", e_meses=True).to_json(),
             "dispersao": charts.grafico_dispersao(workbook.locais).to_json(),
+            "curva_s": charts.grafico_curva_s(workbook.locais, 36).to_json(),
+            "pareto_global": charts.grafico_pareto_global(workbook.locais).to_json(),
+            "scatter_risco": charts.grafico_scatter_risco_retorno(workbook.locais).to_json(),
+            "gauge_saude": charts.grafico_gauge_saude(score_saude["score"]).to_json(),
+            "donut_operacional": charts.grafico_donut_custos_operacionais(workbook.locais).to_json(),
+            "fluxo_empilhado": charts.grafico_fluxo_empilhado(workbook.locais, 36).to_json(),
         },
     }
 
@@ -328,3 +342,29 @@ def importar(
                 },
             )
     return {"id": projeto["id"], "nome": projeto["nome"], "avisos": workbook.avisos}
+
+
+# ---------------------------------------------------------------- cenarios
+
+@router.get("/{id}/cenarios")
+def listar_cenarios(id: int, usuario: dict = Depends(usuario_atual)) -> list[dict]:
+    exigir_projeto(usuario, id)
+    return projetos_store.listar_cenarios(id)
+
+
+@router.post("/{id}/cenarios")
+def criar_cenario(id: int, dados: schemas.CenarioCreateSchema, usuario: dict = Depends(escrita_obrigatoria)) -> dict:
+    exigir_projeto(usuario, id)
+    nome = dados.nome.strip()
+    if not nome:
+        raise HTTPException(status_code=400, detail="Nome do cenário é obrigatório.")
+    return projetos_store.criar_cenario(id, nome, dados.variacao_mensal, dados.variacao_instalacao)
+
+
+
+@router.delete("/cenarios/{cid}", status_code=204)
+def excluir_cenario(cid: int, usuario: dict = Depends(escrita_obrigatoria)) -> None:
+    ok = projetos_store.excluir_cenario(cid)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Cenário não encontrado.")
+

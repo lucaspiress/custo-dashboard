@@ -480,3 +480,65 @@ def excluir_item(item_id: int) -> bool:
         return cursor.rowcount > 0
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------- cenarios
+
+def listar_cenarios(projeto_id: int) -> list[dict]:
+    conn = _conn()
+    try:
+        if _sqlite():
+            linhas = conn.execute(
+                "select id, projeto_id, nome, variacao_mensal, variacao_instalacao, criado_em from cenarios where projeto_id = ? order by id asc",
+                (projeto_id,),
+            ).fetchall()
+        else:
+            linhas = conn.execute(
+                "select id, projeto_id, nome, variacao_mensal, variacao_instalacao, criado_em from public.cenarios where projeto_id = %s order by id asc",
+                (projeto_id,),
+            ).fetchall()
+        return [dict(l) for l in linhas]
+    finally:
+        conn.close()
+
+
+def criar_cenario(projeto_id: int, nome: str, variacao_mensal: float = 0.0, variacao_instalacao: float = 0.0) -> dict:
+    conn = _conn()
+    try:
+        if _sqlite():
+            cur = conn.execute(
+                "insert into cenarios (projeto_id, nome, variacao_mensal, variacao_instalacao) values (?, ?, ?, ?) returning id",
+                (projeto_id, nome, variacao_mensal, variacao_instalacao),
+            )
+            c_id = cur.fetchone()["id"]
+            conn.commit()
+        else:
+            cur = conn.execute(
+                "insert into public.cenarios (projeto_id, nome, variacao_mensal, variacao_instalacao) values (%s, %s, %s, %s) returning id",
+                (projeto_id, nome, variacao_mensal, variacao_instalacao),
+            )
+            c_id = cur.fetchone()["id"]
+            conn.commit()
+        return {
+            "id": c_id,
+            "projeto_id": projeto_id,
+            "nome": nome,
+            "variacao_mensal": variacao_mensal,
+            "variacao_instalacao": variacao_instalacao,
+        }
+    finally:
+        conn.close()
+
+
+def excluir_cenario(cenario_id: int) -> bool:
+    conn = _conn()
+    try:
+        if _sqlite():
+            cur = conn.execute("delete from cenarios where id = ?", (cenario_id,))
+        else:
+            cur = conn.execute("delete from public.cenarios where id = %s", (cenario_id,))
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+

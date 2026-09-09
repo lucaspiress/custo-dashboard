@@ -2,6 +2,9 @@ import type { AnaliseUpload, Local } from '../../lib/types'
 import { fmtData, fmtMoeda, fmtNumero } from '../../lib/format'
 import { KPI_CORES } from '../../lib/theme'
 import KpiCard from '../KpiCard'
+import PlotlyChart from '../PlotlyChart'
+import InsightCard from '../InsightCard'
+import { Link, useParams } from 'react-router-dom'
 
 interface Props {
   analise: AnaliseUpload
@@ -9,6 +12,7 @@ interface Props {
 }
 
 export default function VisaoGeralTab({ analise, local }: Props) {
+  const { id } = useParams<{ id: string }>()
   const r = local.resumo
   const margem = r.margem === null || r.margem === undefined
     ? undefined
@@ -33,17 +37,17 @@ export default function VisaoGeralTab({ analise, local }: Props) {
           className="overflow-x-auto rounded-2xl border"
           style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)', animation: 'fadeInUp 0.5s ease-out 600ms both' }}
         >
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[13px]"><caption className="sr-only">Resumo financeiro por local</caption>
             <thead>
               <tr className="text-left font-semibold border-b" style={{ color: 'var(--cor-tinta)', borderColor: 'var(--cor-borda)' }}>
-                <th className="px-3 py-2.5">Local</th>
-                <th className="px-3 py-2.5">Receita mensal</th>
-                <th className="px-3 py-2.5">Saldo mensal</th>
-                <th className="px-3 py-2.5">Mão de obra</th>
-                <th className="px-3 py-2.5">Equipamento</th>
-                <th className="px-3 py-2.5">Investimento</th>
-                <th className="px-3 py-2.5">Retorno (meses)</th>
-                <th className="px-3 py-2.5">Itens</th>
+                <th scope="col" className="px-3 py-2.5">Local</th>
+                <th scope="col" className="px-3 py-2.5">Receita mensal (R$)</th>
+                <th scope="col" className="px-3 py-2.5">Saldo mensal (R$)</th>
+                <th scope="col" className="px-3 py-2.5">Mão de obra (R$)</th>
+                <th scope="col" className="px-3 py-2.5">Equipamento (R$)</th>
+                <th scope="col" className="px-3 py-2.5">Investimento (R$)</th>
+                <th scope="col" className="px-3 py-2.5">Retorno (meses)</th>
+                <th scope="col" className="px-3 py-2.5">Itens</th>
               </tr>
             </thead>
             <tbody>
@@ -63,6 +67,33 @@ export default function VisaoGeralTab({ analise, local }: Props) {
           </table>
         </div>
       </div>
+
+      <section className="mt-10" aria-labelledby="visao-graficos">
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div><h2 id="visao-graficos" className="text-[15px] font-semibold">Leitura rápida</h2><p className="mt-1 text-xs text-mutado">Gráficos gerados a partir do payload da análise.</p></div>
+          <Link to={id ? `/projetos/${id}/custos` : '#'} className="text-xs font-semibold text-ciano hover:underline">Ver composição detalhada</Link>
+        </div>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {local.graficos.composicao && <PlotlyChart figJson={local.graficos.composicao} />}
+          {analise.projeto.graficos.saldo && <PlotlyChart figJson={analise.projeto.graficos.saldo} />}
+        </div>
+      </section>
+
+      {analise.projeto.graficos.curva_s && (
+        <section className="mt-10" aria-labelledby="visao-curva-s">
+          <div className="mb-3">
+            <h2 id="visao-curva-s" className="text-[15px] font-semibold" style={{ color: 'var(--cor-tinta)' }}>Curva S — Investimentos vs Resultado Acumulado</h2>
+            <p className="mt-1 text-xs text-mutado">Evolução dos desembolsos e fluxo de caixa ao longo dos 36 meses.</p>
+          </div>
+          <PlotlyChart figJson={analise.projeto.graficos.curva_s} />
+        </section>
+      )}
+
+
+      <section className="mt-10" aria-labelledby="visao-insights">
+        <div className="mb-3 flex items-center justify-between gap-3"><h2 id="visao-insights" className="text-[15px] font-semibold">Insights deste local</h2><Link to={id ? `/projetos/${id}/insights` : '#'} className="text-xs font-semibold text-ciano hover:underline">Abrir insights</Link></div>
+        {local.insights.length > 0 ? local.insights.map((insight, indice) => <InsightCard key={indice} {...insight} atraso={indice * 60} />) : <p className="rounded-xl border p-4 text-sm text-mutado" style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-superficie)' }}>Não há evidência suficiente para gerar insights para este local.</p>}
+      </section>
     </div>
   )
 }

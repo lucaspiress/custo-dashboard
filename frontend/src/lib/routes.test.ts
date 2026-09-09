@@ -18,6 +18,7 @@ const expectedCanonicalRoutes = {
   projetoPayback: '/projetos/:id/payback',
   projetoInsights: '/projetos/:id/insights',
   projetoComparativo: '/projetos/:id/comparativo',
+  projetoAnalyticsAvancado: '/projetos/:id/analytics-avancado',
   projetoDados: '/projetos/:id/dados',
   projetoDatasets: '/projetos/:id/datasets',
   projetoDataset: '/projetos/:id/datasets/:did',

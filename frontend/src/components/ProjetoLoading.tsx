@@ -22,13 +22,13 @@ export function ProjetosCarregando() {
   )
 }
 
-function CabecalhoCarregando() {
+function CabecalhoCarregando({ projetoId, area }: { projetoId?: string; area?: string }) {
   return (
     <header className="min-h-[64px] shrink-0 border-b flex items-center justify-between gap-4 px-4 sm:px-5 py-3" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
       <div className="flex items-center gap-3 min-w-0">
+        <span className="sr-only">Carregando {area ?? 'dashboard'} do projeto {projetoId ? `#${projetoId}` : ''}</span>
         <Bloco className="h-8 w-8 rounded-lg" />
-        <Bloco className="h-8 w-28 rounded" />
-        <Bloco className="h-5 w-40 max-w-[35vw] rounded" />
+        <span className="text-xs text-mutado whitespace-nowrap">Projeto {projetoId ? `#${projetoId}` : '—'} · {area ?? 'Dashboard'}</span>
       </div>
       <div className="flex gap-2">
         <Bloco className="h-9 w-9 sm:w-28 rounded-lg" />
@@ -38,10 +38,10 @@ function CabecalhoCarregando() {
   )
 }
 
-export function DashboardCarregando() {
+export function DashboardCarregando({ projetoId, area }: { projetoId?: string; area?: string }) {
   return (
-    <div aria-busy="true" aria-label="Carregando dashboard" className="min-h-screen flex flex-col" style={{ background: 'var(--cor-fundo)' }}>
-      <CabecalhoCarregando />
+    <div aria-busy="true" aria-label={`Carregando ${area ?? 'dashboard'} do projeto ${projetoId ? `#${projetoId}` : ''}`} role="status" className="min-h-screen flex flex-col" style={{ background: 'var(--cor-fundo)' }}>
+      <CabecalhoCarregando projetoId={projetoId} area={area} />
       <div className="flex flex-1 flex-col md:flex-row gap-5 p-5">
         <aside className="w-full md:w-64 shrink-0 rounded-2xl border p-3 space-y-2" style={{ background: 'var(--cor-sidebar)', borderColor: 'var(--cor-borda)' }}>
           {[0, 1, 2, 3, 4].map((indice) => <Bloco key={indice} className="h-9 w-full rounded-lg" />)}

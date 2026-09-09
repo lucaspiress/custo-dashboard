@@ -24,6 +24,8 @@ export default function PaybackTab({ local }: Props) {
             <button
               key={h}
               onClick={() => setMeses(h)}
+              type="button"
+              aria-pressed={meses === h}
               className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${meses === h ? 'botao-marca border-transparent text-white' : ''}`}
               style={meses === h ? undefined : { background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)', color: 'var(--cor-mutado)' }}
             >
@@ -31,20 +33,24 @@ export default function PaybackTab({ local }: Props) {
             </button>
           ))}
         </div>
+        {!fluxo && <div role="status" className="rounded-xl border p-5 text-sm text-mutado" style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-superficie)' }}>Payback indisponível para o horizonte de {meses} meses neste projeto.</div>}
         {fluxo && (
           <>
+            <div role="status" className="mb-3 rounded-lg border px-3 py-2 text-sm" style={{ color: fluxo.payback_mes === null ? 'var(--cor-mutado)' : 'var(--cor-sucesso)', borderColor: fluxo.payback_mes === null ? 'rgba(224,123,26,.35)' : 'rgba(16,185,129,.35)', background: fluxo.payback_mes === null ? 'rgba(224,123,26,.08)' : 'rgba(16,185,129,.08)' }}>
+              {fluxo.payback_mes === null ? `Payback não atingido no horizonte de ${meses} meses.` : `Payback atingido no mês ${fluxo.payback_mes}.`}
+            </div>
             <PlotlyChart figJson={fluxo.grafico} />
             <div className="mt-3 overflow-x-auto rounded-2xl border" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
-              <table className="w-full text-[13px]">
+              <table className="w-full text-[13px]"><caption className="sr-only">Fluxo de caixa projetado para {meses} meses</caption>
                 <thead>
                   <tr className="text-left font-semibold border-b" style={{ color: 'var(--cor-tinta)', borderColor: 'var(--cor-borda)' }}>
-                    <th className="px-3 py-2.5">Mês</th>
-                    <th className="px-3 py-2.5">Receita</th>
-                    <th className="px-3 py-2.5">Impostos</th>
-                    <th className="px-3 py-2.5">Custos fixos</th>
-                    <th className="px-3 py-2.5">Saldo</th>
-                    <th className="px-3 py-2.5">Acumulado</th>
-                    <th className="px-3 py-2.5"></th>
+                    <th scope="col" className="px-3 py-2.5">Mês</th>
+                    <th scope="col" className="px-3 py-2.5">Receita (R$)</th>
+                    <th scope="col" className="px-3 py-2.5">Impostos (R$)</th>
+                    <th scope="col" className="px-3 py-2.5">Custos fixos (R$)</th>
+                    <th scope="col" className="px-3 py-2.5">Saldo (R$)</th>
+                    <th scope="col" className="px-3 py-2.5">Acumulado (R$)</th>
+                    <th scope="col" className="px-3 py-2.5">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -57,7 +63,7 @@ export default function PaybackTab({ local }: Props) {
                       <td className="px-3 py-2">{fmtMoeda(p.saldo)}</td>
                       <td className="px-3 py-2 font-semibold" style={{ color: 'var(--cor-tinta)' }}>{fmtMoeda(p.acumulado)}</td>
                       <td className="px-3 py-2">
-                        {p.payback && (
+                        {p.payback && p.mes === fluxo.payback_mes && (
                           <span className="text-[10.5px] font-bold uppercase tracking-wide text-white bg-sucesso rounded-full px-2 py-0.5">
                             Payback
                           </span>

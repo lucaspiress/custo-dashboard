@@ -106,6 +106,33 @@ describe('criarAutosave', () => {
     await expect(flush).resolves.toBe(true)
   })
 
+  it('drena a última alteração da mesma célula durante a transição de escopo', async () => {
+    vi.useFakeTimers()
+    let concluirPrimeiro!: () => void
+    const salvar = vi.fn()
+      .mockImplementationOnce(() => new Promise<void>((resolve) => {
+        concluirPrimeiro = resolve
+      }))
+      .mockResolvedValue(undefined)
+    const autosave = criarAutosave(salvar)
+
+    autosave.agendar('local:1:nome', 'primeiro')
+    await vi.advanceTimersByTimeAsync(400)
+
+    autosave.agendar('local:1:nome', 'segundo')
+    // This mirrors PlanilhaPage cleanup: begin flushing the old scope, then
+    // cancel its debounce timer while the new value is queued behind an
+    // in-flight request.
+    const flush = autosave.flush()
+    autosave.cancelar()
+    concluirPrimeiro()
+
+    await expect(flush).resolves.toBe(true)
+    expect(salvar).toHaveBeenCalledTimes(2)
+    expect(salvar).toHaveBeenNthCalledWith(1, 'primeiro')
+    expect(salvar).toHaveBeenNthCalledWith(2, 'segundo')
+  })
+
   it('não libera a navegação quando o flush não consegue salvar', async () => {
     vi.useFakeTimers()
     const autosave = criarAutosave(vi.fn().mockRejectedValue(new Error('Rede indisponível')))

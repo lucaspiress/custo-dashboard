@@ -18,6 +18,9 @@ export default function ComparativoTab({ projeto }: Props) {
 
   return (
     <div>
+      <div role="note" className="mb-5 rounded-lg border px-3 py-2 text-sm" style={{ color: 'var(--cor-mutado)', borderColor: 'var(--cor-borda)', background: 'var(--cor-superficie)' }}>
+        Comparações entre orçamento e realizado indisponíveis: não há orçamento registrado neste projeto.
+      </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KpiCard rotulo="Locais" valor={String(t.num_locais)} sub={`${t.num_itens} itens no total`} cor="#18d6ec" />
         <KpiCard rotulo="Receita mensal" valor={fmtMoeda(t.receita_mensal)} sub="Somada dos locais" cor="#5b8cff" atraso={60} />
@@ -41,15 +44,15 @@ export default function ComparativoTab({ projeto }: Props) {
       <div className="mt-2">
         <div className="text-[15px] font-semibold my-1.5 mb-2.5" style={{ color: 'var(--cor-tinta)' }}>Ranking dos locais</div>
         <div className="overflow-x-auto rounded-2xl border" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[13px]"><caption className="sr-only">Ranking financeiro dos locais do projeto</caption>
             <thead>
               <tr className="text-left font-semibold border-b" style={{ color: 'var(--cor-tinta)', borderColor: 'var(--cor-borda)' }}>
-                <th className="px-3 py-2.5">Local</th>
-                <th className="px-3 py-2.5">Receita mensal</th>
-                <th className="px-3 py-2.5">Saldo mensal</th>
-                <th className="px-3 py-2.5">Investimento</th>
-                <th className="px-3 py-2.5">Retorno (meses)</th>
-                <th className="px-3 py-2.5">Itens</th>
+                <th scope="col" className="px-3 py-2.5">Local</th>
+                <th scope="col" className="px-3 py-2.5">Receita mensal (R$)</th>
+                <th scope="col" className="px-3 py-2.5">Saldo mensal (R$)</th>
+                <th scope="col" className="px-3 py-2.5">Investimento (R$)</th>
+                <th scope="col" className="px-3 py-2.5">Retorno (meses)</th>
+                <th scope="col" className="px-3 py-2.5">Itens</th>
               </tr>
             </thead>
             <tbody>

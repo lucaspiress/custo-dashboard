@@ -10,12 +10,17 @@ import CustosTab from '../components/tabs/CustosTab'
 import PaybackTab from '../components/tabs/PaybackTab'
 import InsightsTab from '../components/tabs/InsightsTab'
 import ComparativoTab from '../components/tabs/ComparativoTab'
+import SimuladorTab from '../components/tabs/SimuladorTab'
+import DreSensibilidadeTab from '../components/tabs/DreSensibilidadeTab'
+import AnalyticsAvancadoTab from '../components/tabs/AnalyticsAvancadoTab'
+import ModoApresentacao from '../components/ModoApresentacao'
 import UsuariosTab from '../components/tabs/UsuariosTab'
 import { DashboardCarregando } from '../components/ProjetoLoading'
 import AppShell from '../components/AppShell'
 import Botao from '../components/ui/Botao'
 
-const ABAS_PADRAO = ['Visão Geral', 'Custos', 'Payback', 'Insights', 'Comparativo']
+const ABAS_PADRAO = ['Visão Geral', 'Custos', 'Payback', 'Simulador', 'DRE & Sensibilidade', 'Analytics Avançado', 'Insights', 'Comparativo']
+
 
 const ICONE_PDF = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" /></svg>)
 const ICONE_XLSX = (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /></svg>)
@@ -26,6 +31,9 @@ const ICONES_ABAS: Record<string, ReactNode> = {
   'Visão Geral': (<><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>),
   Custos: (<><circle cx="12" cy="12" r="9" /><path d="M12 6v12" /><path d="M15.5 9.5c0-1.2-1.6-2-3.5-2s-3.5.8-3.5 2 1.6 2 3.5 2 3.5.8 3.5 2-1.6 2-3.5 2-3.5-.8-3.5-2" /></>),
   Payback: (<><polyline points="3 17 9 11 13 15 21 7" /><polyline points="15 7 21 7 21 13" /></>),
+  Simulador: (<><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></>),
+  'DRE & Sensibilidade': (<><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></>),
+  'Analytics Avançado': (<><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></>),
   Insights: (<><path d="M9 18h6" /><path d="M10 21h4" /><path d="M12 3a6 6 0 0 0-4 10.5c.8.7 1.3 1.6 1.5 2.5h5c.2-.9.7-1.8 1.5-2.5A6 6 0 0 0 12 3z" /></>),
   Comparativo: (<><path d="M4 20V10" /><path d="M10 20V4" /><path d="M16 20v-7" /><path d="M22 20V7" /></>),
   Usuários: (<><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" /><circle cx="10" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>),
@@ -55,11 +63,16 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
   const { usuario } = useAuth()
   const [analise, setAnalise] = useState<AnaliseUpload | null>(null)
   const [localNome, setLocalNome] = useState<string | null>(null)
-  const [aba, setAba] = useState(abaInicial)
+  // The route component supplies the tab associated with the canonical URL.
+  // Deriving it during render avoids showing the previous tab during navigation.
+  const aba = abaInicial
   const [categoriasFiltro, setCategoriasFiltro] = useState<string[]>([])
   const [erro, setErro] = useState('')
   const [carregando, setCarregando] = useState(true)
   const [projetoRenderizadoId, setProjetoRenderizadoId] = useState<number | null>(null)
+  const [apresentacaoAtiva, setApresentacaoAtiva] = useState(false)
+  const [tentativa, setTentativa] = useState(0)
+
   const geracaoRotaRef = useRef(0)
   const geracaoDaRenderizacao = geracaoRotaRef.current
 
@@ -106,11 +119,7 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
       cancelado = true
       if (geracaoRotaRef.current === geracao) geracaoRotaRef.current += 1
     }
-  }, [projetoId])
-
-  useEffect(() => {
-    setAba(abaInicial)
-  }, [abaInicial])
+  }, [projetoId, tentativa])
 
   function alternarCategoria(categoria: string) {
     setCategoriasFiltro((atual) =>
@@ -145,19 +154,40 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
   }
 
   if (carregando || projetoRenderizadoId !== projetoId) {
-    return <DashboardCarregando />
+    return <DashboardCarregando projetoId={id} area={abaInicial} />
+  }
+
+  const nomeProjeto = analise?.filename ?? `Projeto #${projetoId}`
+  const estadoDados = erro
+    ? 'Erro ao carregar dados'
+    : !analise || analise.locais.length === 0
+      ? 'Sem dados'
+      : analise.avisos.length > 0 ? 'Dados parciais' : 'Dados válidos'
+  const rotasAbas: Record<string, string> = {
+    'Visão Geral': construirRotaProjeto(ROTAS_CANONICAS.projetoVisaoGeral, projetoId) ?? rotas.dados,
+    Custos: construirRotaProjeto(ROTAS_CANONICAS.projetoCustos, projetoId) ?? rotas.dados,
+    Payback: construirRotaProjeto(ROTAS_CANONICAS.projetoPayback, projetoId) ?? rotas.dados,
+    'Analytics Avançado': construirRotaProjeto(ROTAS_CANONICAS.projetoAnalyticsAvancado, projetoId) ?? rotas.dados,
+    Insights: construirRotaProjeto(ROTAS_CANONICAS.projetoInsights, projetoId) ?? rotas.dados,
+    Comparativo: construirRotaProjeto(ROTAS_CANONICAS.projetoComparativo, projetoId) ?? rotas.dados,
+    Usuários: construirRotaProjeto(ROTAS_CANONICAS.projetoUsuarios, projetoId) ?? rotas.dados,
   }
 
   return (
     <AppShell
-      titulo={analise?.filename ?? 'Projeto'}
+      titulo={nomeProjeto}
+      sub={`Projeto #${projetoId} · ${estadoDados} · Período: não disponível neste projeto${analise?.avisos.length ? ` · ${analise.avisos.length} aviso(s)` : ''}`}
       acoes={
         analise && (
           <>
+            <Botao variante="secundario" onClick={() => setApresentacaoAtiva(true)} aria-label="Modo Apresentação">
+              <span className="hidden sm:inline">📺 Modo Apresentação</span>
+            </Botao>
             <Botao variante="secundario" onClick={() => void baixarPdf()} aria-label="Relatório PDF">
               {ICONE_PDF}
               <span className="hidden sm:inline">Relatório PDF</span>
             </Botao>
+
             <Botao variante="secundario" onClick={() => void baixarPlanilha()} aria-label="Exportar planilha">
               {ICONE_XLSX}
               <span className="hidden sm:inline">Exportar planilha</span>
@@ -188,14 +218,15 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
             borderColor: 'var(--cor-borda)',
           }}
         >
-          <nav className="flex lg:flex-col gap-1 overflow-x-auto">
+          <nav className="flex lg:flex-col gap-1 overflow-x-auto" aria-label="Áreas da análise">
             {abas.map((nome) => (
-              <button
+              <Link
                 key={nome}
-                onClick={() => setAba(nome)}
+                to={rotasAbas[nome] ?? rotas.dados}
                 className={`flex shrink-0 items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium ring-1 ring-inset transition-colors whitespace-nowrap ${
                   aba === nome ? '' : ''
                 }`}
+                aria-current={aba === nome ? 'page' : undefined}
                 style={
                   aba === nome
                     ? {
@@ -214,17 +245,18 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
                   {ICONES_ABAS[nome]}
                 </svg>
                 {nome}
-              </button>
+              </Link>
             ))}
           </nav>
 
           {analise && analise.locais.length > 0 && (
             <div className="mt-4 flex flex-col gap-4 border-t pt-4" style={{ borderColor: 'var(--cor-borda)' }}>
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--cor-mutado)' }}>
+                <label htmlFor="filtro-local" className="text-[11px] font-semibold uppercase tracking-wider mb-2 block" style={{ color: 'var(--cor-mutado)' }}>
                   Local
-                </div>
+                </label>
                 <select
+                  id="filtro-local"
                   value={localNome ?? ''}
                   onChange={(e) => setLocalNome(e.target.value)}
                   className="w-full rounded-lg px-2 py-1.5 text-sm border outline-none"
@@ -238,12 +270,13 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
 
               {categorias.length > 0 && (
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--cor-mutado)' }}>
+                  <div id="filtro-categorias-label" className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--cor-mutado)' }}>
                     Categorias
                   </div>
-                  <div className="flex lg:flex-col flex-wrap gap-1">
+                  <div className="flex lg:flex-col flex-wrap gap-1" role="group" aria-labelledby="filtro-categorias-label">
                     <button
                       onClick={() => setCategoriasFiltro([])}
+                      aria-pressed={categoriasFiltro.length === 0}
                       className={`text-left text-[12.5px] px-2.5 py-1.5 rounded-md border transition-colors ${
                         categoriasFiltro.length === 0 ? '' : ''
                       }`}
@@ -259,6 +292,7 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
                       <button
                         key={c}
                         onClick={() => alternarCategoria(c)}
+                        aria-pressed={categoriasFiltro.includes(c)}
                         className={`text-left text-[12.5px] px-2.5 py-1.5 rounded-md border transition-colors ${
                           categoriasFiltro.includes(c) ? '' : ''
                         }`}
@@ -278,12 +312,18 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
           )}
         </aside>
 
-        <main className="flex-1 min-w-0">
-          {erro && <div className="text-sm mb-4" style={{ color: 'var(--cor-alerta)' }}>{erro}</div>}
+        <div className="flex-1 min-w-0">
+          {erro && <div role="alert" aria-live="assertive" className="text-sm mb-4 rounded-lg border px-3 py-3 flex flex-wrap items-center justify-between gap-3" style={{ color: 'var(--cor-alerta)', borderColor: 'rgba(239,68,68,.35)', background: 'rgba(239,68,68,.08)' }}>
+            <span>{erro}</span>
+            <button type="button" onClick={() => setTentativa((valor) => valor + 1)} className="min-h-11 rounded-lg border px-3 py-2 font-semibold" style={{ borderColor: 'var(--cor-alerta)', color: 'var(--cor-tinta)' }}>Tentar novamente</button>
+          </div>}
+          {analise && <div className="mb-4 rounded-lg border px-3 py-2 text-sm" role="status" aria-live="polite" style={{ color: analise.avisos.length ? 'var(--cor-destaque)' : 'var(--cor-ciano)', borderColor: analise.avisos.length ? 'rgba(224,123,26,.35)' : 'rgba(24,214,236,.25)', background: analise.avisos.length ? 'rgba(224,123,26,.08)' : 'rgba(24,214,236,.06)' }}>
+            {analise.locais.length === 0 ? 'Projeto vazio: preencha os dados antes de considerar a análise válida.' : analise.avisos.length ? 'Dados parciais: revise os avisos abaixo antes de concluir a análise.' : 'Dados válidos para este projeto.'}
+          </div>}
 
           {analise && analise.locais.length === 0 && !usuariosSelecionados && (
-            <div className="rounded-2xl border p-7 text-center" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
-              <div className="text-[15px] font-semibold mb-1.5" style={{ color: 'var(--cor-tinta)' }}>Nenhum local cadastrado</div>
+            <div role="status" className="rounded-2xl border p-7 text-center" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
+              <div className="text-[15px] font-semibold mb-1.5" style={{ color: 'var(--cor-tinta)' }}>Sem dados: nenhum local cadastrado</div>
               <div className="text-[13px] leading-relaxed mb-4" style={{ color: 'var(--cor-mutado)' }}>
                 Preencha os dados na tela de planilha (ou importe uma planilha do template) para ver
                 os gráficos e a análise do projeto.
@@ -312,13 +352,20 @@ export default function DashboardPage({ abaInicial = 'Visão Geral' }: Dashboard
                 <CustosTab local={local} categorias={categoriasFiltro} onCategorias={setCategoriasFiltro} />
               )}
               {aba === 'Payback' && local && <PaybackTab local={local} />}
+              {aba === 'Simulador' && <SimuladorTab analise={analise} />}
+              {aba === 'DRE & Sensibilidade' && <DreSensibilidadeTab analise={analise} />}
+              {aba === 'Analytics Avançado' && <AnalyticsAvancadoTab analise={analise} />}
               {aba === 'Insights' && local && <InsightsTab local={local} />}
               {aba === 'Comparativo' && <ComparativoTab projeto={analise.projeto} />}
             </>
           )}
           {analise && usuariosSelecionados && <UsuariosTab />}
-        </main>
+        </div>
       </div>
+      {apresentacaoAtiva && analise && (
+        <ModoApresentacao analise={analise} onFechar={() => setApresentacaoAtiva(false)} />
+      )}
     </AppShell>
+
   )
 }

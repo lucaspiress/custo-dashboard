@@ -440,3 +440,326 @@ def grafico_fluxo_caixa(local: loader.Local, meses: int = 12) -> go.Figure:
     )
     fig.update_yaxes(tickprefix="R$ ", separatethousands=True)
     return fig
+
+
+def grafico_curva_s(locais: list[loader.Local], meses: int = 36) -> go.Figure:
+    curva = analysis.curva_s_investimentos(locais, meses)
+    fig = go.Figure()
+
+    eixo_x = [p["mes"] for p in curva]
+    investimentos = [p["investimento_acumulado"] for p in curva]
+    resultados = [p["resultado_acumulado"] for p in curva]
+
+    fig.add_trace(
+        go.Scatter(
+            x=eixo_x,
+            y=investimentos,
+            mode="lines",
+            name="Investimento Líquido Inicial",
+            line=dict(color=theme.COR["alerta"], width=2, dash="dash"),
+            customdata=[[_fmt_br(v)] for v in investimentos],
+            hovertemplate="Mês %{x}<br>Investimento: <b>%{customdata[0]}</b><extra></extra>",
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=eixo_x,
+            y=resultados,
+            mode="lines+markers",
+            name="Resultado Acumulado (Curva S)",
+            line=dict(color=theme.COR["primaria"], width=3.5, shape="spline"),
+            fill="tozeroy",
+            fillcolor="rgba(16, 160, 160, 0.08)",
+            marker=dict(size=6, color=theme.COR["primaria"]),
+            customdata=[[_fmt_br(v), f"{p['percentual_concluido']}%"] for v, p in zip(resultados, curva)],
+            hovertemplate="Mês %{x}<br>Resultado Acumulado: <b>%{customdata[0]}</b><br>Progresso: %{customdata[1]}<extra></extra>",
+        )
+    )
+
+    fig.update_layout(
+        **_layout("Curva S - Investimento Líquido vs Resultado Acumulado", 440, x_titulo="Meses", y_titulo="Valor (R$)"),
+        showlegend=True,
+    )
+    fig.update_yaxes(tickprefix="R$ ", separatethousands=True)
+    return fig
+
+
+def grafico_pareto_global(locais: list[loader.Local]) -> go.Figure:
+    """Análise ABC 80/20 combinando barras de custo por material + linha de % acumulado."""
+    fig = go.Figure()
+    if not locais:
+        fig.update_layout(**_layout("Análise Pareto Global ABC (80/20)", 440))
+        fig.add_annotation(text="Nenhum local disponível", showarrow=False, font=dict(color=theme.COR["alerta"], size=13))
+        return fig
+
+    totais_por_material: dict[str, float] = {}
+    for local in locais:
+        for item in local.itens:
+            mat = item.material or "Sem descrição"
+            totais_por_material[mat] = totais_por_material.get(mat, 0.0) + item.valor_total
+
+    if not totais_por_material:
+        fig.update_layout(**_layout("Análise Pareto Global ABC (80/20)", 440))
+        fig.add_annotation(text="Nenhum item de custo cadastrado", showarrow=False, font=dict(color=theme.COR["alerta"], size=13))
+        return fig
+
+    materiais_ord = sorted(totais_por_material.items(), key=lambda x: x[1], reverse=True)[:15]
+    total_projeto = sum(totais_por_material.values()) or 1.0
+
+    nomes = [m[0][:40] for m in materiais_ord]
+    valores = [m[1] for m in materiais_ord]
+
+    acumulado = 0.0
+    pct_acumulado = []
+    for val in valores:
+        acumulado += val
+        pct_acumulado.append((acumulado / total_projeto) * 100.0)
+
+    custom_barras = [[_fmt_br(v), f"{(v/total_projeto)*100:.1f}%"] for v in valores]
+
+    fig.add_trace(
+        go.Bar(
+            x=nomes,
+            y=valores,
+            name="Custo Total",
+            marker_color=theme.COR["primaria"],
+            customdata=custom_barras,
+            hovertemplate="<b>%{x}</b><br>Custo: <b>%{customdata[0]}</b> (%{customdata[1]})<extra></extra>",
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=nomes,
+            y=pct_acumulado,
+            name="% Acumulado",
+            yaxis="y2",
+            mode="lines+markers",
+            line=dict(color=theme.COR["destaque"], width=2.5),
+            marker=dict(size=6, color=theme.COR["destaque"]),
+            hovertemplate="<b>%{x}</b><br>Acumulado: <b>%{y:.1f}%</b><extra></extra>",
+        )
+    )
+
+    fig.add_hline(
+        y=80.0,
+        yref="y2",
+        line_dash="dash",
+        line_color=theme.COR["alerta"],
+        line_width=1.5,
+        annotation_text="Corte 80%",
+        annotation_position="top right",
+        annotation_font=dict(color=theme.COR["alerta"], size=11),
+    )
+
+    fig.update_layout(
+        **_layout("Análise Pareto Global ABC (80/20)", 440, x_titulo="Material", y_titulo="Custo Total (R$)")
+    )
+    fig.update_layout(
+        yaxis2=dict(
+            title="% Acumulado",
+            overlaying="y",
+            side="right",
+            range=[0, 105],
+            showgrid=False,
+            ticksuffix="%",
+            tickfont=dict(size=10),
+        ),
+        margin=dict(l=10, r=40, t=56, b=80),
+        showlegend=True,
+    )
+    fig.update_yaxes(tickprefix="R$ ", separatethousands=True)
+    return fig
+
+
+def grafico_scatter_risco_retorno(locais: list[loader.Local]) -> go.Figure:
+    """Matriz Scatter Investimento vs Saldo Mensal (Tamanho: Qtd Itens, Cor: Payback em meses)."""
+    fig = go.Figure()
+    if not locais:
+        fig.update_layout(**_layout("Matriz Risco x Retorno", 440))
+        fig.add_annotation(text="Nenhum local disponível", showarrow=False, font=dict(color=theme.COR["alerta"], size=13))
+        return fig
+
+    nomes = [l.nome for l in locais]
+    investimentos = [l.investimento for l in locais]
+    saldos = [l.saldo_mensal for l in locais]
+    qtd_itens = [len(l.itens) for l in locais]
+    paybacks = [(l.tempo_retorno if l.tempo_retorno is not None else 60.0) for l in locais]
+    paybacks_texto = [f"{l.tempo_retorno:.1f} meses" if l.tempo_retorno is not None else "Inviável" for l in locais]
+
+    max_itens = max(qtd_itens) if (qtd_itens and max(qtd_itens) > 0) else 1
+    tamanhos = [max(12, min(40, (q / max_itens) * 36 + 12)) for q in qtd_itens]
+
+    custom = [[_fmt_br(inv), _fmt_br(sal), q, pb_t] for inv, sal, q, pb_t in zip(investimentos, saldos, qtd_itens, paybacks_texto)]
+
+    fig.add_trace(
+        go.Scatter(
+            x=investimentos,
+            y=saldos,
+            text=nomes,
+            mode="markers+text",
+            textposition="top center",
+            marker=dict(
+                size=tamanhos,
+                color=paybacks,
+                colorscale="Viridis_r",
+                showscale=True,
+                colorbar=dict(title="Payback (m)", ticksuffix=" m"),
+                line=dict(color="#ffffff", width=1.5),
+            ),
+            customdata=custom,
+            hovertemplate="<b>%{text}</b><br>Investimento: <b>%{customdata[0]}</b><br>Saldo Mensal: <b>%{customdata[1]}</b><br>Itens: %{customdata[2]}<br>Payback: <b>%{customdata[3]}</b><extra></extra>",
+        )
+    )
+
+    fig.update_layout(
+        **_layout("Matriz de Risco x Retorno por Local", 440, x_titulo="Investimento Total (R$)", y_titulo="Saldo Mensal (R$)")
+    )
+    fig.update_xaxes(tickprefix="R$ ", separatethousands=True)
+    fig.update_yaxes(tickprefix="R$ ", separatethousands=True)
+    return fig
+
+
+def grafico_gauge_saude(score: float) -> go.Figure:
+    """Velocímetro de Saúde Financeira de 0 a 100."""
+    fig = go.Figure()
+    score_val = max(0.0, min(100.0, float(score or 0)))
+
+    fig.add_trace(
+        go.Indicator(
+            mode="gauge+number",
+            value=score_val,
+            number={"suffix": " pts", "font": {"color": theme.COR["tinta"], "size": 26}},
+            gauge={
+                "axis": {"range": [0, 100], "tickwidth": 1, "tickcolor": theme.COR["mutado"]},
+                "bar": {"color": theme.COR["primaria"]},
+                "bgcolor": theme.COR["elevado"],
+                "borderwidth": 1,
+                "bordercolor": theme.COR["borda"],
+                "steps": [
+                    {"range": [0, 40], "color": "rgba(239, 68, 68, 0.35)"},
+                    {"range": [40, 60], "color": "rgba(224, 123, 26, 0.35)"},
+                    {"range": [60, 80], "color": "rgba(59, 130, 246, 0.35)"},
+                    {"range": [80, 100], "color": "rgba(16, 185, 129, 0.35)"},
+                ],
+                "threshold": {
+                    "line": {"color": theme.COR["sucesso"], "width": 4},
+                    "thickness": 0.75,
+                    "value": score_val,
+                },
+            },
+        )
+    )
+    fig.update_layout(**_layout("Score de Saúde Financeira", 340))
+    fig.update_layout(margin=dict(l=20, r=20, t=50, b=20))
+    return fig
+
+
+def grafico_donut_custos_operacionais(locais: list[loader.Local]) -> go.Figure:
+    """Donut de Distribuição de Custos Operacionais (Softwares, Chips, Terceirização, Manutenção, Mão de Obra)."""
+    fig = go.Figure()
+    if not locais:
+        fig.update_layout(**_layout("Distribuição de Custos Operacionais", 380))
+        fig.add_annotation(text="Nenhum local disponível", showarrow=False, font=dict(color=theme.COR["alerta"], size=13))
+        return fig
+
+    softwares = sum(l.custos_softwares for l in locais)
+    chips = sum(l.chip_mensal for l in locais)
+    terceirizacao = sum(l.mensal_terceirizada for l in locais)
+    manutencao = sum(l.custo_manutencao for l in locais)
+    mao_obra = sum(l.mao_de_obra for l in locais)
+
+    labels = ["Softwares", "Chips M2M", "Terceirização", "Manutenção", "Mão de Obra"]
+    valores = [softwares, chips, terceirizacao, manutencao, mao_obra]
+    custom = [[_fmt_br(v)] for v in valores]
+
+    if sum(valores) == 0:
+        fig.update_layout(**_layout("Distribuição de Custos Operacionais", 380))
+        fig.add_annotation(text="Sem custos operacionais registrados", showarrow=False, font=dict(color=theme.COR["alerta"], size=13))
+        return fig
+
+    fig.add_trace(
+        go.Pie(
+            labels=labels,
+            values=valores,
+            hole=0.5,
+            marker=dict(colors=theme.PALETA_GRAFICOS[:5], line=dict(color=theme.COR["superficie"], width=2)),
+            customdata=custom,
+            hovertemplate="<b>%{label}</b><br>Valor: <b>%{customdata[0]}</b><br>Percentual: %{percent}<extra></extra>",
+            textinfo="percent+label",
+            textfont=dict(size=11),
+        )
+    )
+
+    fig.update_layout(**_layout("Distribuição de Custos Operacionais", 380))
+    return fig
+
+
+def grafico_fluxo_empilhado(locais: list[loader.Local], meses: int = 36) -> go.Figure:
+    """Barras empilhadas de Receita vs Impostos vs Custos vs Saldo."""
+    fig = go.Figure()
+    if not locais or meses <= 0:
+        fig.update_layout(**_layout("Fluxo de Caixa Projetado (Empilhado)", 420))
+        fig.add_annotation(text="Dados insuficientes para projeção", showarrow=False, font=dict(color=theme.COR["alerta"], size=13))
+        return fig
+
+    meses_list = list(range(1, meses + 1))
+    receita_bruta = sum(l.valor_mensal for l in locais)
+    impostos = sum(l.impostos for l in locais)
+    custos = sum(l.custos_fixos for l in locais)
+    saldo = sum(l.saldo_mensal for l in locais)
+
+    fig.add_trace(
+        go.Bar(
+            x=meses_list,
+            y=[impostos] * meses,
+            name="Impostos",
+            marker_color=theme.COR["cinza"],
+            customdata=[[_fmt_br(impostos)]] * meses,
+            hovertemplate="Mês %{x}<br>Impostos: <b>%{customdata[0]}</b><extra></extra>",
+        )
+    )
+
+    fig.add_trace(
+        go.Bar(
+            x=meses_list,
+            y=[custos] * meses,
+            name="Custos Fixos",
+            marker_color=theme.COR["destaque"],
+            customdata=[[_fmt_br(custos)]] * meses,
+            hovertemplate="Mês %{x}<br>Custos Fixos: <b>%{customdata[0]}</b><extra></extra>",
+        )
+    )
+
+    fig.add_trace(
+        go.Bar(
+            x=meses_list,
+            y=[saldo] * meses,
+            name="Saldo Líquido Mensal",
+            marker_color=theme.COR["sucesso"],
+            customdata=[[_fmt_br(saldo)]] * meses,
+            hovertemplate="Mês %{x}<br>Saldo Líquido: <b>%{customdata[0]}</b><extra></extra>",
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=meses_list,
+            y=[receita_bruta] * meses,
+            name="Receita Bruta Total",
+            mode="lines",
+            line=dict(color=theme.COR["primaria"], width=3),
+            customdata=[[_fmt_br(receita_bruta)]] * meses,
+            hovertemplate="Mês %{x}<br>Receita Bruta: <b>%{customdata[0]}</b><extra></extra>",
+        )
+    )
+
+    fig.update_layout(
+        **_layout("Fluxo de Caixa Empilhado", 420, x_titulo="Mês", y_titulo="Valor Mensal (R$)")
+    )
+    fig.update_layout(barmode="stack")
+    fig.update_yaxes(tickprefix="R$ ", separatethousands=True)
+    return fig
+
+

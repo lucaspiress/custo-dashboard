@@ -58,11 +58,13 @@ export default function CustosTab({ local, categorias }: Props) {
             type="text"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
+            aria-label="Buscar material ou código"
             placeholder="Buscar material ou código…"
             className="rounded-lg px-3 py-1.5 text-sm border outline-none w-64"
             style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-superficie)', color: 'var(--cor-tinta)' }}
           />
           <select
+            aria-label="Ordenar itens de equipamento"
             value={ordenacao}
             onChange={(e) => setOrdenacao(e.target.value)}
             className="rounded-lg px-2 py-1.5 text-sm border outline-none"
@@ -78,15 +80,15 @@ export default function CustosTab({ local, categorias }: Props) {
           </span>
         </div>
         <div className="overflow-x-auto rounded-2xl border" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[13px]"><caption className="sr-only">Itens de equipamento do local selecionado</caption>
             <thead>
               <tr className="text-left font-semibold border-b" style={{ color: 'var(--cor-tinta)', borderColor: 'var(--cor-borda)' }}>
-                <th className="px-3 py-2.5">Categoria</th>
-                <th className="px-3 py-2.5">Código</th>
-                <th className="px-3 py-2.5">Material</th>
-                <th className="px-3 py-2.5">Qtd</th>
-                <th className="px-3 py-2.5">Valor unit.</th>
-                <th className="px-3 py-2.5">Valor total</th>
+                <th scope="col" className="px-3 py-2.5">Categoria</th>
+                <th scope="col" className="px-3 py-2.5">Código</th>
+                <th scope="col" className="px-3 py-2.5">Material</th>
+                <th scope="col" className="px-3 py-2.5">Quantidade</th>
+                <th scope="col" className="px-3 py-2.5">Valor unitário (R$)</th>
+                <th scope="col" className="px-3 py-2.5">Valor total (R$)</th>
               </tr>
             </thead>
             <tbody>
@@ -103,7 +105,7 @@ export default function CustosTab({ local, categorias }: Props) {
               {itens.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-3 py-6 text-center" style={{ color: 'var(--cor-mutado)' }}>
-                    Nenhum item encontrado com os filtros atuais.
+                    <span role="status">Nenhum item encontrado com os filtros atuais. Remova um filtro ou ajuste a busca.</span>
                   </td>
                 </tr>
               )}

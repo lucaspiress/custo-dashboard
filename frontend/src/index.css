@@ -754,15 +754,26 @@ select, input {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .kpi-card, .insight-card {
+  .app-surface *, .app-surface *::before, .app-surface *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+  .app-surface .kpi-card, .app-surface .insight-card {
     animation: none !important;
     transition: none !important;
   }
-  .kpi-card:hover, .insight-card:hover { transform: none !important; box-shadow: none !important; }
-  .star, .status-dot, .logo-halo, .logo-icon, .login-card, .submit-btn, .field, .success-ring, .success-state {
-    animation: none !important;
-    transition: none !important;
-  }
-  .skeleton { animation: none !important; }
-  .star { opacity: var(--min-o, 0.15); }
+  .app-surface .kpi-card:hover, .app-surface .insight-card:hover { transform: none !important; box-shadow: none !important; }
+  .app-surface .skeleton { animation: none !important; }
+}
+
+@media (max-width: 640px) {
+  header > div > div:last-child { flex-basis: 100%; flex-shrink: 1; min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
+  header > div > div:last-child > button,
+  header > div > div:last-child > a { min-height: 44px; }
+  .grafico-caixa { overflow-x: auto; }
+  .grafico-caixa > .js-plotly-plot { min-width: 520px; }
+  .kpi-card { min-width: 0; padding: 14px; }
+  .kpi-value { font-size: 18px; overflow-wrap: anywhere; }
 }

@@ -29,6 +29,13 @@ def admin_obrigatorio(usuario: dict = Depends(usuario_atual)) -> dict:
     return usuario
 
 
+def escrita_obrigatoria(usuario: dict = Depends(usuario_atual)) -> dict:
+    if usuario["papel"] not in ("admin", "usuario"):
+        raise HTTPException(status_code=403, detail="Permissão negada. Perfil de apenas leitura.")
+    return usuario
+
+
+
 def pode_acessar_projeto(usuario: dict, projeto: dict) -> bool:
     """Admin e 'usuario' (consultor) acessam qualquer projeto.
     'cliente' só acessa projetos em que cliente_usuario_id == user.id."""

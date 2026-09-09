@@ -67,6 +67,7 @@ const currentRouteInventory: readonly RouteInventoryEntry[] = [
   { path: '/projetos/:id/payback', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
   { path: '/projetos/:id/insights', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
   { path: '/projetos/:id/comparativo', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
+  { path: '/projetos/:id/analytics-avancado', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id'] },
   { path: '/projetos/:id/dados', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET /api/projetos/:id', 'PATCH /api/projetos/:id/locais/:local_id', 'PATCH /api/projetos/itens/:item_id'] },
   { path: '/projetos/:id/datasets', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET/POST /api/projetos/:id/datasets', 'GET/POST /api/datasets/:did/rows'] },
   { path: '/projetos/:id/datasets/:did', authenticated: 'RotaProjeto', unauthenticated: 'Navigate', api: ['GET/PATCH/DELETE /api/projetos/:id/datasets/:did', 'GET/POST /api/datasets/:did/rows'] },

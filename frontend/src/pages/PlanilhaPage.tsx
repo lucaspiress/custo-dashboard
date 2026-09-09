@@ -321,7 +321,10 @@ export default function PlanilhaPage() {
 
     const autosave = criarAutosave<() => Promise<void>>(
       async (salvar) => {
-        if (!aindaAtiva()) return
+        // A flush started during cleanup must be allowed to drain all values
+        // coalesced for the old scope. The save functions guard their result
+        // before updating state, so allowing the request through cannot
+        // mutate the project rendered by the new scope.
         await salvar()
       },
       (estado) => {
@@ -421,9 +424,10 @@ export default function PlanilhaPage() {
   function agendarSalvar(chave: string, salvar: () => Promise<void>) {
     const geracao = geracaoDaRenderizacao
     if (!rotaAindaAtiva(geracao)) return
-    autosaveRef.current?.agendar(chave, async () => {
-      if (rotaAindaAtiva(geracao)) await salvar()
-    })
+    // An already scheduled save may be flushed after the route changes. Its
+    // request is scoped by the captured project/row IDs, while salvarLocal and
+    // salvarItem discard any stale response before touching the new UI.
+    autosaveRef.current?.agendar(chave, salvar)
   }
 
   function ativarCelula(row: number, col: number, escopo: string, tipo: TipoCelula, valor: unknown, onCommit: (v: unknown) => void, meta?: { localId?: number; itemId?: number }) {

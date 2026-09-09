@@ -33,7 +33,7 @@ import SlicerBar from '../components/SlicerBar'
 import PublishDialog from '../components/PublishDialog'
 import ScheduleDialog from '../components/ScheduleDialog'
 import { renderWidget } from '../components/widgets/renderWidget'
-import { construirRotaProjeto, ROTAS_CANONICAS } from '../lib/routes'
+import { construirRotaProjeto, parseProjetoId, ROTAS_CANONICAS } from '../lib/routes'
 
 const ICONE_PLANILHA = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /></svg>
@@ -70,10 +70,12 @@ const AGGREGATIONS: { value: Aggregation; label: string }[] = [
   { value: 'max', label: 'Máximo' },
 ]
 
-export function construirRotaDashboard(projetoId: number, dashboardId?: number): string {
+export function construirRotaDashboard(projetoId: unknown, dashboardId?: unknown): string {
   const base = construirRotaProjeto(ROTAS_CANONICAS.projetoDashboards, projetoId)
   if (!base) return ROTAS_CANONICAS.projetos
-  return dashboardId === undefined ? base : `${base}/${dashboardId}`
+  if (dashboardId === undefined) return base
+  const id = parseProjetoId(dashboardId)
+  return id === null ? base : `${base}/${id}`
 }
 
 type EscopoDashboard = {
@@ -360,8 +362,9 @@ function PainelConfigWidget({
 export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: boolean }) {
   const { id, dbid } = useParams<{ id: string; dbid?: string }>()
   const navigate = useNavigate()
-  const projetoId = Number(id)
-  const chaveEscopo = `${projetoId}:${dbid ?? ''}`
+  const projetoId = parseProjetoId(id)
+  const dashboardId = parseProjetoId(dbid)
+  const chaveEscopo = `${projetoId ?? 'invalido'}:${dashboardId ?? ''}`
   const cicloEscopoRef = useRef({ chave: chaveEscopo, ciclo: 0 })
   if (cicloEscopoRef.current.chave !== chaveEscopo) {
     cicloEscopoRef.current = { chave: chaveEscopo, ciclo: cicloEscopoRef.current.ciclo + 1 }
@@ -380,6 +383,7 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
   const [escopoDatasets, setEscopoDatasets] = useState<number | null>(null)
   const [dashboard, setDashboard] = useState<Dashboard | null>(null)
   const [escopoDashboard, setEscopoDashboard] = useState<EscopoDashboard | null>(null)
+  const [carregandoDashboard, setCarregandoDashboard] = useState(dashboardId !== null)
   const [modo, setModo] = useState<'editar' | 'visualizar'>('visualizar')
   const [widgetSelecionado, setWidgetSelecionado] = useState<Widget | null>(null)
   const [dadosWidgets, setDadosWidgets] = useState<Record<number, any>>({})
@@ -390,6 +394,8 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
   const [carregandoDados, setCarregandoDados] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
+  const [erroDashboardSelecionado, setErroDashboardSelecionado] = useState<EscopoDashboard | null>(null)
+  const [tentativaDashboard, setTentativaDashboard] = useState(0)
   const [modalNovoDashboard, setModalNovoDashboard] = useState(false)
   const [modalNovoWidget, setModalNovoWidget] = useState(false)
   const [modalNovoSlicer, setModalNovoSlicer] = useState(false)
@@ -404,15 +410,24 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
   const [modalPublicar, setModalPublicar] = useState(false)
   const [modalAgendar, setModalAgendar] = useState(false)
   const [publicacaoAtual, setPublicacaoAtual] = useState<Publicacao | null>(null)
+  const consultaRef = useRef(0)
 
   const dashboardRef = useRef(dashboard)
   const escopoRef = useRef(chaveEscopo)
   escopoRef.current = chaveEscopo
   const dashboardAtual = mesmoEscopo(escopoDashboard, escopoAtual) ? dashboard : null
+  const dashboardSelecionadoFalhou = dashboardId !== null && mesmoEscopo(erroDashboardSelecionado, escopoAtual)
+  const dashboardSelecionadoCarregando = dashboardId !== null && (
+    carregandoDashboard || (!mesmoEscopo(escopoDashboard, escopoAtual) && !dashboardSelecionadoFalhou)
+  )
   dashboardRef.current = dashboardAtual
 
-  const dashboardsDoEscopo = escopoDashboards === projetoId ? dashboards : []
-  const datasetsDoEscopo = escopoDatasets === projetoId ? datasets : []
+  const dashboardsDoEscopo = escopoDashboards === projetoId
+    ? dashboards.filter((d) => d.projeto_id === projetoId)
+    : []
+  const datasetsDoEscopo = escopoDatasets === projetoId
+    ? datasets.filter((d) => d.projeto_id === projetoId)
+    : []
   const widgets = useMemo(() => dashboardAtual?.widgets ?? [], [dashboardAtual])
   const slicers = useMemo(() => dashboardAtual?.slicers ?? [], [dashboardAtual])
 
@@ -435,12 +450,18 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
     setEscopoDashboards(null)
     setDatasets([])
     setEscopoDatasets(null)
+    if (projetoId === null) {
+      setCarregando(false)
+      return () => {
+        ativo = false
+      }
+    }
     Promise.all([listarDashboards(projetoId), listarDatasets(projetoId)])
       .then(([dbs, dss]) => {
         if (!ativo) return
-        setDashboards(dbs)
+        setDashboards(dbs.filter((d) => d.projeto_id === projetoId))
         setEscopoDashboards(projetoId)
-        setDatasets(dss)
+        setDatasets(dss.filter((d) => d.projeto_id === projetoId))
         setEscopoDatasets(projetoId)
       })
       .catch((e) => {
@@ -455,7 +476,7 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
   }, [projetoId])
 
   useEffect(() => {
-    const token = escopoAtual
+    const token: EscopoDashboard = { chave: chaveEscopo, ciclo: cicloEscopo }
     setDashboard(null)
     setEscopoDashboard(null)
     setDadosWidgets({})
@@ -468,20 +489,34 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
     setModalNovoDashboard(false)
     setModalNovoWidget(false)
     setModalNovoSlicer(false)
+    setModalPublicar(false)
+    setModalAgendar(false)
     setNomeEditando(null)
     setPublicacaoAtual(null)
-    if (!dbid) {
-      setCarregando(false)
+    setErroDashboardSelecionado(null)
+    setCarregandoDashboard(dashboardId !== null)
+    setCarregandoDados(false)
+    setSalvando(false)
+    setDragId(null)
+    consultaRef.current += 1
+    if (projetoId === null || dashboardId === null) {
       return
     }
     let ativo = true
-    setCarregando(true)
     setErro('')
-    obterDashboard(projetoId, Number(dbid))
+    obterDashboard(projetoId, dashboardId)
       .then((d) => {
-        if (!ativo || !escopoAindaAtual(token) || d.projeto_id !== projetoId) return
+        if (!ativo || !escopoAindaAtual(token)) return
+        if (d.id !== dashboardId || d.projeto_id !== projetoId) {
+          const mensagem = 'O dashboard selecionado não pertence a este projeto.'
+          setErroDashboardSelecionado(token)
+          setErro(mensagem)
+          setCarregandoDashboard(false)
+          return
+        }
         setDashboard(d)
         setEscopoDashboard(token)
+        setErroDashboardSelecionado(null)
         const vals: Record<number, any> = {}
         for (const s of d.slicers ?? []) vals[s.id] = s.tipo === 'lista' ? [] : ['', '']
         setValoresSlicers(vals)
@@ -506,18 +541,39 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
         })
       })
       .catch((e) => {
-        if (ativo && escopoAindaAtual(token)) setErro(e instanceof Error ? e.message : 'Erro ao carregar dashboard.')
+        if (ativo && escopoAindaAtual(token)) {
+          const mensagem = e instanceof Error ? e.message : 'Erro ao carregar dashboard.'
+          setErroDashboardSelecionado(token)
+          setErro(mensagem)
+          setCarregandoDashboard(false)
+        }
       })
       .finally(() => {
-        if (ativo && escopoAindaAtual(token)) setCarregando(false)
+        if (ativo && escopoAindaAtual(token)) setCarregandoDashboard(false)
       })
     return () => {
       ativo = false
     }
-  }, [projetoId, dbid, chaveEscopo, cicloEscopo])
+  }, [projetoId, dashboardId, chaveEscopo, cicloEscopo, tentativaDashboard])
+
+  useEffect(() => {
+    setModo('visualizar')
+  }, [projetoId])
+
+  function tentarCarregarDashboardSelecionado() {
+    if (dashboardId === null) return
+    setDashboard(null)
+    setEscopoDashboard(null)
+    setErroDashboardSelecionado(null)
+    setErro('')
+    setCarregandoDashboard(true)
+    setTentativaDashboard((valor) => valor + 1)
+  }
 
   async function rodarQuery(widgetIds?: number[]) {
     const token = escopoAtual
+    const consulta = consultaRef.current + 1
+    consultaRef.current = consulta
     const d = dashboardRef.current
     if (!d || !escopoAindaAtual(token)) return
     setCarregandoDados(true)
@@ -528,7 +584,7 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
         ? { [String(drillFilter.widgetOrigemId)]: { [drillFilter.campo]: drillFilter.valor } }
         : undefined
       const res = await executarQuery(d.id, ids, valoresSlicers, drill_filters)
-      if (!escopoAindaAtual(token) || dashboardRef.current?.id !== d.id) return
+      if (!escopoAindaAtual(token) || dashboardRef.current?.id !== d.id || consultaRef.current !== consulta) return
       const dados: Record<number, any> = {}
       for (const w of res.widgets) dados[w.widget_id] = w.data
       setDadosWidgets(dados)
@@ -536,9 +592,11 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
       for (const s of res.slicers) opcoes[s.slicer_id] = s.options
       setOpcoesSlicers(opcoes)
     } catch (e) {
-      if (escopoAindaAtual(token)) setErro(e instanceof Error ? e.message : 'Erro ao executar query.')
+      if (escopoAindaAtual(token) && consultaRef.current === consulta) {
+        setErro(e instanceof Error ? e.message : 'Erro ao executar query.')
+      }
     } finally {
-      setCarregandoDados(false)
+      if (escopoAindaAtual(token) && consultaRef.current === consulta) setCarregandoDados(false)
     }
   }
 
@@ -605,21 +663,22 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
           ordem: w.ordem,
         })
       }
-      setModificados(new Set())
+      if (escopoAindaAtual(token) && dashboardRef.current?.id === d.id) setModificados(new Set())
     } catch (e) {
       if (escopoAindaAtual(token)) setErro(e instanceof Error ? e.message : 'Erro ao salvar alterações.')
     } finally {
-      setSalvando(false)
+      if (escopoAindaAtual(token)) setSalvando(false)
     }
   }
 
   async function criarNovoDashboard(nome: string) {
     const token = escopoAtual
+    if (projetoId === null || !escopoAindaAtual(token)) return
     setModalNovoDashboard(false)
     setErro('')
     try {
       const criado = await criarDashboard(projetoId, nome)
-      if (!escopoAindaAtual(token)) return
+      if (!escopoAindaAtual(token) || criado.projeto_id !== projetoId) return
       setDashboards((atual) => [...atual, criado])
       setEscopoDashboards(projetoId)
       navigate(construirRotaDashboard(projetoId, criado.id))
@@ -636,7 +695,7 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
     setErro('')
     try {
       const w = await adicionarWidget(d.id, type, dataset_id, config, { x: 0, y: 0, w: 4, h: 3 })
-      if (!escopoAindaAtual(token) || dashboardRef.current?.id !== d.id) return
+      if (!escopoAindaAtual(token) || dashboardRef.current?.id !== d.id || w.dashboard_id !== d.id) return
       const novoWidgets = [...(dashboardRef.current?.widgets ?? []), w]
       setDashboard((cur) => (cur ? { ...cur, widgets: novoWidgets } : cur))
       await rodarQuery(novoWidgets.map((x) => x.id))
@@ -670,7 +729,7 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
     setErro('')
     try {
       const s = await adicionarSlicer(d.id, dataset_id, field, tipo)
-      if (!escopoAindaAtual(token) || dashboardRef.current?.id !== d.id) return
+      if (!escopoAindaAtual(token) || dashboardRef.current?.id !== d.id || s.dashboard_id !== d.id) return
       setDashboard((cur) => (cur ? { ...cur, slicers: [...(cur.slicers ?? []), s] } : cur))
       setValoresSlicers((v) => ({ ...v, [s.id]: tipo === 'lista' ? [] : ['', ''] }))
       void rodarQuery()
@@ -701,6 +760,7 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
 
   async function salvarNomeDashboard() {
     const token = escopoAtual
+    if (projetoId === null) return
     const d = dashboardRef.current
     if (!d || !escopoAindaAtual(token)) return
     const novo = (nomeEditando ?? d.nome).trim()
@@ -708,7 +768,7 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
     if (!novo || novo === d.nome) return
     try {
       const atualizado = await atualizarDashboard(projetoId, d.id, { nome: novo })
-      if (!escopoAindaAtual(token) || dashboardRef.current?.id !== d.id) return
+      if (!escopoAindaAtual(token) || dashboardRef.current?.id !== d.id || atualizado.id !== d.id || atualizado.projeto_id !== projetoId) return
       setDashboard((cur) => (cur ? { ...cur, nome: atualizado.nome } : cur))
       setDashboards((atual) => atual.map((x) => (x.id === atualizado.id ? { ...x, nome: atualizado.nome } : x)))
     } catch (e) {
@@ -718,11 +778,12 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
 
   async function alternarInterno() {
     const token = escopoAtual
+    if (projetoId === null) return
     const d = dashboardRef.current
     if (!d || !escopoAindaAtual(token)) return
     try {
       const atualizado = await atualizarDashboard(projetoId, d.id, { eh_interno: !d.eh_interno })
-      if (!escopoAindaAtual(token) || dashboardRef.current?.id !== d.id) return
+      if (!escopoAindaAtual(token) || dashboardRef.current?.id !== d.id || atualizado.id !== d.id || atualizado.projeto_id !== projetoId) return
       setDashboard((cur) => (cur ? { ...cur, eh_interno: atualizado.eh_interno } : cur))
       setDashboards((atual) => atual.map((x) => (x.id === atualizado.id ? { ...x, eh_interno: atualizado.eh_interno } : x)))
     } catch (e) {
@@ -732,6 +793,7 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
 
   async function excluirDashboard() {
     const token = escopoAtual
+    if (projetoId === null) return
     const d = dashboardRef.current
     if (!d || !escopoAindaAtual(token)) return
     setErro('')
@@ -752,24 +814,24 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
       titulo="Dashboards"
       acoes={
         <div
-          className="inline-flex rounded-lg p-0.5 border"
+          className="inline-flex max-w-full flex-wrap overflow-x-auto rounded-lg p-0.5 border"
           style={{ borderColor: 'var(--cor-borda)', background: 'var(--cor-elevado)' }}
           role="tablist"
           aria-label="Visualização do projeto"
         >
-          <Link to={rotaDados} role="tab" aria-selected="false" className="h-8 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors hover:text-tinta" style={{ color: 'var(--cor-mutado)' }}>
+          <Link to={rotaDados} role="tab" aria-selected="false" className="h-8 min-h-11 shrink-0 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors hover:text-tinta" style={{ color: 'var(--cor-mutado)' }}>
             {ICONE_PLANILHA}
             Planilha
           </Link>
-          <Link to={rotaVisaoGeral} role="tab" aria-selected="false" className="h-8 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors hover:text-tinta" style={{ color: 'var(--cor-mutado)' }}>
+          <Link to={rotaVisaoGeral} role="tab" aria-selected="false" className="h-8 min-h-11 shrink-0 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors hover:text-tinta" style={{ color: 'var(--cor-mutado)' }}>
             {ICONE_DASHBOARD}
             Dashboard
           </Link>
-          <Link to={rotaDatasets} role="tab" aria-selected="false" className="h-8 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors hover:text-tinta" style={{ color: 'var(--cor-mutado)' }}>
+          <Link to={rotaDatasets} role="tab" aria-selected="false" className="h-8 min-h-11 shrink-0 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors hover:text-tinta" style={{ color: 'var(--cor-mutado)' }}>
             {ICONE_DATASETS}
             Datasets
           </Link>
-          <Link to={rotaDashboards} role="tab" aria-selected="true" className="h-8 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors" style={{ background: 'var(--cor-superficie)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}>
+          <Link to={rotaDashboards} role="tab" aria-selected="true" className="h-8 min-h-11 shrink-0 px-3 rounded-md text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors" style={{ background: 'var(--cor-superficie)', color: 'var(--cor-tinta)', border: '1px solid var(--cor-borda)' }}>
             {ICONE_DASHBOARD}
             Dashboards
           </Link>
@@ -786,11 +848,11 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
           </div>
           <div className="flex flex-col gap-1">
             {carregando && <div className="text-[12.5px] px-1 py-2" style={{ color: 'var(--cor-mutado)' }}>Carregando…</div>}
-            {!carregando && dashboards.length === 0 && (
+            {!carregando && dashboardsDoEscopo.length === 0 && (
               <div className="text-[12.5px] px-1 py-2" style={{ color: 'var(--cor-mutado)' }}>Nenhum dashboard. Clique em “+” para criar.</div>
             )}
             {dashboardsDoEscopo.map((d) => {
-              const selecionado = d.id === Number(dbid)
+              const selecionado = d.id === dashboardId
               return (
                 <button
                   key={d.id}
@@ -811,11 +873,26 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
         </aside>
 
         <div className="flex-1 min-w-0">
-          {!dashboardAtual ? (
+          {dashboardSelecionadoCarregando ? (
             <div className="rounded-2xl border p-10 text-center" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
-              <div className="text-[15px] font-semibold mb-1.5" style={{ color: 'var(--cor-tinta)' }}>Selecione um dashboard</div>
-              <div className="text-[13px]" style={{ color: 'var(--cor-mutado)' }}>Escolha um dashboard na lista ao lado ou crie um novo.</div>
+              <div className="text-[15px] font-semibold mb-1.5" style={{ color: 'var(--cor-tinta)' }}>Carregando dashboard…</div>
+              <div className="text-[13px]" style={{ color: 'var(--cor-mutado)' }}>Aguarde enquanto o dashboard selecionado é carregado.</div>
             </div>
+          ) : !dashboardAtual ? (
+            erro ? (
+              <div role="alert" aria-live="assertive" className="rounded-2xl border p-10 text-center" style={{ background: 'var(--cor-superficie)', borderColor: 'rgba(239,68,68,.35)' }}>
+                <div className="text-[15px] font-semibold mb-1.5" style={{ color: 'var(--cor-alerta)' }}>Não foi possível carregar o dashboard</div>
+                <div className="text-[13px] mb-4" style={{ color: 'var(--cor-mutado)' }}>{erro}</div>
+                {dashboardId !== null && (
+                  <Botao onClick={tentarCarregarDashboardSelecionado}>Tentar novamente</Botao>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-2xl border p-10 text-center" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>
+                <div className="text-[15px] font-semibold mb-1.5" style={{ color: 'var(--cor-tinta)' }}>Selecione um dashboard</div>
+                <div className="text-[13px]" style={{ color: 'var(--cor-mutado)' }}>Escolha um dashboard na lista ao lado ou crie um novo.</div>
+              </div>
+            )
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -965,7 +1042,7 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
         {modo === 'editar' && widgetSelecionado && (
           <PainelConfigWidget
             widget={widgetSelecionado}
-            datasets={datasets}
+            datasets={datasetsDoEscopo}
             onDataset={(wid, dataset_id) => atualizarWidgetLocal(wid, { dataset_id })}
             onConfig={atualizarConfig}
             onFechar={() => setWidgetSelecionado(null)}
@@ -979,10 +1056,10 @@ export default function DashboardBuilderPage({ readOnly = false }: { readOnly?: 
         <ModalNovoDashboard aoSalvar={(nome) => void criarNovoDashboard(nome)} aoCancelar={() => setModalNovoDashboard(false)} />
       )}
       {modalNovoWidget && (
-        <ModalNovoWidget datasets={datasets} aoSalvar={(t, d, c) => void criarNovoWidget(t, d, c)} aoCancelar={() => setModalNovoWidget(false)} />
+        <ModalNovoWidget datasets={datasetsDoEscopo} aoSalvar={(t, d, c) => void criarNovoWidget(t, d, c)} aoCancelar={() => setModalNovoWidget(false)} />
       )}
       {modalNovoSlicer && (
-        <ModalNovoSlicer datasets={datasets} aoSalvar={(d, f, t) => void criarNovoSlicer(d, f, t)} aoCancelar={() => setModalNovoSlicer(false)} />
+        <ModalNovoSlicer datasets={datasetsDoEscopo} aoSalvar={(d, f, t) => void criarNovoSlicer(d, f, t)} aoCancelar={() => setModalNovoSlicer(false)} />
       )}
       {modalPublicar && dashboardAtual && (
         <PublishDialog

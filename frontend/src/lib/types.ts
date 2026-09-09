@@ -6,6 +6,16 @@ export interface Usuario {
   ativo: boolean
 }
 
+export interface Cenario {
+  id?: number
+  projeto_id?: number
+  nome: string
+  variacao_mensal: number
+  variacao_instalacao: number
+  criado_em?: string
+}
+
+
 export interface ResumoLocal {
   local: string
   valor_mensal: number

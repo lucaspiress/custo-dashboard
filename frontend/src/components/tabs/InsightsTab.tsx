@@ -7,13 +7,14 @@ interface Props {
 
 export default function InsightsTab({ local }: Props) {
   if (local.insights.length === 0) {
-    return <div className="text-sm text-mutado">Nenhum insight gerado para este local.</div>
+    return <div role="status" className="rounded-xl border p-5 text-sm text-mutado" style={{ background: 'var(--cor-superficie)', borderColor: 'var(--cor-borda)' }}>Não há evidência suficiente para gerar insights para este local.</div>
   }
   return (
-    <div>
+    <section aria-labelledby="titulo-insights">
+      <h2 id="titulo-insights" className="text-[15px] font-semibold mb-3" style={{ color: 'var(--cor-tinta)' }}>Pontos de atenção</h2>
       {local.insights.map((insight, indice) => (
         <InsightCard key={indice} severidade={insight.severidade} texto={insight.texto} atraso={indice * 60} />
       ))}
-    </div>
+    </section>
   )
 }

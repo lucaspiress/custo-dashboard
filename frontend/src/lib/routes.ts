@@ -13,6 +13,7 @@ export const ROTAS_CANONICAS = {
   projetoPayback: '/projetos/:id/payback',
   projetoInsights: '/projetos/:id/insights',
   projetoComparativo: '/projetos/:id/comparativo',
+  projetoAnalyticsAvancado: '/projetos/:id/analytics-avancado',
   projetoDados: '/projetos/:id/dados',
   projetoDatasets: '/projetos/:id/datasets',
   projetoDataset: '/projetos/:id/datasets/:did',
@@ -65,6 +66,11 @@ export const METADADOS_ROTAS = {
     requiredContext: ['id'],
   },
   [ROTAS_CANONICAS.projetoComparativo]: {
+    auth: 'authenticated',
+    projectScoped: true,
+    requiredContext: ['id'],
+  },
+  [ROTAS_CANONICAS.projetoAnalyticsAvancado]: {
     auth: 'authenticated',
     projectScoped: true,
     requiredContext: ['id'],

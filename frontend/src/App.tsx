@@ -18,11 +18,15 @@ function RedirecionarLegado({ alias }: { alias: keyof typeof ALIASES_ROTAS }) {
   return <Navigate to={obterDestinoAlias(alias, id) ?? ROTA_FALLBACK} replace />
 }
 
-function RotaProjeto({ children, adminOnly = false }: { children: ReactElement; adminOnly?: boolean }) {
-  const { id } = useParams<{ id: string }>()
+function RotaProjeto({ children, adminOnly = false, dashboardOnly = false }: { children: ReactElement; adminOnly?: boolean; dashboardOnly?: boolean }) {
+  const { id, dbid } = useParams<{ id: string; dbid?: string }>()
   const { usuario } = useAuth()
 
-  if (parseProjetoId(id) === null || (adminOnly && usuario?.papel !== 'admin')) {
+  if (
+    parseProjetoId(id) === null ||
+    (dashboardOnly && parseProjetoId(dbid) === null) ||
+    (adminOnly && usuario?.papel !== 'admin')
+  ) {
     return <Navigate to={ROTA_FALLBACK} replace />
   }
 
@@ -77,11 +81,12 @@ function Rotas() {
         <Route path={ROTAS_CANONICAS.projetoPayback} element={usuario ? <RotaProjeto><DashboardPage abaInicial="Payback" /></RotaProjeto> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.projetoInsights} element={usuario ? <RotaProjeto><DashboardPage abaInicial="Insights" /></RotaProjeto> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.projetoComparativo} element={usuario ? <RotaProjeto><DashboardPage abaInicial="Comparativo" /></RotaProjeto> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoAnalyticsAvancado} element={usuario ? <RotaProjeto><DashboardPage abaInicial="Analytics Avançado" /></RotaProjeto> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.projetoDados} element={usuario ? <RotaProjeto><PlanilhaPage /></RotaProjeto> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.projetoDatasets} element={usuario ? <RotaProjeto><DatasetsPage /></RotaProjeto> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.projetoDataset} element={usuario ? <RotaProjeto><DatasetsPage /></RotaProjeto> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.projetoDashboards} element={usuario ? <RotaProjeto><DashboardBuilderPage /></RotaProjeto> : <Navigate to="/login" replace />} />
-        <Route path={ROTAS_CANONICAS.projetoDashboard} element={usuario ? <RotaProjeto><DashboardBuilderPage /></RotaProjeto> : <Navigate to="/login" replace />} />
+        <Route path={ROTAS_CANONICAS.projetoDashboard} element={usuario ? <RotaProjeto dashboardOnly><DashboardBuilderPage /></RotaProjeto> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.projetoUsuarios} element={usuario ? <RotaProjeto adminOnly><DashboardPage abaInicial="Usuários" /></RotaProjeto> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.compartilhados} element={usuario ? <CompartilhadosPage /> : <Navigate to="/login" replace />} />
         <Route path={ROTAS_CANONICAS.relatorios} element={usuario ? <RelatoriosPage /> : <Navigate to="/login" replace />} />
